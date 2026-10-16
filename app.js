@@ -435,7 +435,7 @@ async function loadAdminMatches() {
   }
   const reviewCount = adminMatchesCache.filter(m => m.needs_review).length;
   const isOpen=m=>m.predictions_enabled&&m.match_status==='scheduled'&&!m.actual_start&&!m.needs_review&&m.start_time_confirmed&&Date.parse(m.scheduled_start)>Date.now();
-  const visible=adminMatchesCache.filter(m=>adminShowAllMatches||isOpen(m));
+  const visible=adminMatchesCache.filter(m=>adminShowAllMatches||isOpen(m)||(m.home_score==null&&m.away_score==null&&['scheduled','live'].includes(m.match_status)&&(Date.parse(m.actual_start)<=Date.now()||Date.parse(m.scheduled_start)<=Date.now())));
   const rows = visible.map(m => {
     const start = m.scheduled_start ? fmt(m.scheduled_start) : 'Onbekend';
     const lockedForEdit = m.match_status !== 'scheduled' ||
@@ -449,7 +449,7 @@ async function loadAdminMatches() {
       <td>${esc(start)}</td>
       <td>${m.start_time_confirmed ? 'Bevestigd' : 'Niet bevestigd'}</td>
       <td>${m.needs_review ? 'Controle nodig' : 'Gecontroleerd'}</td>
-      <td>${isOpen(m) ? 'Open' : 'Gesloten'}</td><td class="result-column">${m.home_score!=null?esc(m.home_score)+'–'+esc(m.away_score):'—'}</td>
+      <td>${isOpen(m)?'Voorspellen open':m.home_score!=null?'Afgerond':canRecordAdminResult(m)?'Uitslag nodig':'Voorspellen gesloten'}</td><td class="result-column">${m.home_score!=null?esc(m.home_score)+'–'+esc(m.away_score):'—'}</td>
       <td>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn secondary" data-edit-match="${esc(m.match_id)}"
@@ -473,7 +473,7 @@ async function loadAdminMatches() {
       </td>
     </tr>`;
   }).join('');
-  target.innerHTML = `<p class="muted mini">${resultResponse.error?'Uitslagen laden mislukt: '+esc(resultResponse.error.message)+'. ':''}${visible.length} van ${adminMatchesCache.length} wedstrijden. ${reviewCount} vereisen controle.</p><label class="choice"><input type="checkbox" id="admin-show-all" ${adminShowAllMatches?'checked':''}>Toon alle wedstrijden</label>${!visible.length?'<p>Geen open wedstrijden.</p>':''}
+  target.innerHTML = `<p class="muted mini">${resultResponse.error?'Uitslagen laden mislukt: '+esc(resultResponse.error.message)+'. ':''}Nog af te handelen · ${visible.length} van ${adminMatchesCache.length} wedstrijden. ${reviewCount} vereisen controle.</p><label class="choice"><input type="checkbox" id="admin-show-all" ${adminShowAllMatches?'checked':''}>Toon alle wedstrijden</label>${!visible.length?'<p>Geen wedstrijden om af te handelen.</p>':''}
   <table><thead><tr><th>Toernooi</th><th>Speler 1</th><th>Speler 2</th><th>Ronde</th><th>Starttijd</th><th>Starttijdstatus</th><th>Controle</th><th>Voorspellen</th><th class="result-column">Uitslag</th><th>Actie</th></tr></thead>
   <tbody>${rows}</tbody></table>`;
   target.querySelector('#admin-show-all').onchange=e=>{adminShowAllMatches=e.target.checked;loadAdminMatches();};

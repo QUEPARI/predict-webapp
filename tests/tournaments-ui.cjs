@@ -2,7 +2,7 @@
 const {chromium}=require('playwright');
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
 (async()=>{
-  const files={'/':'index.html','/app.js':'app.js','/pool-comparison.js':'pool-comparison.js','/knockout.js':'knockout.js','/tournament-management.js':'tournament-management.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'};
+  const files={'/':'index.html','/app.js':'app.js','/pool-comparison.js':'pool-comparison.js','/bracket.js':'bracket.js','/knockout.js':'knockout.js','/tournament-management.js':'tournament-management.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'};
   const server=http.createServer((req,res)=>{
     const file=files[req.url];if(!file){res.writeHead(404).end();return;}
     res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');
@@ -36,6 +36,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
         },
         async rpc(name,args){
           window.qaCalls.push({name,args});
+          if(name==='get_tournament_prediction_counts')return {data:{server_now:'2026-10-16T14:00:00Z',next_deadline:'2026-10-16T14:01:00Z',tournaments:[{id:'tour',open_count:49,remaining_count:48}]}};
           if(name==='join_tournament'){window.qaJoined=true;return {data:'tour'};}
           if(name==='get_my_match_points')return {data:[{match_id:'match-2',earned_points:1}]};
           if(name==='submit_match_prediction'){
@@ -51,15 +52,15 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
     await page.getByText('Je doet nog niet mee aan een toernooi.',{exact:false}).waitFor();
     await page.getByRole('button',{name:'Toernooien',exact:true}).click();
-    await page.getByRole('button',{name:'Bekijk toernooi'}).click();
+    await page.getByText('49 wedstrijden open om te voorspellen',{exact:true}).waitFor();await page.getByRole('button',{name:'Bekijk toernooi'}).click();
     await page.getByRole('button',{name:'Deelnemen aan dit toernooi'}).waitFor();
     assert.equal(await page.locator('[data-online-predict]').count(),0,'Nonparticipant cannot submit');
     assert.equal(await page.locator('#online-tournaments img').count(),0,'Names escaped');
     await page.getByRole('button',{name:'Deelnemen aan dit toernooi'}).click();
     await page.getByText('Je neemt nu deel aan dit toernooi.').waitFor();
     await page.getByText('Je doet mee · Punten uit afgeronde wedstrijden: 1.',{exact:false}).waitFor();
-    const card=page.locator('[data-online-match="match-0"]');
-    await card.locator('[name="home"]').fill('6');await card.locator('[name="away"]').fill('6');
+    await page.getByRole('button',{name:'Spelregels & puntentelling',exact:true}).click();await page.getByRole('heading',{name:'Spelregels & puntentelling'}).waitFor();assert((await page.locator('[data-detail-panel=rules]').textContent()).includes('first-to 6'));assert.equal(await page.locator('.match-rules').count(),0);await page.getByRole('button',{name:'Voorspellingen',exact:true}).click();const card=page.locator('[data-online-match="match-0"]');
+    assert(await page.locator('.nav').evaluate(e=>getComputedStyle(e).position==='static'&&e.getBoundingClientRect().top<document.querySelector('#online-tournaments').getBoundingClientRect().top),'Mobile menu above content');await card.locator('[name="home"]').fill('6');await card.locator('[name="away"]').fill('6');
     await card.getByRole('button').click();
     await card.getByText('Vul een geldige eindstand voor dit wedstrijdformaat in.').waitFor();
     assert.equal(await page.evaluate(()=>window.qaCalls.filter(c=>c.name==='submit_match_prediction').length),0);
