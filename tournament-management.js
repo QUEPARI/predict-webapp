@@ -1,4 +1,4 @@
-import {dutchInput,dutchToUTC,dutchTime} from './knockout.js';
+import {dutchInput,dutchToUTC,dutchTime} from './knockout.js?v=daily-20261016';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const labels={draft:'Concept',published:'Gepubliceerd',active:'Actief',completed:'Afgerond',archived:'Gepauzeerd / archief'};
 export async function loadTournamentManagement(target,ctx){
@@ -40,15 +40,16 @@ export async function loadTournamentManagement(target,ctx){
 export async function loadChampionPrediction(target,ctx,id,joined){
  const alive=()=>target.isConnected&&!ctx.signal.aborted&&ctx.isCurrent();
  try{const r=await ctx.supabase.rpc('get_champion_prediction',{p_id:id});if(!alive())return;if(r.error)throw r.error;const data=r.data;
-  if(!data?.enabled){target.textContent='Er is nog geen voorspelling voor de toernooiwinnaar ingesteld.';return;}
+  if(!data?.enabled){target.textContent='Er is nog geen voorspelling voor de toernooiwinnaar ingesteld.';return data||{enabled:false};}
   const offset=Date.parse(data.server_now)-Date.now();let opened=!!data.open&&joined,saving=false,timer;
-  target.innerHTML=`<h2>Wie wint het toernooi?</h2><p>${data.points} bonuspunten · Sluit ${esc(dutchTime(data.deadline))}</p>${data.winner?`<p>Winnaar: ${esc(data.winner)} · Jouw bonus: ${data.earned_points} punten</p>`:''}<form class="stack"><label>Jouw toernooiwinnaar<select name="choice"><option value="">Kies speler of team</option>${data.choices.map(x=>`<option ${x===data.mine?'selected':''}>${esc(x)}</option>`).join('')}</select></label><p data-state role="status">${data.mine?'Opgeslagen: '+esc(data.mine):'Nog niet voorspeld.'}</p><button class="btn">Winnaarsvoorspelling opslaan</button></form><p>${joined?'Deze voorspelling telt voor het toernooi en je bijbehorende poules.':'Neem eerst deel aan dit toernooi.'}</p>`;
+  target.innerHTML=`<h2>Wie wint het toernooi?</h2><p>${data.points} bonuspunten · Sluit ${esc(new Intl.DateTimeFormat('nl-NL',{dateStyle:'short',timeStyle:'short'}).format(new Date(data.deadline)))}</p>${data.winner?`<p>Winnaar: ${esc(data.winner)} · Jouw bonus: ${data.earned_points} punten</p>`:''}<form class="stack"><label>Jouw toernooiwinnaar<select name="choice"><option value="">Kies speler of team</option>${data.choices.map(x=>`<option ${x===data.mine?'selected':''}>${esc(x)}</option>`).join('')}</select></label><p data-state role="status">${data.mine?'Opgeslagen: '+esc(data.mine):'Nog niet voorspeld.'}</p><button class="btn">Winnaarsvoorspelling opslaan</button></form><p>${joined?'Deze voorspelling telt voor het toernooi en je bijbehorende poules.':'Neem eerst deel aan dit toernooi.'}</p>`;
   const f=target.querySelector('form'),message=target.querySelector('[data-state]');
-  function expire(){if(!alive()){clearInterval(timer);return;}opened=!!data.open&&joined&&Date.now()+offset<Date.parse(data.deadline);f.querySelectorAll('select,button').forEach(x=>x.disabled=!opened||saving);if(!opened)message.textContent=(data.mine?'Opgeslagen: '+data.mine+'. ':'')+'Voorspellen gesloten.';}
+  function expire(){if(!alive()){clearInterval(timer);return;}opened=!!data.open&&joined&&Date.now()+offset<Date.parse(data.deadline);f.querySelectorAll('select,button').forEach(x=>x.disabled=!opened||saving);if(!opened)message.textContent=(data.mine?'Opgeslagen: '+data.mine+'. ':'Niet voorspeld. ')+'Voorspellen gesloten.';}
   expire();timer=setInterval(expire,1000);ctx.signal.addEventListener('abort',()=>clearInterval(timer),{once:true});
   f.onchange=()=>{if(opened)target.dataset.koDirty='true';};
   f.onsubmit=async e=>{e.preventDefault();expire();if(!opened)return;const choice=f.elements.choice.value;if(!choice){message.textContent='Kies een speler of team.';return;}saving=true;f.querySelectorAll('select,button').forEach(x=>x.disabled=true);
    try{const r=await ctx.supabase.rpc('submit_champion_prediction',{p_id:id,p_choice:choice});if(!alive())return;if(r.error)throw r.error;data.mine=choice;target.dataset.koDirty='false';message.textContent='Opgeslagen: '+choice;}catch(error){if(alive())message.textContent=error.message;}finally{saving=false;if(alive()){opened=!!data.open&&joined&&Date.now()+offset<Date.parse(data.deadline);f.querySelectorAll('select,button').forEach(x=>x.disabled=!opened);}}
   };
+ return data;
  }catch(error){if(alive())target.textContent='Winnaarsvraag laden mislukt: '+error.message;}
 }
