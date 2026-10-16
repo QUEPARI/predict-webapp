@@ -1331,27 +1331,201 @@ async function loadPublicLeaderboard() {
   const isAdmin=['admin','super_admin'].includes(currentRole);
   const available=(tours.data||[]).filter(t=>isAdmin||joined.has(t.id));
   if (!available.length) {target.textContent='Nog geen toegankelijke toernooien.';return;}
-  target.innerHTML='<label for="lb-tour">Toernooi</label><select id="lb-tour">'+available.map(t=>'<option value="'+esc(t.id)+'">'+esc(t.name)+'</option>').join('')+'</select><label for="lb-round">Ronde</label><select id="lb-round"><option value="">Alle rondes</option></select><div class="table-wrap" id="lb-data">Laden...</div><button class="btn secondary" id="lb-refresh" type="button">Vernieuwen</button>';
-  const tour=target.querySelector('#lb-tour'),round=target.querySelector('#lb-round'),results=target.querySelector('#lb-data');
+  target.innerHTML='<label for="lb-tour">Toernooi</label><select id="lb-tour">'+available.map(t=>'<option value="'+esc(t.id)+'">'+esc(t.name)+'</option>').join('')+'</select><label for="lb-pool">Poule</label><select id="lb-pool"><option value="">Alle deelnemers</option></select><label for="lb-round">Ronde</label><select id="lb-round"><option value="">Alle rondes</option></select><div class="table-wrap" id="lb-data">Laden...</div><button class="btn secondary" id="lb-refresh" type="button">Vernieuwen</button>';
+  const tour=target.querySelector('#lb-tour'),pool=target.querySelector('#lb-pool'),round=target.querySelector('#lb-round'),results=target.querySelector('#lb-data');
   let generation=0;
   async function loadRounds() {
     const g=++generation;
     round.innerHTML='<option value="">Alle rondes</option>';
-    const {data,error}=await supabase.from('tournament_rounds').select('id,name').eq('tournament_id',tour.value).order('round_order');
+    pool.innerHTML='<option value="">Alle deelnemers</option>';
+    const [{data,error},poolResponse]=await Promise.all([
+      supabase.from('tournament_rounds').select('id,name').eq('tournament_id',tour.value).order('round_order'),
+      supabase.from('pools').select('id,name').eq('tournament_id',tour.value).order('name')
+    ]);
     if (!target.isConnected||g!==generation)return;
+    if (error||poolResponse.error) {results.textContent='Filters laden mislukt. Kies het toernooi opnieuw.';return;}
+    (poolResponse.data||[]).forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;pool.add(o);});
     if (!error) (data||[]).forEach(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.name;round.add(o);});
     await loadRows();
   }
   async function loadRows() {
     const g=++generation;
     results.textContent='Klassement laden...';
-    const {data,error}=await supabase.rpc('get_tournament_leaderboard',{p_tournament_id:tour.value,p_pool_id:null,p_round_id:round.value||null});
+    const {data,error}=await supabase.rpc('get_tournament_leaderboard',{p_tournament_id:tour.value,p_pool_id:pool.value||null,p_round_id:round.value||null});
     if (!target.isConnected||g!==generation)return;
     if (error) {results.textContent='Klassement ophalen mislukt: '+error.message;return;}
     results.innerHTML=(data||[]).length?'<table><thead><tr><th>#</th><th>Gebruiker</th><th>Punten</th><th>Winnaars</th></tr></thead><tbody>'+(data||[]).map(r=>'<tr><td>'+r.rank_position+'</td><td>'+esc(r.display_name)+(r.user_id===currentUser.id?' (jij)':'')+'</td><td>'+r.earned_points+'</td><td>'+r.correct_winners+'</td></tr>').join('')+'</tbody></table>':'Nog geen deelnemers.';
   }
   tour.onchange=loadRounds;
   round.onchange=loadRows;
+  pool.onchange=loadRows;
   target.querySelector('#lb-refresh').onclick=loadRows;
   await loadRounds();
+}
+
+// Online privépoules replace the old local-only demonstration on this tab.
+pools = function () {
+  return `<h1>Mijn privépoules</h1><p class="sub">Iedere poule hoort bij één toernooi.
+    Je centrale voorspellingen tellen in iedere poule mee, ook als je later lid wordt.</p>
+    <div id="private-pools" class="stack" role="region" aria-label="Privépoules">Poules laden...</div>`;
+};
+const renderBeforePrivatePools = render;
+render = function () {
+  renderBeforePrivatePools();
+  if (currentUser && !state.tournament && state.tab === 'pools') {
+    const badge = document.querySelector('.top .badge');
+    if (badge) badge.textContent = 'ONLINE';
+    const footer = document.querySelector('.footer');
+    if (footer) footer.textContent = 'Predict · Privépoules en klassementen uit Supabase';
+    loadPrivatePools();
+  }
+};
+
+async function loadPrivatePools() {
+  const target = document.getElementById('private-pools');
+  if (!target || !currentUser) return;
+  const userId = currentUser.id;
+  const [memberships, poolResponse, tournamentsResponse] = await Promise.all([
+    supabase.from('pool_members').select('pool_id').eq('user_id', userId),
+    supabase.from('pools').select('id,name,tournament_id,owner_id').order('name'),
+    supabase.from('tournaments').select('id,name,status').order('name')
+  ]);
+  if (!target.isConnected || currentUser?.id !== userId) return;
+  const failure = memberships.error || poolResponse.error || tournamentsResponse.error;
+  if (failure) {
+    target.textContent = 'Poules laden mislukt: ' + failure.message;
+    const retry = document.createElement('button'); retry.className = 'btn secondary';
+    retry.textContent = 'Opnieuw proberen'; retry.onclick = loadPrivatePools; target.append(retry);
+    return;
+  }
+  const ids = new Set((memberships.data || []).map(m => m.pool_id));
+  const mine = (poolResponse.data || []).filter(p => ids.has(p.id));
+  const tournamentsById = new Map((tournamentsResponse.data || []).map(t => [t.id, t]));
+  const openTours = (tournamentsResponse.data || []).filter(t => ['published','active'].includes(t.status));
+  target.innerHTML = `<p id="pool-message" role="status"></p>
+    <div class="grid">${mine.length ? mine.map(p => `<article class="panel stack">
+      <h2>${esc(p.name)}</h2><div class="muted">${esc(tournamentsById.get(p.tournament_id)?.name || 'Toernooi')}</div>
+      <div>${p.owner_id === userId ? 'Jij beheert deze poule' : 'Pouledeelnemer'}</div>
+      <button class="btn secondary" data-pool-detail="${esc(p.id)}">Leden en klassement</button>
+    </article>`).join('') : '<p>Je bent nog geen lid van een privépoule.</p>'}</div>
+    <form id="private-create-form" class="panel stack"><h2>Poule aanmaken</h2>
+      <label for="private-pool-name">Poulenaam</label><input id="private-pool-name" required minlength="2" maxlength="80">
+      <label for="private-pool-tournament">Toernooi</label><select id="private-pool-tournament" required>
+      ${openTours.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select>
+      <p class="hint">Je wordt automatisch deelnemer van het toernooi en beheerder van de poule.</p>
+      <button class="btn" ${openTours.length ? '' : 'disabled'}>Poule aanmaken</button>
+    </form>
+    <form id="private-accept-form" class="panel stack"><h2>Uitnodiging accepteren</h2>
+      <label for="private-invite-code">Uitnodigingscode</label><input id="private-invite-code" required pattern="[0-9a-f]{64}" maxlength="64" autocomplete="off" spellcheck="false">
+      <p class="hint">Log in met het bevestigde e-mailadres waarvoor je bent uitgenodigd. Een code is zeven dagen geldig en eenmalig bruikbaar.</p>
+      <button class="btn">Lid worden</button>
+    </form><div id="private-pool-detail" class="stack"></div>`;
+  const message = target.querySelector('#pool-message');
+  async function submit(form, rpc, args) {
+    const button = form.querySelector('button'); button.disabled = true; message.textContent = 'Bezig...';
+    try {
+      const {error} = await supabase.rpc(rpc, args);
+      if (!target.isConnected || currentUser?.id !== userId) return;
+      if (error) {message.textContent = error.message; return;}
+      await loadPrivatePools();
+    } catch {if (target.isConnected) message.textContent = 'Verbinding mislukt. Probeer opnieuw.';}
+    finally {if (button.isConnected) button.disabled = false;}
+  }
+  const create = target.querySelector('#private-create-form');
+  create.onsubmit = event => {event.preventDefault(); submit(create,'create_pool', {
+    p_tournament_id: target.querySelector('#private-pool-tournament').value,
+    p_name: target.querySelector('#private-pool-name').value.trim()
+  });};
+  const accept = target.querySelector('#private-accept-form');
+  accept.onsubmit = event => {event.preventDefault(); submit(accept,'accept_pool_invitation', {
+    p_token: target.querySelector('#private-invite-code').value.trim()
+  });};
+  target.querySelectorAll('[data-pool-detail]').forEach(button => {
+    button.onclick = () => loadPrivatePoolDetail(mine.find(p => p.id === button.dataset.poolDetail));
+  });
+}
+
+async function loadPrivatePoolDetail(pool) {
+  const host = document.getElementById('private-pool-detail');
+  if (!pool || !host || !currentUser) return;
+  // A new element invalidates outstanding requests from a previously selected pool.
+  const target = document.createElement('div'); target.className = 'panel stack';
+  host.replaceChildren(target); target.textContent = 'Leden en klassement laden...';
+  const userId = currentUser.id;
+  const owner = pool.owner_id === userId;
+  const [members, rows, rounds] = await Promise.all([
+    supabase.from('pool_members').select('user_id').eq('pool_id',pool.id),
+    supabase.rpc('get_tournament_leaderboard',{p_tournament_id:pool.tournament_id,p_pool_id:pool.id,p_round_id:null}),
+    supabase.from('tournament_rounds').select('id,name').eq('tournament_id',pool.tournament_id).order('round_order')
+  ]);
+  if (!target.isConnected || currentUser?.id !== userId) return;
+  if (members.error || rows.error || rounds.error) {
+    target.textContent = 'Poule laden mislukt: ' + (members.error || rows.error || rounds.error).message; return;
+  }
+  const names = new Map((rows.data || []).map(r => [r.user_id,r.display_name]));
+  target.innerHTML = `<h2>${esc(pool.name)}</h2><p id="private-detail-message" role="status"></p>
+    <h3>Leden (${members.data.length})</h3><ul>${members.data.map(m => `<li>
+      ${esc(names.get(m.user_id) || 'Gebruiker')}${m.user_id === pool.owner_id ? ' (beheerder)' : ''}
+      ${owner && m.user_id !== userId ? `<button class="ghost" data-remove-member="${esc(m.user_id)}">Verwijderen</button>
+        <button class="ghost" data-transfer-member="${esc(m.user_id)}">Beheer overdragen</button>` : ''}</li>`).join('')}</ul>
+    <label for="private-pool-round">Klassement per ronde</label><select id="private-pool-round"><option value="">Alle rondes</option>
+      ${rounds.data.map(r => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('')}</select>
+    <div id="private-pool-ranking" class="table-wrap" role="status"></div>
+    ${owner ? `<form id="private-invite-form" class="stack"><h3>Lid uitnodigen</h3>
+      <label for="private-invite-email">E-mailadres</label><input id="private-invite-email" type="email" required maxlength="254" autocomplete="off">
+      <button class="btn">Uitnodigingscode maken</button>
+      <p class="hint">Deel de code zelf met de bedoelde ontvanger. Die heeft een bestaand Predict-account nodig.
+      Een nieuwe code voor hetzelfde adres maakt de vorige ongeldig.</p>
+      <div id="private-invite-result" role="status"></div></form>
+      <button class="btn secondary" id="private-revoke">Alle openstaande uitnodigingen intrekken</button>` :
+      '<button class="btn secondary" id="private-leave">Poule verlaten</button>'}`;
+  const message = target.querySelector('#private-detail-message');
+  const ranking = target.querySelector('#private-pool-ranking');
+  function showRanking(data) {
+    ranking.innerHTML = data.length ? `<table><thead><tr><th>#</th><th>Gebruiker</th><th>Punten</th><th>Winnaars</th></tr></thead>
+      <tbody>${data.map(r => `<tr><td>${esc(r.rank_position)}</td><td>${esc(r.display_name)}${r.user_id === userId ? ' (jij)' : ''}</td>
+        <td>${esc(r.earned_points)}</td><td>${esc(r.correct_winners)}</td></tr>`).join('')}</tbody></table>` : 'Nog geen deelnemers.';
+  }
+  showRanking(rows.data || []);
+  let generation = 0;
+  target.querySelector('#private-pool-round').onchange = async event => {
+    const g = ++generation; ranking.textContent = 'Klassement laden...';
+    const {data,error} = await supabase.rpc('get_tournament_leaderboard',{
+      p_tournament_id:pool.tournament_id,p_pool_id:pool.id,p_round_id:event.target.value || null
+    });
+    if (!target.isConnected || g !== generation) return;
+    if (error) ranking.textContent = error.message; else showRanking(data || []);
+  };
+  async function manage(action, member, button) {
+    if (!confirm(action === 'transfer' ? 'Poulebeheer overdragen aan dit lid?' :
+      action === 'remove' ? 'Dit lid uit de poule verwijderen?' :
+      action === 'revoke' ? 'Alle openstaande uitnodigingen intrekken?' : 'Deze poule verlaten?')) return;
+    button.disabled = true;
+    try {
+      const {error} = await supabase.rpc('manage_pool_member',{p_pool_id:pool.id,p_user_id:member,p_action:action});
+      if (!target.isConnected) return;
+      if (error) message.textContent = error.message; else await loadPrivatePools();
+    } catch {if (target.isConnected) message.textContent = 'Verbinding mislukt. Probeer opnieuw.';}
+    finally {if (button.isConnected) button.disabled = false;}
+  }
+  target.querySelectorAll('[data-remove-member]').forEach(b => b.onclick = () => manage('remove',b.dataset.removeMember,b));
+  target.querySelectorAll('[data-transfer-member]').forEach(b => b.onclick = () => manage('transfer',b.dataset.transferMember,b));
+  const leave = target.querySelector('#private-leave'); if (leave) leave.onclick = () => manage('leave',null,leave);
+  const revoke = target.querySelector('#private-revoke'); if (revoke) revoke.onclick = () => manage('revoke',null,revoke);
+  const invite = target.querySelector('#private-invite-form');
+  if (invite) invite.onsubmit = async event => {
+    event.preventDefault(); const button = invite.querySelector('button'); button.disabled = true;
+    const result = target.querySelector('#private-invite-result'); result.textContent = 'Code maken...';
+    try {
+      const {data,error} = await supabase.rpc('invite_pool_member',{
+        p_pool_id:pool.id,p_email:target.querySelector('#private-invite-email').value.trim()
+      });
+      if (!target.isConnected) return;
+      if (error) {result.textContent = error.message; return;}
+      result.innerHTML = '<label for="private-created-code">Kopieer deze eenmalige code voor de ontvanger</label><input id="private-created-code" readonly autocomplete="off"><p class="hint">Deze code wordt alleen nu getoond en niet op dit apparaat opgeslagen.</p>';
+      result.querySelector('input').value = data;
+      result.querySelector('input').onclick = event => event.target.select();
+    } catch {if (target.isConnected) result.textContent = 'Verbinding mislukt. Probeer opnieuw.';}
+    finally {if (button.isConnected) button.disabled = false;}
+  };
 }
