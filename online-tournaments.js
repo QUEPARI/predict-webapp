@@ -1,5 +1,5 @@
 // Public user screens. Supabase remains authoritative for access, scores and deadlines.
-const labels = {published:'Gepubliceerd',active:'Actief',completed:'Afgerond',archived:'Gearchiveerd',scheduled:'Gepland',postponed:'Uitgesteld',live:'Bezig',finished:'Afgerond',cancelled:'Geannuleerd'};
+const labels = {published:'Gepubliceerd',active:'Actief',completed:'Afgerond',archived:'Gepauzeerd / archief',scheduled:'Gepland',postponed:'Uitgesteld',live:'Bezig',finished:'Afgerond',cancelled:'Geannuleerd'};
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const date = value => value && Number.isFinite(Date.parse(value))
   ? new Intl.DateTimeFormat('nl-NL',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Amsterdam'}).format(new Date(value)) : 'Nog niet bevestigd';
@@ -103,10 +103,12 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='') {
       }).join('') || '<p>Er zijn nog geen wedstrijden beschikbaar op deze pagina.</p>'}</div>
       <div class="row"><button class="btn secondary" id="online-previous" ${page===0?'disabled':''}>Vorige</button>
         <span>Pagina ${page+1}</span><button class="btn secondary" id="online-next" ${(page+1)*size >= (matches.count ?? list.length)?'disabled':''}>Volgende</button></div>`;
+    const champion=document.createElement('section');champion.className='panel stack';champion.textContent='Winnaarsvraag laden...';target.querySelector('.online-matches').before(champion);
+    import('./tournament-management.js').then(({loadChampionPrediction})=>{if(current(target,ctx))loadChampionPrediction(champion,ctx,t.id,joined);}).catch(()=>{if(current(target,ctx))champion.textContent='Winnaarsvraag laden mislukt.';});
     const schema=document.createElement('section');schema.className='panel stack';schema.textContent='Toernooischema laden...';
     target.querySelector('.online-matches').before(schema);
     import('./knockout.js').then(({loadKnockoutSchema})=>{if(current(target,ctx))loadKnockoutSchema(schema,ctx,t.id);}).catch(()=>{if(current(target,ctx))schema.textContent='Schema laden mislukt. Vernieuw het toernooi.';});
-    const hasDraft=()=>[...target.querySelectorAll('input')].some(i=>i.value!==i.defaultValue);
+    const hasDraft=()=>!!target.querySelector('[data-ko-dirty="true"]')||[...target.querySelectorAll('input')].some(i=>i.value!==i.defaultValue);
     const discard=()=>!hasDraft() || confirm('Niet-opgeslagen wijzigingen laten vervallen?');
     window.addEventListener('beforeunload',event=>{
       if(current(target,ctx)&&hasDraft()){event.preventDefault();event.returnValue='';}

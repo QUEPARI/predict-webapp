@@ -19,6 +19,12 @@ De mijlpaal voor [gebruikersnaam en wachtwoord zonder e-mail](docs/manual-accoun
 - Alle deelnemers moeten ingevuld zijn vóór publiceren. Ook de bestaande publicatieroute en wedstrijdbeveiliging weigeren onvolledige deelnemers. Datums en tijden blijven apart in te vullen.
 - Zie [mijlpaal lege schema’s en sjablonen](docs/knockout-templates-milestone.md). Migratie `20261016183915` is na toestemming toegepast; de hosted rollbacktests slagen. De frontend is opgenomen in PR #8.
 
+## Uitgebreid toernooibeheer en winnaarsvoorspelling
+- Beheer heeft eigen navigatie. Toernooien kunnen worden bewerkt, gepauzeerd, hervat, veilig terug naar concept of definitief verwijderd met naambevestiging en impactoverzicht. Bestaande audits blijven bewaard.
+- Via **Beheer → Toernooien** stel je de winnaarsvraag in met expliciete bonuspunten. De vraag sluit uiterlijk bij de eerste wedstrijd. De winnaarbonus telt mee in de totale toernooi- en pouleklassementen; bestaande wedstrijdpunten blijven gelijk.
+- Naam, schema en punten wijzigen blijft aan de bestaande voorspellingen/gestarte wedstrijden gebonden. Verlopen deadlines worden niet automatisch heropend. Toernooien met een startdatum in het verleden kunnen als concept worden ingevoerd.
+- Zie [beheerverbeteringen, testresultaten en verdere bevindingen](docs/tournament-management-milestone.md).
+
 ## Profiel en voorkeuren (vervolg)
 
 - Het profiel toont je eigen gebruikersnaam, bewerkbare weergavenaam en thema: systeeminstelling, licht of donker.

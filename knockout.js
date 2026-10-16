@@ -1,5 +1,5 @@
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const tournamentLabel=s=>({draft:'Concept',published:'Gepubliceerd',active:'Actief',completed:'Afgerond',archived:'Gearchiveerd'}[s]||s);
+const tournamentLabel=s=>({draft:'Concept',published:'Gepubliceerd',active:'Actief',completed:'Afgerond',archived:'Gepauzeerd / archief'}[s]||s);
 export const dutchTime=value=>value?new Intl.DateTimeFormat('nl-NL',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Amsterdam'}).format(new Date(value)):'Nog in te vullen';
 export function dutchInput(value){
   if(!value)return '';
@@ -40,7 +40,8 @@ export async function loadKnockoutAdmin(target,ctx){
   target.innerHTML='<h2>Knock-outtoernooien</h2><p>Maak een schema met spelers of teams. Namen en tijden beheer je zelf; er wordt geen sport-API gebruikt.</p><div id="ko-create"></div><label for="ko-tour">Toernooi beheren</label><select id="ko-tour"><option value="">Kies een knock-outtoernooi</option></select><p id="ko-message" role="status"></p><div id="ko-editor" class="stack"></div>';
   const $=x=>target.querySelector('#'+x),msg=$('ko-message');
   const rpc=async(name,args)=>{const r=await ctx.supabase.rpc(name,args);if(r.error)throw Error(r.error.message);return r.data;};
-  let catalog,data,currentId='',busy=false,tickTimer;
+  let catalog,data,currentId='',busy=false,tickTimer,requestedId='';
+  document.addEventListener('predict-knockout-select',event=>{if(busy||dirty()&&!confirm('Niet-opgeslagen schemawijzigingen laten vervallen?'))return;requestedId=event.detail;if(catalog?.tournaments.some(t=>t.id===requestedId)){currentId=requestedId;$('ko-tour').value=currentId;read().catch(e=>msg.textContent=e.message);}},{signal:ctx.signal});
   ctx.signal.addEventListener('abort',()=>clearInterval(tickTimer),{once:true});
   const dirty=()=>!!target.querySelector('[data-ko-dirty="true"]');
   window.addEventListener('beforeunload',e=>{if(dirty()){e.preventDefault();e.returnValue='';}},{signal:ctx.signal});
@@ -58,7 +59,7 @@ export async function loadKnockoutAdmin(target,ctx){
     const host=$('ko-editor');
     host.innerHTML=`<h3>${esc(data.name)}</h3><p>Status: ${esc(tournamentLabel(data.status))}</p>${data.status==='draft'?'<button class="btn" id="ko-publish">Publiceren en complete wedstrijden openen</button>':''}<button class="ghost" id="ko-refresh">Schema vernieuwen</button><p>Bij verstreken begintijd sluit voorspellen automatisch. “Uitslag nodig” is geen bevestiging dat de wedstrijd werkelijk begonnen is. Opslaan van een gewijzigde tijd sluit voorspellingen; vrijgeven/heropenen doe je bewust met een reden.</p><div class="row"><label>Toon<select id="ko-filter"><option value="all">Alle wedstrijden</option><option>Uitslag nodig</option><option>Nog aanvullen</option><option>Afgerond</option></select></label></div><div id="ko-cards" class="stack"></div><div id="ko-full"></div>`;
     drawSchema($('ko-full'),data);
-    if(data.status==='draft'){
+    if(data.status!=='completed'){
       const rosterForm=document.createElement('form');rosterForm.className='stack';rosterForm.id='ko-roster';
       const seen=new Set();
       const entrant=(slot,label)=>{
@@ -67,7 +68,7 @@ export async function loadKnockoutAdmin(target,ctx){
         const direct=data.matches.some(m=>m.bye&&m.home_slot===slot);
         return `<label>${direct?'Geplaatste deelnemer · direct in ronde 2':'Deelnemer'} · plek ${slot}<input data-slot="${slot}" maxlength="80" value="${esc(data.roster[slot-1])}" placeholder="Naam invullen"></label>`;
       };
-      rosterForm.innerHTML=`<h3>Namen invullen in het schema</h3><p>Vul spelers of teams op hun officiële lotingsplek in. Een winnaarverwijzing wordt automatisch ingevuld na de uitslag. Lege plekken mag je tussentijds opslaan.</p><div class="ko-bracket">${data.rounds.map(r=>`<section class="stack ko-round"><h4>${esc(r.name)}</h4>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel stack"><strong>Wedstrijd ${m.number}</strong>${entrant(m.home_slot,m.home)}${entrant(m.away_slot,m.away)}</article>`).join('')}</section>`).join('')}</div><button class="btn">Deelnemersnamen opslaan</button>`;
+      rosterForm.innerHTML=`<h3>Namen invullen in het schema</h3><p>Vul spelers of teams op hun officiële lotingsplek in. Een winnaarverwijzing wordt automatisch ingevuld na de uitslag. Lege plekken mag je tussentijds opslaan. Namen wijzigen kan zolang er geen voorspellingen, gestarte wedstrijden of ingestelde winnaarsvraag zijn.</p><div class="ko-bracket">${data.rounds.map(r=>`<section class="stack ko-round"><h4>${esc(r.name)}</h4>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel stack"><strong>Wedstrijd ${m.number}</strong>${entrant(m.home_slot,m.home)}${entrant(m.away_slot,m.away)}</article>`).join('')}</section>`).join('')}</div><button class="btn">Deelnemersnamen opslaan</button>`;
       // Preserve edit access if a historical bracket contains an unusual slot arrangement.
       if(seen.size!==data.roster.length){for(let slot=1;slot<=data.roster.length;slot++){if(!seen.has(slot))rosterForm.insertAdjacentHTML('beforeend',entrant(slot,''));}}
       host.querySelector('h3').after(rosterForm);rosterForm.oninput=()=>rosterForm.dataset.koDirty='true';
@@ -142,9 +143,10 @@ export async function loadKnockoutAdmin(target,ctx){
       try{
         const id=await rpc('create_knockout_tournament',{p_name:f.elements.name.value.trim(),p_sport:f.elements.sport.value,p_kind:f.elements.kind.value,p_roster:roster,p_start:dutchToUTC(f.elements.start.value),p_mode:f.elements.mode.value,
           p_rules:readRules()});
-        if(!alive(target,ctx))return;create.dataset.koDirty='false';currentId=id;await refreshCatalog();await read();feedback.textContent='Leeg schema aangemaakt. Vul namen op de juiste plekken en daarna de speeltijden in.';ctx.onSaved?.();
+        if(!alive(target,ctx))return;create.dataset.koDirty='false';currentId=id;await refreshCatalog();await read();document.dispatchEvent(new CustomEvent('predict-admin-schema-created'));feedback.textContent='Leeg schema aangemaakt. Vul namen op de juiste plekken en daarna de speeltijden in.';ctx.onSaved?.();
       }catch(error){if(alive(target,ctx))feedback.textContent=error.message;}finally{busy=false;if(alive(target,ctx))freezeCreate(false);}
     };
+    if(requestedId&&catalog.tournaments.some(t=>t.id===requestedId)){currentId=requestedId;$('ko-tour').value=currentId;await read();}
     $('ko-tour').onchange=()=>{if(busy||dirty()&&!confirm('Niet-opgeslagen wijzigingen laten vervallen?')){$('ko-tour').value=currentId;return;}currentId=$('ko-tour').value;if(currentId)read().catch(e=>msg.textContent=e.message);else $('ko-editor').textContent='';};
   }catch(e){if(alive(target,ctx))msg.textContent=e.message;}
 }
