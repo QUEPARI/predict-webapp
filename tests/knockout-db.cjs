@@ -46,6 +46,8 @@ const {PGlite}=require('../.local-test/node_modules/@electric-sql/pglite');
  create trigger protect_scoring_audit_log before update or delete on public.scoring_audit_log for each row execute function public.prevent_scoring_audit_changes();`);
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261016192203_tournament_management.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261016202950_compact_predictions.sql'),'utf8'));
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261016210334_tournament_counts.sql'),'utf8'));
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/tournament_counts.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/manual_knockout.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/knockout_templates.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/tournament_management.sql'),'utf8'));

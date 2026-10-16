@@ -1,0 +1,33 @@
+begin;
+do $$
+declare a uuid:=gen_random_uuid();u uuid:=gen_random_uuid();v uuid:=gen_random_uuid();sid uuid;tid uuid;draft_id uuid;mid uuid;result jsonb;item jsonb;rules jsonb:='[{"unit":"legs","first_to":6,"winner_points":1,"exact_points":3}]';
+begin
+ if to_regclass('auth.users') is not null then insert into auth.users(id,email,email_confirmed_at,aud,role) values(a,a||'@counts-qa.invalid',now(),'authenticated','authenticated'),(u,u||'@counts-qa.invalid',now(),'authenticated','authenticated'),(v,v||'@counts-qa.invalid',now(),'authenticated','authenticated');end if;
+ insert into public.profiles(id,username) values(a,'counts-'||substr(a::text,1,20)),(u,'counts-'||substr(u::text,1,20)),(v,'counts-'||substr(v::text,1,20)) on conflict do nothing;
+ insert into public.user_roles values(a,'admin'),(u,'user'),(v,'user');select id into sid from public.sports where slug='darts';
+ perform set_config('request.jwt.claim.sub',a::text,true);perform set_config('role','authenticated',true);
+ tid:=public.create_knockout_tournament('QA counts',sid,'players',array['QA A','QA B'],now()+interval '1 day',rules);mid:=(public.get_knockout_schema(tid)->'matches'->0->>'id')::uuid;
+ draft_id:=public.create_knockout_tournament('QA counts draft',sid,'players',array['',''],now()+interval '1 day',rules);
+ perform public.edit_knockout(tid,'schedule',mid,jsonb_build_object('start',now()+interval '1 day','unit','legs','first_to',6));perform public.edit_knockout(tid,'publish');
+ perform set_config('role','postgres',true);insert into public.tournament_entries values(tid,u),(tid,v);
+ perform set_config('role','authenticated',true);perform set_config('request.jwt.claim.sub',u::text,true);perform public.submit_match_prediction(mid,6,4);
+ result:=public.get_tournament_prediction_counts();select x into item from jsonb_array_elements(result->'tournaments')x where x->>'id'=tid::text;
+ if item->>'open_count'<>'1' or item->>'remaining_count'<>'0' then raise exception 'FAIL own prediction count';end if;
+ if exists(select 1 from jsonb_array_elements(result->'tournaments')x where x->>'id'=draft_id::text) then raise exception 'FAIL draft visible';end if;
+ perform set_config('request.jwt.claim.sub',v::text,true);result:=public.get_tournament_prediction_counts();select x into item from jsonb_array_elements(result->'tournaments')x where x->>'id'=tid::text;
+ if item->>'open_count'<>'1' or item->>'remaining_count'<>'1' then raise exception 'FAIL other user prediction affected own count';end if;
+ perform set_config('request.jwt.claim.sub',a::text,true);perform public.edit_knockout(tid,'close',mid,'{"reason":"QA counts closed"}');
+ result:=public.get_tournament_prediction_counts();select x into item from jsonb_array_elements(result->'tournaments')x where x->>'id'=tid::text;
+ if item->>'open_count'<>'0' then raise exception 'FAIL manually closed counted';end if;
+ tid:=public.create_knockout_tournament('QA counts deadline',sid,'players',array['QA C','QA D'],now()+interval '1 day',rules);mid:=(public.get_knockout_schema(tid)->'matches'->0->>'id')::uuid;
+ perform public.edit_knockout(tid,'schedule',mid,jsonb_build_object('start',clock_timestamp()+interval '0.15 seconds','unit','legs','first_to',6));perform public.edit_knockout(tid,'publish');perform pg_sleep(0.2);
+ result:=public.get_tournament_prediction_counts();select x into item from jsonb_array_elements(result->'tournaments')x where x->>'id'=tid::text;
+ if item->>'open_count'<>'0' then raise exception 'FAIL deadline counted using transaction time';end if;
+ perform set_config('role','postgres',true);perform set_config('request.jwt.claim.sub','',true);perform set_config('role','anon',true);
+ begin perform public.get_tournament_prediction_counts();raise exception 'FAIL anonymous access';exception when insufficient_privilege then null;end;
+ perform set_config('role','authenticated',true);
+ begin perform public.get_tournament_prediction_counts();raise exception 'FAIL missing user accepted';exception when insufficient_privilege then null;end;
+ perform set_config('role','postgres',true);
+end $$;
+select 'PASS: own prediction counts, draft exclusion, manual closure, real-time deadline and authentication' as result;
+rollback;

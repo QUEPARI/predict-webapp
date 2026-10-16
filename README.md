@@ -31,6 +31,14 @@ De mijlpaal voor [gebruikersnaam en wachtwoord zonder e-mail](docs/manual-accoun
 - Klik in een poule op een lid om diens voorspellingen naast je eigen voorspellingen en de uitslagen te bekijken. De server onthult alleen wedstrijden waarvan de individuele deadline is verstreken of de werkelijke start is bereikt; handmatig sluiten onthult niets.
 - Zie [testresultaten en details](docs/compact-predictions-milestone.md).
 
+## Compactere rondes en mobiel schema
+- Toernooikaarten tonen hoeveel wedstrijden openstaan en hoeveel je nog moet voorspellen. Spelregels en puntentelling staan in een eigen toernooitab.
+- Het mobiele hoofdmenu staat bovenaan. Wedstrijdkaarten, de toernooikop en score-invoer zijn compacter.
+- Het volledige knock-outschema loopt horizontaal door, met verbindingen en scrollknoppen. Rondes worden niet onder elkaar afgebroken.
+- Schemabeheer groepeert wedstrijden per ronde en sorteert daarbinnen op datum/tijd. Begintijd en first-to staan naast elkaar; spelvorm komt uit het vastgelegde format en wijzigingen krijgen automatisch een auditreden.
+- Beheer toont standaard nog af te handelen wedstrijden, inclusief verstreken wedstrijden zonder uitslag. Afgeronde wedstrijden blijven bereikbaar via alle wedstrijden.
+- Zie [mijlpaal compacte rondes](docs/compact-rounds-milestone.md), inclusief de toegepaste tellingmigratie `20261016210334` en verificatie.
+
 ## Profiel en voorkeuren (vervolg)
 
 - Het profiel toont je eigen gebruikersnaam, bewerkbare weergavenaam en thema: systeeminstelling, licht of donker.
