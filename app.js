@@ -365,6 +365,13 @@ async function loadAdminMatches() {
               !m.needs_review
               ? 'disabled title="Goedkeuren vereist een bevestigde toekomstige starttijd, gesloten voorspellingen en een wedstrijd die nog niet begonnen is"'
               : 'title="Wedstrijdgegevens controleren en goedkeuren"'}>Goedkeuren</button>
+          <button class="btn secondary" data-result-match="${esc(m.match_id)}"
+            ${m.match_status !== 'scheduled' && m.match_status !== 'live' ||
+              !m.scheduled_start || new Date(m.scheduled_start) > new Date() ||
+              !m.round_id || (m.score_unit !== 'goals' &&
+              (!Number.isInteger(m.first_to) || m.first_to < 1))
+              ? 'disabled title="Uitslag invoeren vereist een verstreken geplande starttijd, vastgelegde ronde en geldig wedstrijdformaat"'
+              : 'title="Handmatige eindstand met auditregistratie invoeren"'}>Uitslag invoeren</button>
         </div>
       </td>
     </tr>`;
@@ -377,6 +384,9 @@ async function loadAdminMatches() {
   });
   target.querySelectorAll('[data-approve-match]').forEach(button => {
     button.onclick = () => approveAdminMatch(button.dataset.approveMatch);
+  });
+  target.querySelectorAll('[data-result-match]').forEach(button => {
+    button.onclick = () => recordAdminMatchResult(button.dataset.resultMatch);
   });
 }
 
@@ -631,6 +641,113 @@ async function approveAdminMatch(matchId) {
     if (saveError) {
       console.error('Goedkeuring:', saveError);
       message.textContent = `Goedkeuren mislukt: ${saveError.message}`;
+      submit.disabled = false;
+      return;
+    }
+    dialog.close();
+    await loadAdminMatches();
+  };
+}
+
+
+// Handmatige uitslagen: de serverfunctie valideert status, scoreformaat,
+// wedstrijdstart, gebruikersrol en eerste registratie opnieuw.
+// Het formulier kent geen mogelijkheid om een bestaande uitslag te overschrijven.
+async function recordAdminMatchResult(matchId) {
+  if (!['admin', 'super_admin'].includes(currentRole)) return;
+  const match = adminMatchesCache.find(m => m.match_id === matchId);
+  if (!match) return;
+
+  document.getElementById('admin-result-dialog')?.close();
+  const dialog = document.createElement('dialog');
+  dialog.id = 'admin-result-dialog';
+  dialog.className = 'panel stack';
+  dialog.setAttribute('aria-labelledby', 'result-title');
+  Object.assign(dialog.style, {
+    width: 'min(520px, calc(100% - 32px))',
+    maxHeight: '85vh', overflowY: 'auto', margin: 'auto',
+    padding: '28px', borderRadius: '16px', border: '1px solid #374151',
+    background: state.theme === 'dark' ? '#1e293b' : '#ffffff',
+    color: state.theme === 'dark' ? '#ffffff' : '#111827',
+    boxShadow: '0 20px 80px rgba(0,0,0,.55)'
+  });
+  if (!document.getElementById('predict-result-modal-style')) {
+    const style = document.createElement('style');
+    style.id = 'predict-result-modal-style';
+    style.textContent = '#admin-result-dialog::backdrop{background:rgba(4,10,25,.75)}';
+    document.head.appendChild(style);
+  }
+  document.body.appendChild(dialog);
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  const eligible = ['scheduled', 'live'].includes(match.match_status) &&
+    match.scheduled_start && new Date(match.scheduled_start) <= new Date() &&
+    Boolean(match.round_id) && (match.score_unit === 'goals' ||
+    (Number.isInteger(match.first_to) && match.first_to > 0));
+  const formatHint = match.score_unit === 'goals'
+    ? 'Voetbal: eindstand na eventuele verlenging, zonder strafschoppen.'
+    : `Darts: de winnaar moet exact ${esc(String(match.first_to ?? '?'))} ` +
+      `${match.score_unit === 'sets' ? 'sets' : 'legs'} hebben.`;
+  dialog.innerHTML = `
+    <div class="row" style="justify-content:space-between;align-items:center;gap:12px">
+      <h2 id="result-title" style="margin:0">Uitslag invoeren</h2>
+      <button type="button" class="ghost" id="result-close" aria-label="Sluiten">✕</button>
+    </div>
+    <p><strong>${esc(match.home_name)} – ${esc(match.away_name)}</strong></p>
+    <p class="hint">${esc(match.tournament_name)} · ${esc(match.round_name ?? 'Ronde onbekend')} ·
+    Geplande start: ${match.scheduled_start ? esc(fmt(match.scheduled_start)) : 'Onbekend'}</p>
+    <p class="notice">${formatHint} Alleen de eerste registratie is toegestaan.
+      De actie wordt vastgelegd in het auditlog. Een latere API-verificatie blijft noodzakelijk.</p>
+    <form id="result-form" class="stack">
+      <div class="row" style="gap:12px;flex-wrap:wrap">
+        <div class="field"><label for="result-home">${esc(match.home_name)}</label>
+          <input id="result-home" type="number" required min="0" max="999" step="1" style="max-width:120px"></div>
+        <div class="field"><label for="result-away">${esc(match.away_name)}</label>
+          <input id="result-away" type="number" required min="0" max="999" step="1" style="max-width:120px"></div>
+      </div>
+      <label><input id="result-verified" type="checkbox" required>
+        Ik heb de eindstand gecontroleerd aan de hand van een betrouwbare uitslagenbron.</label>
+      <p id="result-message" role="status"></p>
+      <div class="row"><button type="submit" class="btn" ${eligible ? '' : 'disabled'}>Uitslag opslaan</button>
+        <button type="button" class="btn secondary" id="result-cancel">Annuleren</button></div>
+    </form>`;
+  dialog.querySelector('#result-close').onclick = () => dialog.close();
+  dialog.querySelector('#result-cancel').onclick = () => dialog.close();
+  dialog.querySelector('#result-form').onsubmit = async event => {
+    event.preventDefault();
+    const message = dialog.querySelector('#result-message');
+    const submit = dialog.querySelector('button[type="submit"]');
+    const homeRaw = dialog.querySelector('#result-home').value;
+    const awayRaw = dialog.querySelector('#result-away').value;
+    const home = Number(homeRaw);
+    const away = Number(awayRaw);
+    if (!eligible || homeRaw === '' || awayRaw === '' ||
+        !Number.isInteger(home) || !Number.isInteger(away) ||
+        home < 0 || away < 0 || home > 999 || away > 999) {
+      message.textContent = 'Voer twee geldige, gehele, niet-negatieve scores in.';
+      return;
+    }
+    if (match.score_unit !== 'goals' && !(
+        (home === match.first_to && away < match.first_to) ||
+        (away === match.first_to && home < match.first_to))) {
+      message.textContent = `Ongeldige dartuitslag: de winnaar moet exact ${match.first_to} halen.`;
+      return;
+    }
+    if (!dialog.querySelector('#result-verified').checked) {
+      message.textContent = 'Bevestig eerst dat de eindstand gecontroleerd is.';
+      return;
+    }
+    if (!window.confirm(`Definitieve uitslag invoeren: ${match.home_name} ${home} – ${away} ${match.away_name}?`)) return;
+    submit.disabled = true;
+    message.textContent = 'Uitslag opslaan...';
+    const { error } = await supabase.rpc('admin_record_match_result', {
+      p_match_id: match.match_id,
+      p_home_score: home,
+      p_away_score: away
+    });
+    if (!dialog.isConnected) return;
+    if (error) {
+      console.error('Uitslagregistratie:', error);
+      message.textContent = `Opslaan mislukt: ${error.message}`;
       submit.disabled = false;
       return;
     }
