@@ -306,6 +306,13 @@ render = function () {
     </div>
 
     <div class="section-head">
+      <h2>QA-test: echte voorspelling</h2>
+    </div>
+    <div class="panel stack" id="qa-prediction-panel">
+      QA-testwedstrijd laden...
+    </div>
+
+    <div class="section-head">
       <h2>Wedstrijden</h2>
       <button class="btn secondary"
               id="admin-refresh">
@@ -327,6 +334,7 @@ render = function () {
 
   loadAdminMatches();
   loadAdminTournamentPublications();
+  loadQaPredictionForm();
 };
 
 let adminMatchesCache = [];
@@ -970,5 +978,155 @@ function showPublishTournamentDialog(tournament) {
     }
     dialog.close();
     await loadAdminTournamentPublications();
+  };
+}
+
+
+/*
+ * PREDICT - Gecontroleerde QA-voorspelling
+ * Gebruikt uitsluitend Supabase RPC en de RLS-regels.
+ * De gewone lokale demonstratiegegevens blijven onaangetast.
+ */
+async function loadQaPredictionForm() {
+  const target = document.getElementById('qa-prediction-panel');
+  if (!target || !currentUser) return;
+  target.textContent = 'QA-gegevens ophalen...';
+
+  const { data: tours, error: tourError } =
+    await supabase.rpc('admin_list_tournaments');
+  if (!target.isConnected) return;
+  if (tourError) {
+    target.textContent = `Testtoernooi ophalen mislukt: ${tourError.message}`;
+    return;
+  }
+  const qaTours = (tours ?? []).filter(t => t.name === 'Predict QA - dartstest');
+  if (qaTours.length !== 1) {
+    target.textContent = 'QA-testtoernooi ontbreekt of is niet uniek.';
+    return;
+  }
+  const tournament = qaTours[0];
+  if (tournament.status !== 'published' && tournament.status !== 'active') {
+    target.textContent = 'QA-testtoernooi is nog niet gepubliceerd.';
+    return;
+  }
+
+  const {data: allMatches, error: matchError} = await supabase.rpc(
+    'admin_get_matches', {p_tournament_id: tournament.id}
+  );
+  if (!target.isConnected) return;
+  if (matchError) {
+    target.textContent = `Testwedstrijd ophalen mislukt: ${matchError.message}`;
+    return;
+  }
+  const qaMatches = (allMatches ?? []).filter(m =>
+    m.home_name === 'Testspeler A' &&
+    m.away_name === 'Testspeler B'
+  );
+  if (qaMatches.length !== 1) {
+    target.textContent = 'Er is niet precies één QA-testwedstrijd.';
+    return;
+  }
+  const match = qaMatches[0];
+
+  const {data: predictions, error: predictionError} = await supabase
+    .from('match_predictions')
+    .select('id,home_score,away_score,updated_at')
+    .eq('match_id', match.match_id)
+    .eq('user_id', currentUser.id)
+    .limit(1);
+  if (!target.isConnected) return;
+  if (predictionError) {
+    target.textContent =
+      `Eigen voorspelling ophalen mislukt: ${predictionError.message}`;
+    return;
+  }
+  const prediction = predictions?.[0] ?? null;
+  const deadline = match.scheduled_start
+    ? new Date(match.scheduled_start) : null;
+  const allowed = match.predictions_enabled === true &&
+    match.start_time_confirmed === true &&
+    match.needs_review === false &&
+    match.match_status === 'scheduled' &&
+    match.actual_start == null &&
+    deadline && Number.isFinite(deadline.getTime()) &&
+    deadline > new Date();
+
+  target.innerHTML = `
+    <p class="muted mini">
+      Alleen voor de fictieve QA-wedstrijd. Opslaan gebeurt echt in
+      Supabase; geen lokale demovoorspelling.
+    </p>
+    <h3 style="margin:0">${esc(match.home_name)} – ${esc(match.away_name)}</h3>
+    <p class="muted mini">
+      ${esc(match.round_name ?? 'Testronde')} · Deadline:
+      ${deadline ? esc(fmt(match.scheduled_start)) : 'Onbekend'} (Nederlandse tijd)
+      · ${allowed ? 'Voorspellingen open' : 'Voorspellingen gesloten'}
+    </p>
+    <p>
+      ${prediction
+        ? `Huidige eigen voorspelling: <strong>${prediction.home_score}–${prediction.away_score}</strong>`
+        : 'Nog geen voorspelling opgeslagen.'}
+    </p>
+    <form id="qa-prediction-form" class="stack">
+      <div class="two">
+        <div class="field">
+          <label for="qa-home-score">${esc(match.home_name)} (legs)</label>
+          <input id="qa-home-score" type="number" min="0" max="99" step="1"
+            value="${prediction ? prediction.home_score : 6}"
+            required ${allowed ? '' : 'disabled'}>
+        </div>
+        <div class="field">
+          <label for="qa-away-score">${esc(match.away_name)} (legs)</label>
+          <input id="qa-away-score" type="number" min="0" max="99" step="1"
+            value="${prediction ? prediction.away_score : 3}"
+            required ${allowed ? '' : 'disabled'}>
+        </div>
+      </div>
+      <p class="hint">
+        Best of 11 legs: precies één speler moet 6 legs hebben;
+        de andere speler maximaal 5.
+      </p>
+      <p id="qa-prediction-feedback" role="status"></p>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <button class="btn" type="submit" ${allowed ? '' : 'disabled'}>
+          ${prediction ? 'Voorspelling wijzigen' : 'Voorspelling indienen'}
+        </button>
+        <button class="btn secondary" type="button" id="qa-reload">
+          Vernieuwen
+        </button>
+      </div>
+    </form>
+  `;
+
+  target.querySelector('#qa-reload').onclick = loadQaPredictionForm;
+  target.querySelector('#qa-prediction-form').onsubmit = async event => {
+    event.preventDefault();
+    const a = Number(target.querySelector('#qa-home-score').value);
+    const b = Number(target.querySelector('#qa-away-score').value);
+    const feedback = target.querySelector('#qa-prediction-feedback');
+    const button = target.querySelector('button[type="submit"]');
+
+    if (!Number.isInteger(a) || !Number.isInteger(b) ||
+        !((a === 6 && b >= 0 && b < 6) ||
+          (b === 6 && a >= 0 && a < 6))) {
+      feedback.textContent = 'Ongeldige legstand: één speler moet precies 6 legs winnen.';
+      return;
+    }
+    button.disabled = true;
+    feedback.textContent = 'Voorspelling naar Supabase versturen...';
+
+    const {data: savedId, error} = await supabase.rpc(
+      'submit_match_prediction',
+      {p_match_id: match.match_id, p_home_score: a, p_away_score: b}
+    );
+    if (!target.isConnected) return;
+    if (error) {
+      feedback.textContent = `Opslaan geweigerd: ${error.message}`;
+      button.disabled = false;
+      console.error('QA voorspelling:', error);
+      return;
+    }
+    feedback.textContent = `Opgeslagen in Supabase (ID: ${savedId}).`;
+    await loadQaPredictionForm();
   };
 }
