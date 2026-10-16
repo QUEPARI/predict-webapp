@@ -1114,7 +1114,40 @@ async function loadQaPredictionForm() {
         </button>
       </div>
     </form>
+    <div id="qa-points-panel" class="notice" role="status">
+      ${match.match_status === 'finished'
+        ? 'Officiële testuitslag en punten ophalen...'
+        : 'Punten verschijnen zodra de testwedstrijd is afgerond.'}
+    </div>
   `;
+
+  if (match.match_status === 'finished') {
+    const pointsTarget = target.querySelector('#qa-points-panel');
+    const { data: pointRows, error: pointsError } = await supabase.rpc(
+      'get_my_match_points',
+      { p_tournament_id: tournament.id }
+    );
+    if (!target.isConnected || !pointsTarget.isConnected) return;
+    if (pointsError) {
+      pointsTarget.textContent = `Punten ophalen mislukt: ${pointsError.message}`;
+      console.error('QA-punten:', pointsError);
+    } else {
+      const forMatch = (pointRows ?? []).filter(row => row.match_id === match.match_id);
+      if (forMatch.length !== 1) {
+        pointsTarget.textContent = 'Geen unieke afgeronde voorspelling gevonden voor deze wedstrijd.';
+      } else {
+        const p = forMatch[0];
+        pointsTarget.innerHTML = `
+          <h3 style="margin:0 0 8px">Testresultaat uit Supabase</h3>
+          <p>Voorspelling: <strong>${esc(p.predicted_home)}–${esc(p.predicted_away)}</strong></p>
+          <p>Uitslag: <strong>${esc(p.actual_home)}–${esc(p.actual_away)}</strong></p>
+          <p>Juiste winnaar: <strong>${p.correct_winner ? 'Ja' : 'Nee'}</strong> ·
+             Exacte uitslag: <strong>${p.exact_score ? 'Ja' : 'Nee'}</strong></p>
+          <p><strong>Behaalde punten: ${esc(p.earned_points)}</strong></p>
+        `;
+      }
+    }
+  }
 
   target.querySelector('#qa-reload').onclick = loadQaPredictionForm;
   target.querySelector('#qa-prediction-form').onsubmit = async event => {
