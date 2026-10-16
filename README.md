@@ -3,6 +3,8 @@
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
 ## Profiel en voorkeuren
+De vervolgmijlpaal voor [accountuitnodigingen en wachtwoordherstel](docs/account-auth-milestone.md) is voorbereid. De nieuwe backendmigratie en Edge Functions zijn toegepast; publicatie van de frontend en acceptatie van echte e-mailaflevering zijn nog nodig. Zie het verslag voor de gecontroleerde instellingen, testresultaten en mailtemplates.
+
 - Het profiel toont je eigen gebruikersnaam, bewerkbare weergavenaam en thema: systeeminstelling, licht of donker.
 - Weergavenaam (1–40 tekens) en thema worden via `update_my_profile` bij je account opgeslagen. Gebruikersnaam en rol kunnen hiermee niet worden gewijzigd.
 - De themaknop bovenaan gebruikt dezelfde accountvoorkeur, zonder andere invoer te wissen. Systeeminstelling volgt wijzigingen in de apparaatvoorkeur.

@@ -3,6 +3,14 @@ import { createClient } from
 import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js';
 import {loadOnlineProfile} from './online-profile.js';
 
+// Route native Auth callbacks to the isolated, non-persistent account flow.
+const authCallback = new URLSearchParams(location.hash.slice(1));
+const legacyInvite = new URLSearchParams(location.search).get('invite');
+if (['invite','recovery'].includes(authCallback.get('type')) || legacyInvite || new URLSearchParams(location.search).has('token_hash')) {
+  location.replace(new URL('./account.html',location.href).href + (legacyInvite ? '#invite='+encodeURIComponent(legacyInvite) : location.search+location.hash));
+  await new Promise(()=>{});
+}
+
 const SUPABASE_URL =
   'https://sfcozzjcuppfypetbbzn.supabase.co';
 
@@ -148,6 +156,7 @@ render = function () {
           </form>
 
           <p id="login-error" role="alert"></p>
+          <a href="./account.html">Wachtwoord vergeten?</a>
         </div>
       </main>
     `;
@@ -1627,4 +1636,31 @@ render=function(){
   const revision=profileRevision;
   loadOnlineProfile(target,{supabase,userId,signal:profileScreenController.signal,isCurrent:()=>currentUser?.id===userId,
     save:persistProfile,onLoaded:data=>{if(profileRevision===revision)applyAccountProfile(data);return currentProfile;}});
+};
+
+const renderBeforeAccountInvitations=render;
+render=function(){
+  renderBeforeAccountInvitations();
+  if(!currentUser||!['admin','super_admin'].includes(currentRole)||state.tab!=='admin')return;
+  const panel=document.createElement('section');panel.className='panel stack';panel.id='account-invitations';
+  panel.innerHTML='<h2>Accountuitnodigingen</h2><p>Maak een eenmalige uitnodiging voor een nieuw account. Deze blijft zeven dagen geldig. Deel de link zelf met de ontvanger; die bevestigt daarna het e-mailadres.</p><form class="stack"><label for="account-invite-email">E-mailadres nieuw account</label><input id="account-invite-email" type="email" autocomplete="off" maxlength="254" required><button class="btn">Account uitnodigen</button><button class="ghost" type="button" id="revoke-account-invite">Uitnodigingen voor dit adres intrekken</button></form><p id="account-invite-message" role="status"></p><div id="account-invite-result"></div>';
+  document.querySelector('.nav')?.after(panel);
+  const form=panel.querySelector('form'), email=panel.querySelector('input'), message=panel.querySelector('#account-invite-message'),result=panel.querySelector('#account-invite-result');
+  async function submit(revoke){
+    if(!form.reportValidity())return;
+    const userId=currentUser.id;form.querySelectorAll('button').forEach(b=>b.disabled=true);message.textContent='';result.textContent='';
+    try{
+      const response=await supabase.rpc(revoke?'revoke_account_invitations':'create_account_invitation',{p_email:email.value.trim()});
+      if(!panel.isConnected||currentUser?.id!==userId)return;
+      if(response.error)throw response.error;
+      if(revoke){message.textContent='Openstaande accountuitnodigingen ingetrokken.';return;}
+      const link=new URL('./account.html',location.href);link.hash='invite='+response.data;
+      const label=document.createElement('label');label.textContent='Kopieer deze uitnodigingslink voor de ontvanger';
+      const output=document.createElement('input');output.readOnly=true;output.autocomplete='off';output.value=link.href;output.setAttribute('aria-label','Accountuitnodigingslink');output.onclick=()=>output.select();
+      result.append(label,output);message.textContent='Uitnodiging aangemaakt. De link wordt alleen nu getoond.';
+    }catch(error){if(panel.isConnected&&currentUser?.id===userId)message.textContent=error.message||'Verbinding mislukt. Probeer opnieuw.';}
+    finally{if(panel.isConnected)form.querySelectorAll('button').forEach(b=>b.disabled=false);}
+  }
+  form.onsubmit=e=>{e.preventDefault();submit(false);};
+  panel.querySelector('#revoke-account-invite').onclick=()=>submit(true);
 };
