@@ -6,6 +6,10 @@ const assert=require('node:assert/strict'),path=require('node:path'),{pathToFile
   const response=(data,next=null)=>new Response(JSON.stringify({data,meta:{next_cursor:next}}));
   assert(!validDate('2026-02-31'));assert(validDate('2028-02-29'));
   const normalized=normalizeDarts([fixture],scope);assert.equal(normalized[0].scheduled_start,null);assert(!('price' in normalized[0]));
+  const timed=normalizeDarts([{...fixture,round:'last_48',starts_at:'2026-10-17T20:00:00Z',date_confirmed:true}],scope)[0];
+  assert.equal(timed.scheduled_start,'2026-10-17T20:00:00.000Z');assert.equal(timed.round,'last_48');assert.equal(timed.date_confirmed,true);
+  assert.throws(()=>normalizeDarts([{...fixture,starts_at:'2026-10-17T22:00:00'}],scope),/invalid_data/);
+  assert.throws(()=>normalizeDarts([{...fixture,starts_at:'2026-10-18T20:00:00Z'}],scope),/invalid_data/);
   assert.equal(normalizeDarts([{...fixture,competition:'Other event'}],scope).length,0);
   assert.throws(()=>normalizeDarts([fixture,fixture],scope),/invalid_data/);
   assert.throws(()=>normalizeDarts([{...fixture,players:[fixture.players[0],fixture.players[0]]}],scope));

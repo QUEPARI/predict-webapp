@@ -1,5 +1,29 @@
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const dateOnly=d=>d.toISOString().slice(0,10);
+const roundKey=value=>String(value??'').trim().toLowerCase().replace(/[_\s-]+/g,' ');
+export function resolveImportRound(payload,rounds){
+  const source=roundKey(payload.round);
+  if(!source)return null;
+  const exact=rounds.filter(r=>roundKey(r.round_name)===source);
+  if(exact.length)return exact.length===1?exact[0]:null;
+  const aliases={'last 16':'achtste finales','quarter finals':'kwartfinales','semi finals':'halve finales','final':'finale'};
+  let name=aliases[source];
+  // Opening rounds depend on the tournament's draw; never infer them by ordinal alone.
+  if(['last 48','last 32'].includes(source)){
+    const expected=['eerste ronde','tweede ronde','achtste finales','kwartfinales','halve finales','finale'];
+    if(roundKey(payload.competition)!=='dutch darts championship'||rounds.length!==expected.length||
+      expected.some(n=>rounds.filter(r=>roundKey(r.round_name)===n).length!==1))return null;
+    name=source==='last 48'?'eerste ronde':'tweede ronde';
+  }
+  const found=name?rounds.filter(r=>roundKey(r.round_name)===name):[];
+  return found.length===1?found[0]:null;
+}
+export function importStartLabel(value){
+  if(!value)return 'Starttijd ontbreekt in het importvoorstel; er wordt geen tijd geschat.';
+  const date=new Date(value);
+  if(!Number.isFinite(date.getTime()))return 'Ongeldige bronstarttijd; controle nodig.';
+  return 'Bronstart: '+new Intl.DateTimeFormat('nl-NL',{timeZone:'Europe/Amsterdam',dateStyle:'short',timeStyle:'short'}).format(date)+' (Nederlandse tijd).';
+}
 export async function loadAdminImports(target,ctx){
   const {supabase,signal}=ctx,alive=()=>!signal.aborted&&target.isConnected&&ctx.isCurrent();
   let offset=0,total=0,rounds=[],matches=[],busy=false,lastTournament='';
@@ -36,10 +60,14 @@ export async function loadAdminImports(target,ctx){
     const p=item.payload||{},card=document.createElement('article');card.className='panel stack';card.style.overflowWrap='anywhere';
     const active=['pending','conflict'].includes(item.state),result=item.kind==='results';
     const state={pending:'Te controleren',applied:'Verwerkt',rejected:'Afgewezen',conflict:'Conflict — geblokkeerd'}[item.state]||item.state;
-    card.innerHTML=`<h3>${esc(p.home_name)} – ${esc(p.away_name)}</h3><p>${result?'Uitslagvoorstel':'Wedstrijdvoorstel'} · ${esc(state)} · ${esc(p.played_on)}</p><p class="hint">Bron: ${esc(p.competition)} · ronde: ${esc(p.round||'onbekend')} · ${esc(item.external_id)}</p>${result?`<p>Bronwinnaar ${esc(p.home_name)}: ${esc(p.home_score)}–${esc(p.away_score)}. De server zet de score om naar de wedstrijdvolgorde.</p>`:`<p>Bronstart: ${esc(p.scheduled_start||'onbekend')}. Datum bevestigd: ${p.date_confirmed?'ja':'nee'}.</p>`}<p class="hint">${esc(item.review_note||'Controleer toernooi-editie, speeldag, deelnemers, ronde en spelvorm met de bron. Alleen normaal uitgespeelde wedstrijden verwerken; geen walk-over of opgave.')}</p>`;
+    card.innerHTML=`<h3>${esc(p.home_name)} – ${esc(p.away_name)}</h3><p>${result?'Uitslagvoorstel':'Wedstrijdvoorstel'} · ${esc(state)} · ${esc(p.played_on)}</p><p class="hint">Bron: ${esc(p.competition)} · ronde: ${esc(p.round||'onbekend')} · ${esc(item.external_id)}</p>${result?`<p>Bronwinnaar ${esc(p.home_name)}: ${esc(p.home_score)}–${esc(p.away_score)}. De server zet de score om naar de wedstrijdvolgorde.</p>`:`<p>${esc(importStartLabel(p.scheduled_start))} Speeldatum door bron bevestigd: ${p.date_confirmed?'ja':'nee'}.</p>`}<p class="hint">${esc(item.review_note||'Controleer toernooi-editie, speeldag, deelnemers, ronde en spelvorm met de bron. Alleen normaal uitgespeelde wedstrijden verwerken; geen walk-over of opgave.')}</p>`;
     if(active){
       const form=document.createElement('form');form.className='stack';
       form.innerHTML=`${result?`<label>Lokale wedstrijd<select name="match" required><option value="">Kies gecontroleerde wedstrijd</option>${matches.map(m=>`<option value="${esc(m.match_id)}">${esc(m.home_name)} – ${esc(m.away_name)} · ${esc(m.scheduled_start)} · ${esc(m.score_unit)}</option>`).join('')}</select></label>`:''}<label>Gecontroleerde ronde<select name="round" aria-label="Gecontroleerde ronde" required><option value="">Kies ronde</option>${rounds.map(r=>`<option value="${esc(r.round_id)}">${esc(r.round_name)}</option>`).join('')}</select></label><label>Gecontroleerde score-eenheid<select name="unit" required><option value="">Kies spelvorm</option><option value="sets">Sets</option><option value="legs">Legs</option></select></label>${!result?'<label>Benodigd aantal sets of legs<input name="first" type="number" min="1" max="99" step="1" required></label>':''}<label class="choice"><input name="attested" type="checkbox" required> Ik heb toernooi, ronde, spelvorm en normaal wedstrijdverloop gecontroleerd.</label><button class="btn" ${item.state==='conflict'?'disabled':''}>${result?'Uitslag gecontroleerd verwerken':'Wedstrijdconcept maken'}</button><button class="ghost" type="button" data-reject>Voorstel afwijzen</button><p role="status" data-feedback></p>`;
+      const mappedRound=resolveImportRound(p,rounds),roundHint=document.createElement('p');roundHint.className='hint';
+      if(mappedRound){form.elements.round.value=mappedRound.round_id;roundHint.textContent='Bronronde automatisch herkend: '+mappedRound.round_name+'.';}
+      else roundHint.textContent='Bronronde niet eenduidig te koppelen aan dit toernooi.';
+      form.elements.round.closest('label').after(roundHint);
       form.onchange=()=>card.dataset.importDirty='true';
       async function review(action){
         if(action==='apply'&&!form.reportValidity())return;
