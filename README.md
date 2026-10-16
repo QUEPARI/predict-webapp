@@ -12,12 +12,12 @@ De mijlpaal voor [gebruikersnaam en wachtwoord zonder e-mail](docs/manual-accoun
 - Zie [knock-outmijlpaal](docs/manual-knockout-milestone.md) voor verificatie en ingebruikname. Na expliciete toestemming is migratie `20261016181258` toegepast en zijn de hosted rollbacktests geslaagd. De frontend is via PR #7 gepubliceerd.
 - Oude bronrecords en importmigraties blijven als historie behouden. De nieuwe code verwijdert het importscherm en vervangt de twee sportimportfuncties door HTTP 410-antwoorden. Dit is via PR #7 uitgerold.
 
-## Nieuwe versie: lege schema’s en sjablonen (nog niet gepubliceerd)
+## Lege schema’s en sjablonen
 - Kies per sport een vrij knock-outformat of een bewaard eigen sjabloon. Sjablonen bewaren deelnemersaantal, spelers/teams, rondeformaten en punten; geen namen of tijden.
 - Darts heeft een ingebouwd **European Tour**-sjabloon: 48 spelers, 16 direct geplaatst in ronde 2 tegenover de 16 winnaars uit ronde 1. Legs: first-to 6 in de eerste vier rondes, 7 in de halve finales en 8 in de finale. Punten blijven expliciet in te vullen.
 - Maak eerst een leeg conceptschema. Vul namen op de zichtbare lotingsplekken in, ook de geplaatste spelers in ronde 2. Tussentijds opslaan met lege plekken kan; dubbele ingevulde namen worden geweigerd.
 - Alle deelnemers moeten ingevuld zijn vóór publiceren. Ook de bestaande publicatieroute en wedstrijdbeveiliging weigeren onvolledige deelnemers. Datums en tijden blijven apart in te vullen.
-- Zie [mijlpaal lege schema’s en sjablonen](docs/knockout-templates-milestone.md). Migratie `20261016183020` is alleen lokaal getest en nog niet live toegepast.
+- Zie [mijlpaal lege schema’s en sjablonen](docs/knockout-templates-milestone.md). Migratie `20261016183915` is na toestemming toegepast; de hosted rollbacktests slagen. De frontend is opgenomen in PR #8.
 
 ## Profiel en voorkeuren (vervolg)
 
