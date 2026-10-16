@@ -1295,3 +1295,63 @@ async function loadAdminLeaderboards() {
   panel.querySelector('#leaderboard-refresh').onclick = refreshRows;
   await refreshOptions();
 }
+
+
+const renderBeforePublicLeaderboard = render;
+render = function () {
+  renderBeforePublicLeaderboard();
+  if (!currentUser || state.tournament || !document.querySelector('.nav')) return;
+  const nav = document.querySelector('.nav');
+  const button = document.createElement('button');
+  button.textContent = 'Klassementen';
+  button.classList.toggle('active',state.tab==='leaderboards');
+  button.onclick = () => {state.tab='leaderboards';state.tournament=null;save();render();};
+  nav.append(button);
+  if (state.tab!=='leaderboards') return;
+  while(nav.nextSibling) nav.nextSibling.remove();
+  const section=document.createElement('section');
+  section.innerHTML='<h1>Klassementen</h1><p class="sub">Actuele punten uit Supabase.</p><div class="panel stack" id="public-leaderboard">Laden...</div>';
+  document.querySelector('.layout').append(section);
+  loadPublicLeaderboard();
+};
+
+async function loadPublicLeaderboard() {
+  const target=document.getElementById('public-leaderboard');
+  if (!target || !currentUser) return;
+  const [entries,tours] = await Promise.all([
+    supabase.from('tournament_entries').select('tournament_id').eq('user_id',currentUser.id),
+    supabase.from('tournaments').select('id,name,status').neq('status','draft').order('name')
+  ]);
+  if (!target.isConnected) return;
+  if (entries.error || tours.error) {
+    target.textContent='Toernooien ophalen mislukt: '+(entries.error?.message||tours.error?.message);
+    return;
+  }
+  const joined=new Set((entries.data||[]).map(e=>e.tournament_id));
+  const isAdmin=['admin','super_admin'].includes(currentRole);
+  const available=(tours.data||[]).filter(t=>isAdmin||joined.has(t.id));
+  if (!available.length) {target.textContent='Nog geen toegankelijke toernooien.';return;}
+  target.innerHTML='<label for="lb-tour">Toernooi</label><select id="lb-tour">'+available.map(t=>'<option value="'+esc(t.id)+'">'+esc(t.name)+'</option>').join('')+'</select><label for="lb-round">Ronde</label><select id="lb-round"><option value="">Alle rondes</option></select><div class="table-wrap" id="lb-data">Laden...</div><button class="btn secondary" id="lb-refresh" type="button">Vernieuwen</button>';
+  const tour=target.querySelector('#lb-tour'),round=target.querySelector('#lb-round'),results=target.querySelector('#lb-data');
+  let generation=0;
+  async function loadRounds() {
+    const g=++generation;
+    round.innerHTML='<option value="">Alle rondes</option>';
+    const {data,error}=await supabase.from('tournament_rounds').select('id,name').eq('tournament_id',tour.value).order('round_order');
+    if (!target.isConnected||g!==generation)return;
+    if (!error) (data||[]).forEach(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.name;round.add(o);});
+    await loadRows();
+  }
+  async function loadRows() {
+    const g=++generation;
+    results.textContent='Klassement laden...';
+    const {data,error}=await supabase.rpc('get_tournament_leaderboard',{p_tournament_id:tour.value,p_pool_id:null,p_round_id:round.value||null});
+    if (!target.isConnected||g!==generation)return;
+    if (error) {results.textContent='Klassement ophalen mislukt: '+error.message;return;}
+    results.innerHTML=(data||[]).length?'<table><thead><tr><th>#</th><th>Gebruiker</th><th>Punten</th><th>Winnaars</th></tr></thead><tbody>'+(data||[]).map(r=>'<tr><td>'+r.rank_position+'</td><td>'+esc(r.display_name)+(r.user_id===currentUser.id?' (jij)':'')+'</td><td>'+r.earned_points+'</td><td>'+r.correct_winners+'</td></tr>').join('')+'</tbody></table>':'Nog geen deelnemers.';
+  }
+  tour.onchange=loadRounds;
+  round.onchange=loadRows;
+  target.querySelector('#lb-refresh').onclick=loadRows;
+  await loadRounds();
+}
