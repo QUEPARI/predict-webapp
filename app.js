@@ -809,6 +809,13 @@ async function recordAdminMatchStart(matchId) {
       gesloten. Zonder opgegeven exacte aanvang registreert Supabase het meldmoment als starttijd;
       dit is niet noodzakelijk het werkelijke aanvangsmoment.</div>
     <form id="start-form" class="stack">
+      <div class="field">
+        <label for="start-actual-time">Geverifieerde werkelijke starttijd (optioneel)</label>
+        <input id="start-actual-time" type="datetime-local" step="60">
+        <p class="hint">Laat dit veld leeg als je de exacte starttijd niet kent. Supabase registreert dan
+          het moment van melden. Bij invullen geldt de tijdzone van je apparaat
+          (<span id="start-timezone"></span>). Gebruik alleen een door een betrouwbare bron bevestigde tijd.</p>
+      </div>
       <label><input id="start-attested" type="checkbox" required>
         Ik heb via een betrouwbare bron vastgesteld dat deze wedstrijd begonnen is.</label>
       <p id="start-message" role="status"></p>
@@ -818,6 +825,8 @@ async function recordAdminMatchStart(matchId) {
       </div>
     </form>`;
   dialog.showModal();
+  dialog.querySelector('#start-timezone').textContent =
+    Intl.DateTimeFormat().resolvedOptions().timeZone || 'lokale tijdzone';
   dialog.querySelector('#start-close').onclick = () => dialog.close();
   dialog.querySelector('#start-cancel').onclick = () => dialog.close();
   dialog.querySelector('#start-form').onsubmit = async event => {
@@ -828,13 +837,29 @@ async function recordAdminMatchStart(matchId) {
       message.textContent = 'Bevestig eerst dat je de werkelijke start hebt vastgesteld.';
       return;
     }
-    if (!window.confirm(`Is ${match.home_name} – ${match.away_name} daadwerkelijk begonnen? ` +
-      'Deze actie kan niet via dit scherm ongedaan worden gemaakt en sluit voorspellingen.')) return;
+    const enteredTime = dialog.querySelector('#start-actual-time').value;
+    let verifiedStart = null;
+    if (enteredTime) {
+      const parsed = new Date(enteredTime);
+      if (!Number.isFinite(parsed.getTime()) || parsed.getTime() > Date.now()) {
+        message.textContent = 'Vul een geldige werkelijke starttijd in die niet in de toekomst ligt.';
+        return;
+      }
+      verifiedStart = parsed.toISOString();
+    }
+    const startDescription = verifiedStart
+      ? `Geverifieerde werkelijke start: ${new Date(verifiedStart).toLocaleString('nl-NL')} ` +
+        `(${Intl.DateTimeFormat().resolvedOptions().timeZone || 'lokale tijdzone'}).`
+      : 'Exacte start onbekend; Supabase gebruikt het meldmoment.';
+    if (!window.confirm(
+      `Is ${match.home_name} – ${match.away_name} daadwerkelijk begonnen?\n` +
+      `${startDescription}\nDeze actie sluit voorspellingen en kan niet via dit scherm ongedaan worden gemaakt.`
+    )) return;
     submit.disabled = true;
     message.textContent = 'Wedstrijdstart registreren...';
     const { error } = await supabase.rpc('admin_record_match_start', {
       p_match_id: match.match_id,
-      p_actual_start: null
+      p_actual_start: verifiedStart
     });
     if (!dialog.isConnected) return;
     if (error) {
