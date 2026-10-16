@@ -5,7 +5,7 @@ const SUPABASE_URL =
   'https://sfcozzjcuppfypetbbzn.supabase.co';
 
 const SUPABASE_PUBLISHABLE_KEY =
-  'JOUW_BESTAANDE_PUBLISHABLE_KEY';
+  'sb_publishable_1opRVzunD94Sd71rKSJAew_0ydMP2VU';
 
 const supabase = createClient(
   SUPABASE_URL,
