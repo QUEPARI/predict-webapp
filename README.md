@@ -39,7 +39,12 @@ De mijlpaal voor [gebruikersnaam en wachtwoord zonder e-mail](docs/manual-accoun
 - Beheer toont standaard nog af te handelen wedstrijden, inclusief verstreken wedstrijden zonder uitslag. Afgeronde wedstrijden blijven bereikbaar via alle wedstrijden.
 - Zie [mijlpaal compacte rondes](docs/compact-rounds-milestone.md), inclusief de toegepaste tellingmigratie `20261016210334` en verificatie.
 
-## Profiel en voorkeuren (vervolg)
+## Account en voorkeuren (vervolg)
+
+- **Account** vervangt het navigatielabel Profiel. Gebruikersnaam, licht/donker/systeeminstelling en Uitloggen staan op deze pagina; de header bevat alleen de huisstijl.
+- Gewijzigde frontendbestanden hebben een versieparameter voor verversen van de browsercache. De bestaande mobiele menuplaatsing is behouden.
+- Zie [accountnavigatie en verificatie](docs/account-navigation-milestone.md).
+
 
 - Het profiel toont je eigen gebruikersnaam, bewerkbare weergavenaam en thema: systeeminstelling, licht of donker.
 - Weergavenaam (1–40 tekens) en thema worden via `update_my_profile` bij je account opgeslagen. Gebruikersnaam en rol kunnen hiermee niet worden gewijzigd.

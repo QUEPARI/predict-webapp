@@ -3,7 +3,7 @@ const active=(target,ctx)=>target.isConnected&&!ctx.signal.aborted&&ctx.isCurren
 const status={scheduled:'Gepland',postponed:'Uitgesteld',live:'Bezig',finished:'Afgerond',cancelled:'Geannuleerd'};
 
 export async function loadOnlineProfile(target,ctx){
-  target.textContent='Profiel laden...';
+  target.textContent='Account laden...';
   try {
     const [profile,entries,tours]=await Promise.all([
       ctx.supabase.from('profiles').select('username,display_name,theme').eq('id',ctx.userId).single(),
@@ -15,7 +15,7 @@ export async function loadOnlineProfile(target,ctx){
     if(error||!profile.data)throw new Error(error?.message||'Eigen profiel niet gevonden.');
     const p=ctx.onLoaded(profile.data)||profile.data,joined=new Set((entries.data||[]).map(e=>e.tournament_id));
     const available=(tours.data||[]).filter(t=>joined.has(t.id));
-    target.innerHTML=`<h1>Profiel en instellingen</h1><p class="sub">Je accountvoorkeuren en eigen voorspellingen.</p>
+    target.innerHTML=`<h1>Account</h1><p class="sub">Je accountvoorkeuren en eigen voorspellingen.</p>
       <form class="panel stack" data-profile-form data-dirty="false">
         <div class="muted mini">Gebruikersnaam: ${esc(p.username)}</div>
         <div class="field"><label for="account-display-name">Weergavenaam</label>
@@ -23,7 +23,7 @@ export async function loadOnlineProfile(target,ctx){
         <div class="field"><label for="account-theme">Thema</label><select id="account-theme">
           ${[['system','Systeeminstelling'],['light','Licht'],['dark','Donker']].map(([v,label])=>`<option value="${v}" ${p.theme===v?'selected':''}>${label}</option>`).join('')}</select></div>
         <p class="hint">Naam en thema worden bij je account opgeslagen. Systeeminstelling volgt de voorkeur van je apparaat.</p>
-        <p role="status" id="account-profile-message"></p><button class="btn">Profiel opslaan</button>
+        <p role="status" id="account-profile-message"></p><button class="btn">Account opslaan</button>
       </form><div class="panel stack"><h2>Mijn voorspellingen</h2>
         ${available.length?`<label for="account-prediction-tour">Toernooi</label><select id="account-prediction-tour">
           ${available.map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select>
@@ -36,7 +36,7 @@ export async function loadOnlineProfile(target,ctx){
     window.addEventListener('beforeunload',event=>{
       if(active(target,ctx)&&form.dataset.dirty==='true'){event.preventDefault();event.returnValue='';}
     },{signal:ctx.signal});
-    // A header theme change uses the same account preference without discarding drafts.
+    // Account preference updates preserve unsaved display-name drafts.
     window.addEventListener('predict-preferences-saved',event=>{
       if(!active(target,ctx))return;
       const displayName=event.detail.display_name||event.detail.username;
@@ -54,7 +54,7 @@ export async function loadOnlineProfile(target,ctx){
         const data=await ctx.save({p_display_name:name.value.trim(),p_theme:theme.value});
         if(!active(target,ctx))return;
         name.value=data.display_name;name.defaultValue=data.display_name;savedName=data.display_name;
-        theme.value=data.theme;savedTheme=data.theme;dirty();message.textContent='Profiel opgeslagen in Predict.';
+        theme.value=data.theme;savedTheme=data.theme;dirty();message.textContent='Account opgeslagen in Predict.';
       } catch(error){if(active(target,ctx))message.textContent='Opslaan mislukt: '+error.message;}
       finally{if(active(target,ctx))controls.forEach(c=>c.disabled=false);}
     };
@@ -66,8 +66,8 @@ export async function loadOnlineProfile(target,ctx){
     }
   } catch(error){
     if(!active(target,ctx))return;
-    target.innerHTML='<h1>Profiel</h1><p role="alert"></p><button class="btn secondary">Opnieuw proberen</button>';
-    target.querySelector('p').textContent='Profiel laden mislukt: '+error.message;
+    target.innerHTML='<h1>Account</h1><p role="alert"></p><button class="btn secondary">Opnieuw proberen</button>';
+    target.querySelector('p').textContent='Account laden mislukt: '+error.message;
     target.querySelector('button').onclick=()=>loadOnlineProfile(target,ctx);
   }
 }
