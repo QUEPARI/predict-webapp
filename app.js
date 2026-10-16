@@ -1,4 +1,3 @@
-
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -6,7 +5,7 @@ const SUPABASE_URL =
   'https://sfcozzjcuppfypetbbzn.supabase.co';
 
 const SUPABASE_PUBLISHABLE_KEY =
-  'sb_publishable_1opRVzunD94Sd71rKSJAew_0ydMP2VU';
+  'JOUW_BESTAANDE_PUBLISHABLE_KEY';
 
 const supabase = createClient(
   SUPABASE_URL,
@@ -19,6 +18,11 @@ const supabase = createClient(
     }
   }
 );
+
+// NIEUWE REGEL:
+window.predictSupabase = supabase;
+
+// Offline demonstrator. No real users, server security, or live sports data.
 // Offline demonstrator. No real users, server security, or live sports data.
 const STORE='predict-demo-v1';
 const defaults={theme:'light',user:'Demo-gebruiker',tab:'home',tournament:null,predictions:{},extra:{},pools:[{id:'friends',tournament:'darts27',name:'Vriendengroep',members:['Demo-gebruiker','Thomas','Mark']}],joined:['darts27','football'],showAdmin:false};
