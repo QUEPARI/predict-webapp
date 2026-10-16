@@ -1,7 +1,7 @@
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js';
-import {loadOnlineProfile} from './online-profile.js';
+import {loadOnlineProfile} from './online-profile.js?v=account-20261016';
 
 // Route native Auth callbacks to the isolated, non-persistent account flow.
 const authCallback = new URLSearchParams(location.hash.slice(1));
@@ -65,8 +65,8 @@ function locked(m){return m.status!=='scheduled'||new Date(m.start)<=new Date()}
 function score(m,p){if(!m.official||!p)return 0;const a=m.official,b=p;const exact=Number(a.home)===Number(b.home)&&Number(a.away)===Number(b.away);const actualWin=Math.sign(a.home-a.away),predWin=Math.sign(b.home-b.away);if(m.format==='sets'){const [win,ex]=dartsPts[m.round]||[0,0];return exact?ex:actualWin===predWin?win:0}return exact?7:actualWin===predWin?3:0}
 function points(tid){return fixtures.filter(m=>m.tournament===tid).reduce((s,m)=>s+score(m,state.predictions[m.id]),0)}
 function missing(tid){return fixtures.filter(m=>m.tournament===tid&&!locked(m)&&!state.predictions[m.id]).length}
-function nav(){return `<div class="nav">${[['home','Home'],['discover','Toernooien'],['pools','Mijn poules'],['profile','Profiel']].map(([id,label])=>`<button data-tab="${id}" class="${state.tab===id?'active':''}">${label}</button>`).join('')}</div>`}
-function header(){return `<header class="top"><div class="logo"><div class="logo-mark">P</div><div><div class="brand">Predict</div><div class="tag">SPORTVOORSPELLINGEN</div></div></div><div class="top-actions"><span class="badge">DEMO</span><button class="ghost" data-action="theme" aria-label="Wissel licht/donker">${isDarkTheme()?'☀ Licht':'◐ Donker'}</button></div></header>`}
+function nav(){return `<div class="nav">${[['home','Home'],['discover','Toernooien'],['pools','Mijn poules'],['profile','Account']].map(([id,label])=>`<button data-tab="${id}" class="${state.tab===id?'active':''}">${label}</button>`).join('')}</div>`}
+function header(){return `<header class="top"><div class="logo"><div class="logo-mark">P</div><div><div class="brand">Predict</div><div class="tag">SPORTVOORSPELLINGEN</div></div></div></header>`}
 function tournamentCard(t){return `<div class="panel stack"><div class="row"><span class="sport">${t.sport==='darts'?'DARTS':'VOETBAL'}</span><span class="pill mutedpill">${esc(t.state)}</span></div><h2 style="margin:0">${esc(t.name)}</h2><div class="muted mini">${esc(t.description)}</div><div class="row"><span class="mini muted">${missing(t.id)} nog te voorspellen</span><span class="mini"><b>${points(t.id)} pt</b></span></div><button class="btn" data-open="${t.id}">Open toernooi →</button></div>`}
 function home(){return `<h1>Mijn toernooien</h1><p class="sub">Welkom, ${esc(state.user)}. Overzicht van jouw toernooien en voorspellingen.</p><div class="notice">Dit is een lokale demonstratie met fictieve wedstrijden. Er worden nog geen echte accounts, poules of uitslagen gesynchroniseerd.</div><div class="grid">${tournaments.filter(t=>state.joined.includes(t.id)).map(tournamentCard).join('')}</div>`}
 function discover(){return `<h1>Toernooien</h1><p class="sub">Kies een beschikbaar toernooi. Alleen systeembeheerders zullen later toernooien kunnen toevoegen.</p><div class="grid">${tournaments.map(tournamentCard).join('')}</div>`}
@@ -195,39 +195,6 @@ render = function () {
   }
 
   renderDemo();
-
-  // Toon accountgegevens en uitlogknop
-  const actions = document.querySelector('.top-actions');
-
-  if (actions) {
-    const account = document.createElement('span');
-    account.className = 'mini';
-    account.textContent =
-      currentRole === 'super_admin'
-        ? 'Systeembeheerder'
-        : currentRole === 'admin'
-          ? 'Beheerder'
-          : 'Gebruiker';
-
-    const logoutButton = document.createElement('button');
-    logoutButton.className = 'ghost';
-    logoutButton.textContent = 'Uitloggen';
-
-    logoutButton.onclick = async () => {
-      const { error } = await supabase.auth.signOut();
-
-      if (error) {
-        alert('Uitloggen mislukt. Probeer opnieuw.');
-        return;
-      }
-
-      currentUser = null;
-      currentRole = 'user';
-      render();
-    };
-
-    actions.append(account, logoutButton);
-  }
 };
 
 async function loadCurrentUser() {
@@ -1611,7 +1578,7 @@ render = function () {
   else loadTournamentCatalog(target,ctx);
 };
 
-profile=function(){return '<section id="online-profile" class="stack" aria-label="Profiel">Profiel laden...</section>';};
+profile=function(){return '<section id="online-profile" class="stack" aria-label="Account">Account laden...</section><section class="panel stack account-session"><h2>Sessie</h2><button type="button" class="ghost" id="account-logout">Uitloggen</button><p id="account-logout-message" role="status"></p></section>';};
 let profileScreenController=null;
 const renderBeforeOnlineProfile=render;
 render=function(){
@@ -1620,19 +1587,18 @@ render=function(){
   const badge=document.querySelector('.top .badge');if(badge)badge.textContent='ONLINE';
   const footer=document.querySelector('.footer');if(footer)footer.textContent='Predict · Je account, voorspellingen en poules uit Supabase';
   const userId=currentUser.id;
-  const themeButton=document.querySelector('[data-action="theme"]');
-  if(themeButton)themeButton.onclick=async()=>{
-    themeButton.disabled=true;
-    try {await persistProfile({p_theme:isDarkTheme()?'light':'dark'});document.getElementById('theme-save-message')?.remove();}
-    catch(error){
-      if(currentUser?.id!==userId||!themeButton.isConnected)return;
-      let message=document.getElementById('theme-save-message');
-      if(!message){message=document.createElement('p');message.id='theme-save-message';message.setAttribute('role','alert');document.querySelector('.top').after(message);}
-      message.textContent='Thema opslaan mislukt: '+error.message;
-    } finally{if(themeButton.isConnected)themeButton.disabled=false;}
-  };
   applyTheme();
   const target=document.getElementById('online-profile');if(!target)return;
+  const logout=document.getElementById('account-logout');
+  logout.onclick=async()=>{
+    const message=document.getElementById('account-logout-message');logout.disabled=true;message.textContent='Uitloggen…';
+    try{
+      const {error}=await supabase.auth.signOut();if(error)throw error;
+      if(currentUser?.id!==userId)return;
+      currentUser=null;currentProfile=null;currentRole='user';render();
+    }catch(error){if(logout.isConnected&&currentUser?.id===userId){message.textContent='Uitloggen mislukt. Probeer opnieuw.';message.setAttribute('role','alert');}}
+    finally{if(logout.isConnected)logout.disabled=false;}
+  };
   profileScreenController=new AbortController();
   const revision=profileRevision;
   loadOnlineProfile(target,{supabase,userId,signal:profileScreenController.signal,isCurrent:()=>currentUser?.id===userId,

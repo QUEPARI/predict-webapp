@@ -2,7 +2,7 @@
 const {chromium}=require('playwright');const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
 (async()=>{
   const files={'/':'index.html','/app.js':'app.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'};
-  const server=http.createServer((req,res)=>{const f=files[req.url];if(!f){res.writeHead(404).end();return;}res.setHeader('Content-Type',f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(path.join(__dirname,'..',f)));});
+  const server=http.createServer((req,res)=>{req.url=req.url.split('?')[0];const f=files[req.url];if(!f){res.writeHead(404).end();return;}res.setHeader('Content-Type',f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(path.join(__dirname,'..',f)));});
   await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
   const profiles={a:{username:'account-a',display_name:'QA <img src=x onerror=alert(1)>',theme:'system'},b:{username:'account-b',display_name:'Ander account',theme:'dark'}};
   try {
@@ -18,7 +18,7 @@ const {chromium}=require('playwright');const http=require('node:http');const fs=
       window.qaUid='a';window.qaFailSave=false;window.qaFailPredictions=false;window.qaSlow=false;window.qaReads=[];
       localStorage.setItem('predict-demo-v1',JSON.stringify({user:'Old Demo',predictions:{d1:{home:3,away:0}}}));
       localStorage.setItem('qa-auth-session','session-preserved');
-      window.qaSupabase={auth:{getUser:async()=>({data:{user:window.qaUid?{id:window.qaUid}:null}}),signOut:async()=>{window.qaUid=null;return {};},
+      window.qaSupabase={auth:{getUser:async()=>({data:{user:window.qaUid?{id:window.qaUid}:null}}),signOut:async()=>{if(window.qaFailLogout)return {error:{message:'QA uitlogfout'}};window.qaUid=null;return {};},
         signInWithPassword:async({email})=>{window.qaUid=email.startsWith('b')?'b':'a';return {};}},
         from(table){const filters={};let one=false,start=0,end=999;
           const q={select(){return q;},eq(k,v){filters[k]=v;return q;},neq(){return q;},in(){return q;},order(){return q;},single(){one=true;return q;},range(a,b){start=a;end=b;return q;},then(resolve,reject){return (async()=>{
@@ -47,19 +47,19 @@ const {chromium}=require('playwright');const http=require('node:http');const fs=
     });
     await page.route('https://cdn.jsdelivr.net/**',r=>r.fulfill({contentType:'text/javascript',body:'export const createClient=()=>window.qaSupabase;'}));
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
-    await page.getByRole('button',{name:'Profiel',exact:true}).click();
-    await page.getByRole('button',{name:'Profiel opslaan'}).waitFor();
+    await page.getByRole('button',{name:'Account',exact:true}).click();
+    await page.getByRole('button',{name:'Account opslaan'}).waitFor();
     await page.waitForFunction(()=>document.body.classList.contains('dark'));
     await page.emulateMedia({colorScheme:'light'});await page.waitForFunction(()=>!document.body.classList.contains('dark'));
-    assert.equal(await page.locator('#online-profile img').count(),0);
+    assert.equal(await page.locator('.top button,.top .badge,.top-actions').count(),0);assert.equal(await page.locator('.top').innerText(),'P\nPredict\nSPORTVOORSPELLINGEN');assert.equal(await page.locator('#online-profile img').count(),0);
     assert.equal(await page.getByRole('button',{name:'Verwijder lokale demogegevens'}).count(),0);
     await page.locator('#account-predictions table').waitFor();
     const first=page.locator('#account-predictions tbody tr').first();
     assert((await first.innerText()).includes('6–4'));assert((await first.innerText()).includes('6–3'));assert.equal(await first.locator('td').last().innerText(),'1');
     await page.getByLabel('Weergavenaam',{exact:true}).fill('  Opgeslagen naam  ');
-    await page.getByLabel('Thema',{exact:true}).selectOption('light');await page.getByRole('button',{name:'Profiel opslaan'}).click();
-    await page.getByText('Profiel opgeslagen in Predict.').waitFor();assert.equal(profiles.a.display_name,'Opgeslagen naam');
-    await page.reload();await page.getByRole('button',{name:'Profiel opslaan'}).waitFor();
+    await page.getByLabel('Thema',{exact:true}).selectOption('light');await page.getByRole('button',{name:'Account opslaan'}).click();
+    await page.getByText('Account opgeslagen in Predict.').waitFor();assert.equal(profiles.a.display_name,'Opgeslagen naam');
+    await page.reload();await page.getByRole('button',{name:'Account opslaan'}).waitFor();
     assert.equal(await page.getByLabel('Weergavenaam',{exact:true}).inputValue(),'Opgeslagen naam');
     await page.getByRole('button',{name:'Volgende',exact:true}).click();
     await page.getByText('Speler 25 – Tegenstander',{exact:false}).waitFor();
@@ -70,16 +70,16 @@ const {chromium}=require('playwright');const http=require('node:http');const fs=
     await page.evaluate(()=>window.qaFailPredictions=false);await page.getByRole('button',{name:'Voorspellingen opnieuw proberen'}).click();
     await page.locator('#account-predictions table').waitFor();
     await page.getByLabel('Weergavenaam',{exact:true}).fill('Niet kwijt');await page.evaluate(()=>window.qaFailSave=true);
-    await page.getByRole('button',{name:'Profiel opslaan'}).click();await page.getByText('Opslaan mislukt: QA opslagfout').waitFor();
+    await page.getByRole('button',{name:'Account opslaan'}).click();await page.getByText('Opslaan mislukt: QA opslagfout').waitFor();
     assert.equal(await page.getByLabel('Weergavenaam',{exact:true}).inputValue(),'Niet kwijt');
-    await page.getByRole('button',{name:'Wissel licht/donker'}).click();await page.getByText('Thema opslaan mislukt: QA opslagfout').waitFor();
-    assert.equal(await page.locator('body').getAttribute('class'),'');
-    await page.evaluate(()=>window.qaFailSave=false);await page.getByRole('button',{name:'Wissel licht/donker'}).click();
-    await page.waitForFunction(()=>document.body.classList.contains('dark'));
-    assert.equal(await page.getByLabel('Weergavenaam',{exact:true}).inputValue(),'Niet kwijt','Header toggle keeps unsaved name');
+    await page.evaluate(()=>window.qaFailSave=false);
+    await page.getByLabel('Thema',{exact:true}).selectOption('dark');await page.getByRole('button',{name:'Account opslaan'}).click();
+    await page.getByText('Account opgeslagen in Predict.').waitFor();await page.waitForFunction(()=>document.body.classList.contains('dark'));
+    assert.equal(await page.getByLabel('Weergavenaam',{exact:true}).inputValue(),'Niet kwijt');
     assert.equal(await page.getByLabel('Thema',{exact:true}).inputValue(),'dark');
-    page.once('dialog',d=>d.dismiss());await page.getByRole('button',{name:'Home',exact:true}).click();assert.equal(await page.getByLabel('Weergavenaam',{exact:true}).inputValue(),'Niet kwijt');
-    await page.getByRole('button',{name:'Profiel opslaan'}).click();await page.getByText('Profiel opgeslagen in Predict.').waitFor();
+    await page.getByLabel('Weergavenaam',{exact:true}).fill('Niet kwijt concept');
+    page.once('dialog',d=>d.dismiss());await page.getByRole('button',{name:'Home',exact:true}).click();assert.equal(await page.getByLabel('Weergavenaam',{exact:true}).inputValue(),'Niet kwijt concept');await page.getByLabel('Weergavenaam',{exact:true}).fill('Niet kwijt');
+    await page.getByRole('button',{name:'Account opslaan'}).click();await page.getByText('Account opgeslagen in Predict.').waitFor();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     fs.mkdirSync(path.join(__dirname,'..','test-results'),{recursive:true});await page.evaluate(()=>scrollTo(0,0));
     await page.screenshot({path:path.join(__dirname,'..','test-results','profile-mobile.png'),fullPage:false});
@@ -87,13 +87,13 @@ const {chromium}=require('playwright');const http=require('node:http');const fs=
     const local=await page.evaluate(()=>({...localStorage}));assert.equal(local['predict-demo-v1'],undefined);assert.equal(local['qa-auth-session'],'session-preserved');
     assert.deepEqual(Object.keys(JSON.parse(local['predict-ui-v2'])).sort(),['tab','theme']);
     await page.getByRole('button',{name:'Home',exact:true}).click();await page.evaluate(()=>window.qaSlow=true);
-    await page.getByRole('button',{name:'Profiel',exact:true}).click();await page.waitForFunction(()=>!!window.qaResolve);
+    await page.getByRole('button',{name:'Account',exact:true}).click();await page.waitForFunction(()=>!!window.qaResolve);
     await page.getByRole('button',{name:'Home',exact:true}).click();await page.evaluate(()=>{window.qaSlow=false;window.qaResolve();});
     assert.equal(await page.locator('#account-predictions').count(),0,'Late response cannot replace another screen');
-    await page.getByRole('button',{name:'Uitloggen'}).click();await page.getByLabel('Gebruikersnaam',{exact:true}).fill('b@example.invalid');await page.getByLabel('Wachtwoord').fill('test-only');
-    await page.getByRole('button',{name:'Inloggen',exact:true}).click();await page.getByRole('button',{name:'Profiel',exact:true}).click();
-    await page.getByRole('button',{name:'Profiel opslaan'}).waitFor();assert.equal(await page.getByLabel('Weergavenaam',{exact:true}).inputValue(),'Ander account');
+    await page.getByRole('button',{name:'Account',exact:true}).click();await page.evaluate(()=>window.qaFailLogout=true);await page.getByRole('button',{name:'Uitloggen'}).click();await page.getByText('Uitloggen mislukt. Probeer opnieuw.').waitFor();assert.equal(await page.getByRole('button',{name:'Uitloggen'}).isEnabled(),true);await page.evaluate(()=>window.qaFailLogout=false);await page.getByRole('button',{name:'Uitloggen'}).click();await page.getByLabel('Gebruikersnaam',{exact:true}).fill('b@example.invalid');await page.getByLabel('Wachtwoord').fill('test-only');
+    await page.getByRole('button',{name:'Inloggen',exact:true}).click();await page.getByRole('button',{name:'Account',exact:true}).click();
+    await page.getByRole('button',{name:'Account opslaan'}).waitFor();assert.equal(await page.getByLabel('Weergavenaam',{exact:true}).inputValue(),'Ander account');
     assert.equal(profiles.a.display_name,'Niet kwijt');assert.equal(profiles.b.display_name,'Ander account');assert.deepEqual(errors,[]);
-    console.log('PASS: profile persistence/reload, system/header themes, error recovery, draft preservation, own paginated predictions/points, legacy-cache cleanup, stale requests and account separation');
+    console.log('PASS: profile persistence/reload, account themes, error recovery, draft preservation, own paginated predictions/points, legacy-cache cleanup, stale requests and account separation');
   } finally {if(browser)await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
