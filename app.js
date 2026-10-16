@@ -236,3 +236,179 @@ $('app').textContent = 'Account laden...';
 
 loadCurrentUser();
 
+/*
+ * PREDICT - Beheerdersoverzicht
+ * Alleen lezen; geen databasewijzigingen.
+ */
+
+const renderWithLogin = render;
+
+render = function () {
+  // Behoud de bestaande login en webapp.
+  renderWithLogin();
+
+  const isAdmin =
+    currentRole === 'admin' ||
+    currentRole === 'super_admin';
+
+  if (!currentUser || !isAdmin) return;
+
+  const navigation = document.querySelector('.nav');
+
+  // Op toernooidetailpagina's is geen navigatie zichtbaar.
+  if (!navigation) return;
+
+  // Voeg het beheertabblad toe.
+  const adminButton = document.createElement('button');
+  adminButton.textContent = 'Beheer';
+  adminButton.classList.toggle(
+    'active',
+    state.tab === 'admin'
+  );
+
+  adminButton.onclick = () => {
+    state.tab = 'admin';
+    state.tournament = null;
+    save();
+    render();
+  };
+
+  navigation.appendChild(adminButton);
+
+  if (state.tab !== 'admin') return;
+
+  const layout = document.querySelector('.layout');
+
+  // Verwijder alleen de standaardinhoud onder
+  // de navigatie; behoud header en navigatie.
+  while (navigation.nextSibling) {
+    navigation.nextSibling.remove();
+  }
+
+  const section = document.createElement('section');
+
+  section.innerHTML = `
+    <h1>Wedstrijdbeheer</h1>
+    <p class="sub">
+      Controleer geïmporteerde wedstrijden
+      van alle toernooien.
+    </p>
+
+    <div class="notice">
+      Alleen-lezen beheerdersoverzicht.
+      Wedstrijden worden hier nog niet gewijzigd.
+    </div>
+
+    <div class="section-head">
+      <h2>Wedstrijden</h2>
+      <button class="btn secondary"
+              id="admin-refresh">
+        Vernieuwen
+      </button>
+    </div>
+
+    <div class="panel table-wrap">
+      <div id="admin-matches">
+        Wedstrijden laden...
+      </div>
+    </div>
+  `;
+
+  layout.appendChild(section);
+
+  document.getElementById('admin-refresh').onclick =
+    loadAdminMatches;
+
+  loadAdminMatches();
+};
+
+async function loadAdminMatches() {
+  const target = document.getElementById('admin-matches');
+
+  if (!target) return;
+
+  target.textContent = 'Wedstrijden laden...';
+
+  const { data, error } = await supabase.rpc(
+    'admin_get_matches'
+  );
+
+  // Voorkom updates van een inmiddels gesloten tab.
+  if (!target.isConnected) return;
+
+  if (error) {
+    console.error('Wedstrijdbeheer:', error);
+    target.textContent =
+      'Wedstrijden konden niet worden geladen.';
+    return;
+  }
+
+  const matches = data ?? [];
+
+  if (matches.length === 0) {
+    target.textContent = 'Geen wedstrijden gevonden.';
+    return;
+  }
+
+  const reviewCount = matches.filter(
+    match => match.needs_review
+  ).length;
+
+  const rows = matches.map(match => {
+    const round = match.round_name ?? 'Onbekend';
+
+    const start = match.scheduled_start
+      ? fmt(match.scheduled_start)
+      : 'Onbekend';
+
+    const confirmed = match.start_time_confirmed
+      ? 'Bevestigd'
+      : 'Niet bevestigd';
+
+    const review = match.needs_review
+      ? 'Controle nodig'
+      : 'Gecontroleerd';
+
+    const predictionStatus = match.predictions_enabled
+      ? 'Open'
+      : 'Gesloten';
+
+    return `
+      <tr>
+        <td>${esc(match.tournament_name)}</td>
+        <td>${esc(match.home_name)}</td>
+        <td>${esc(match.away_name)}</td>
+        <td>${esc(round)}</td>
+        <td>${esc(start)}</td>
+        <td>${esc(confirmed)}</td>
+        <td>${esc(review)}</td>
+        <td>${esc(predictionStatus)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  target.innerHTML = `
+    <p class="muted mini">
+      ${matches.length} wedstrijden gevonden.
+      ${reviewCount} vereisen controle.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Toernooi</th>
+          <th>Speler 1</th>
+          <th>Speler 2</th>
+          <th>Ronde</th>
+          <th>Starttijd</th>
+          <th>Starttijdstatus</th>
+          <th>Controle</th>
+          <th>Voorspellen</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+
