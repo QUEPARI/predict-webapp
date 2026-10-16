@@ -295,8 +295,7 @@ render = function () {
     </p>
 
     <div class="notice">
-      Alleen-lezen beheerdersoverzicht.
-      Wedstrijden worden hier nog niet gewijzigd.
+      Beheerdersoverzicht. Alleen toekomstige, nog niet gestarte wedstrijden zonder geopende voorspellingen kunnen worden gecorrigeerd.
     </div>
 
     <div class="section-head">
@@ -322,93 +321,135 @@ render = function () {
   loadAdminMatches();
 };
 
+let adminMatchesCache = [];
+
 async function loadAdminMatches() {
   const target = document.getElementById('admin-matches');
-
   if (!target) return;
-
   target.textContent = 'Wedstrijden laden...';
-
-  const { data, error } = await supabase.rpc(
-    'admin_get_matches'
-  );
-
-  // Voorkom updates van een inmiddels gesloten tab.
+  const { data, error } = await supabase.rpc('admin_get_matches');
   if (!target.isConnected) return;
-
   if (error) {
     console.error('Wedstrijdbeheer:', error);
-    target.textContent =
-      'Wedstrijden konden niet worden geladen.';
+    target.textContent = 'Wedstrijden laden mislukt.';
     return;
   }
-
-  const matches = data ?? [];
-
-  if (matches.length === 0) {
+  adminMatchesCache = data ?? [];
+  if (adminMatchesCache.length === 0) {
     target.textContent = 'Geen wedstrijden gevonden.';
     return;
   }
-
-  const reviewCount = matches.filter(
-    match => match.needs_review
-  ).length;
-
-  const rows = matches.map(match => {
-    const round = match.round_name ?? 'Onbekend';
-
-    const start = match.scheduled_start
-      ? fmt(match.scheduled_start)
-      : 'Onbekend';
-
-    const confirmed = match.start_time_confirmed
-      ? 'Bevestigd'
-      : 'Niet bevestigd';
-
-    const review = match.needs_review
-      ? 'Controle nodig'
-      : 'Gecontroleerd';
-
-    const predictionStatus = match.predictions_enabled
-      ? 'Open'
-      : 'Gesloten';
-
-    return `
-      <tr>
-        <td>${esc(match.tournament_name)}</td>
-        <td>${esc(match.home_name)}</td>
-        <td>${esc(match.away_name)}</td>
-        <td>${esc(round)}</td>
-        <td>${esc(start)}</td>
-        <td>${esc(confirmed)}</td>
-        <td>${esc(review)}</td>
-        <td>${esc(predictionStatus)}</td>
-      </tr>
-    `;
+  const reviewCount = adminMatchesCache.filter(m => m.needs_review).length;
+  const rows = adminMatchesCache.map(m => {
+    const start = m.scheduled_start ? fmt(m.scheduled_start) : 'Onbekend';
+    const lockedForEdit = m.match_status !== 'scheduled' ||
+      m.actual_start != null || m.predictions_enabled ||
+      (m.scheduled_start != null && new Date(m.scheduled_start) <= new Date());
+    return `<tr>
+      <td>${esc(m.tournament_name)}</td>
+      <td>${esc(m.home_name)}</td>
+      <td>${esc(m.away_name)}</td>
+      <td>${esc(m.round_name ?? 'Onbekend')}</td>
+      <td>${esc(start)}</td>
+      <td>${m.start_time_confirmed ? 'Bevestigd' : 'Niet bevestigd'}</td>
+      <td>${m.needs_review ? 'Controle nodig' : 'Gecontroleerd'}</td>
+      <td>${m.predictions_enabled ? 'Open' : 'Gesloten'}</td>
+      <td><button class="btn secondary" data-edit-match="${esc(m.match_id)}"
+        ${lockedForEdit ? 'disabled title="Wedstrijd niet wijzigbaar via deze procedure"' : 'title="Ronde en starttijd bewerken"'}>Bewerken</button></td>
+    </tr>`;
   }).join('');
-
-  target.innerHTML = `
-    <p class="muted mini">
-      ${matches.length} wedstrijden gevonden.
-      ${reviewCount} vereisen controle.
-    </p>
-
-    <table>
-      <thead>
-        <tr>
-          <th>Toernooi</th>
-          <th>Speler 1</th>
-          <th>Speler 2</th>
-          <th>Ronde</th>
-          <th>Starttijd</th>
-          <th>Starttijdstatus</th>
-          <th>Controle</th>
-          <th>Voorspellen</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-  `;
+  target.innerHTML = `<p class="muted mini">${adminMatchesCache.length} wedstrijden gevonden. ${reviewCount} vereisen controle.</p>
+  <table><thead><tr><th>Toernooi</th><th>Speler 1</th><th>Speler 2</th><th>Ronde</th><th>Starttijd</th><th>Starttijdstatus</th><th>Controle</th><th>Voorspellen</th><th>Actie</th></tr></thead>
+  <tbody>${rows}</tbody></table>`;
+  target.querySelectorAll('[data-edit-match]').forEach(button => {
+    button.onclick = () => editAdminMatch(button.dataset.editMatch);
+  });
 }
 
+function localDateTimeValue(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
+async function editAdminMatch(matchId) {
+  if (currentRole !== 'admin' && currentRole !== 'super_admin') return;
+  const match = adminMatchesCache.find(m => m.match_id === matchId);
+  const target = document.getElementById('admin-matches');
+  if (!match || !target) return;
+  let editor = document.getElementById('admin-editor');
+  if (!editor) {
+    editor = document.createElement('div');
+    editor.id = 'admin-editor';
+    editor.className = 'panel stack';
+    target.parentElement.appendChild(editor);
+  }
+  editor.textContent = 'Beschikbare rondes laden...';
+  const { data: rounds, error } = await supabase.rpc('admin_get_tournament_rounds', {
+    p_tournament_id: match.tournament_id
+  });
+  if (!editor.isConnected) return;
+  if (error) {
+    console.error('Rondes:', error);
+    editor.textContent = 'Rondes ophalen mislukt.';
+    return;
+  }
+  const options = ['<option value="">Onbekend</option>', ...(rounds ?? []).map(r =>
+    `<option value="${esc(r.round_id)}" ${r.round_id === match.round_id ? 'selected' : ''}>${esc(r.round_name)}</option>`
+  )].join('');
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  editor.innerHTML = `<h2>Wedstrijd bewerken</h2>
+    <p>${esc(match.home_name)} – ${esc(match.away_name)}</p>
+    <form id="admin-edit-form" class="stack">
+      <div class="field"><label for="edit-round">Ronde</label><select id="edit-round">${options}</select></div>
+      <div class="field"><label for="edit-start">Starttijd</label>
+        <input id="edit-start" type="datetime-local" value="${localDateTimeValue(match.scheduled_start)}">
+        <div class="hint">Tijdzone van dit apparaat: ${esc(timezone)}. Controleer dat dit Nederlandse tijd is als je Nederlandse tijden invoert.</div>
+      </div>
+      <label><input id="edit-confirmed" type="checkbox" ${match.start_time_confirmed ? 'checked' : ''}> Officiële starttijd bevestigd</label>
+      <p id="admin-edit-message" role="status"></p>
+      <div class="row"><button class="btn" type="submit">Wijzigingen opslaan</button>
+      <button class="btn secondary" type="button" id="admin-edit-cancel">Annuleren</button></div>
+    </form>`;
+  editor.querySelector('#admin-edit-cancel').onclick = () => editor.remove();
+  editor.querySelector('#admin-edit-form').onsubmit = async event => {
+    event.preventDefault();
+    const button = editor.querySelector('button[type="submit"]');
+    const message = editor.querySelector('#admin-edit-message');
+    const roundId = editor.querySelector('#edit-round').value || null;
+    const startInput = editor.querySelector('#edit-start').value;
+    const confirmed = editor.querySelector('#edit-confirmed').checked;
+    const parsed = startInput ? new Date(startInput) : null;
+    if (parsed && Number.isNaN(parsed.getTime())) {
+      message.textContent = 'Ongeldige starttijd.';
+      return;
+    }
+    if (confirmed && !parsed) {
+      message.textContent = 'Een bevestigde starttijd mag niet leeg zijn.';
+      return;
+    }
+    if (parsed && parsed <= new Date()) {
+      message.textContent = 'De nieuwe starttijd moet in de toekomst liggen.';
+      return;
+    }
+    button.disabled = true;
+    message.textContent = 'Wijzigingen opslaan...';
+    const { error: saveError } = await supabase.rpc('admin_correct_match_schedule', {
+      p_match_id: match.match_id,
+      p_round_id: roundId,
+      p_scheduled_start: parsed ? parsed.toISOString() : null,
+      p_start_confirmed: confirmed
+    });
+    if (!editor.isConnected) return;
+    if (saveError) {
+      console.error('Opslaan:', saveError);
+      message.textContent = `Opslaan mislukt: ${saveError.message}`;
+      button.disabled = false;
+      return;
+    }
+    editor.remove();
+    await loadAdminMatches();
+  };
+}
