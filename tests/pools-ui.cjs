@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 
 (async () => {
   const server = http.createServer((req,res) => {
-    const file = {'/':'index.html','/app.js':'app.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'}[req.url];
+    const file = {'/':'index.html','/app.js':'app.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'}[req.url];
     if (!file) {res.writeHead(404).end(); return;}
     res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');
     res.end(fs.readFileSync(path.join(__dirname,'..',file)));
