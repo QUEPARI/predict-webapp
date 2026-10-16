@@ -379,14 +379,35 @@ async function editAdminMatch(matchId) {
   const match = adminMatchesCache.find(m => m.match_id === matchId);
   const target = document.getElementById('admin-matches');
   if (!match || !target) return;
-  let editor = document.getElementById('admin-editor');
-  if (!editor) {
-    editor = document.createElement('div');
-    editor.id = 'admin-editor';
-    editor.className = 'panel stack';
-    target.parentElement.appendChild(editor);
+  // Eén modal tegelijk, zodat formulieren elkaar niet kunnen overlappen.
+  document.getElementById('admin-editor')?.close();
+  const editor = document.createElement('dialog');
+  editor.id = 'admin-editor';
+  editor.className = 'panel stack';
+  editor.setAttribute('aria-labelledby', 'admin-edit-title');
+  Object.assign(editor.style, {
+    width: 'min(520px, calc(100% - 32px))',
+    maxHeight: '85vh',
+    overflowY: 'auto',
+    margin: 'auto',
+    padding: '28px',
+    borderRadius: '16px',
+    border: '1px solid #374151',
+    background: state.theme === 'dark' ? '#1e293b' : '#ffffff',
+    color: state.theme === 'dark' ? '#ffffff' : '#111827',
+    boxShadow: '0 20px 80px rgba(0,0,0,.55)'
+  });
+  // De backdrop hoort bij het modale dialoogelement.
+  if (!document.getElementById('predict-modal-style')) {
+    const style = document.createElement('style');
+    style.id = 'predict-modal-style';
+    style.textContent = '#admin-editor::backdrop { background: rgba(4, 10, 25, .75); }';
+    document.head.appendChild(style);
   }
+  document.body.appendChild(editor);
+  editor.addEventListener('close', () => editor.remove(), { once: true });
   editor.textContent = 'Beschikbare rondes laden...';
+  editor.showModal();
   const { data: rounds, error } = await supabase.rpc('admin_get_tournament_rounds', {
     p_tournament_id: match.tournament_id
   });
@@ -400,7 +421,10 @@ async function editAdminMatch(matchId) {
     `<option value="${esc(r.round_id)}" ${r.round_id === match.round_id ? 'selected' : ''}>${esc(r.round_name)}</option>`
   )].join('');
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  editor.innerHTML = `<h2>Wedstrijd bewerken</h2>
+  editor.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;gap:12px">
+      <h2 id="admin-edit-title" style="margin:0">Wedstrijd bewerken</h2>
+      <button type="button" class="ghost" id="admin-edit-close" aria-label="Sluiten">✕</button>
+    </div>
     <p>${esc(match.home_name)} – ${esc(match.away_name)}</p>
     <form id="admin-edit-form" class="stack">
       <div class="field"><label for="edit-round">Ronde</label><select id="edit-round">${options}</select></div>
@@ -413,7 +437,8 @@ async function editAdminMatch(matchId) {
       <div class="row"><button class="btn" type="submit">Wijzigingen opslaan</button>
       <button class="btn secondary" type="button" id="admin-edit-cancel">Annuleren</button></div>
     </form>`;
-  editor.querySelector('#admin-edit-cancel').onclick = () => editor.remove();
+  editor.querySelector('#admin-edit-cancel').onclick = () => editor.close();
+  editor.querySelector('#admin-edit-close').onclick = () => editor.close();
   editor.querySelector('#admin-edit-form').onsubmit = async event => {
     event.preventDefault();
     const button = editor.querySelector('button[type="submit"]');
@@ -449,7 +474,7 @@ async function editAdminMatch(matchId) {
       button.disabled = false;
       return;
     }
-    editor.remove();
+    editor.close();
     await loadAdminMatches();
   };
 }
