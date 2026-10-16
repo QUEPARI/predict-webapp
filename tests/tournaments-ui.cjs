@@ -21,14 +21,14 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
           const q={select(){return q;},eq(k,v){filters[k]=v;return q;},neq(){return q;},in(k,v){filters[k]=v;return q;},
             order(){return q;},single(){one=true;return q;},range(a,b){from=a;to=b;return q;},then(resolve,reject){
               if(window.qaFailRead&&table==='matches')return Promise.resolve({error:{message:'Testverbinding verbroken'}}).then(resolve,reject);
-              const ms=Array.from({length:53},(_,i)=>({id:'match-'+i,round_id:'round',home_name:'Speler '+i,away_name:'Tegenstander '+i,
-                scheduled_start:i===51?'2026-10-17T14:00:00Z':i===52?'2026-10-17T00:30:00Z':'2026-10-16T14:01:00Z',actual_start:null,status:i===1?'postponed':i===2?'finished':'scheduled',
-                home_score:i===2?6:null,away_score:i===2?3:null,score_unit:i===3?'goals':'legs',first_to:i===3?null:6,
+              const ms=Array.from({length:53},(_,i)=>({id:'match-'+i,round_id:i>=51?'round-2':'round',home_name:'Speler '+i,away_name:'Tegenstander '+i,
+                scheduled_start:i===51?'2026-10-17T14:00:00Z':i===52?'2026-10-17T00:30:00Z':'2026-10-16T14:01:00Z',actual_start:null,status:i===1?'postponed':[2,51].includes(i)?'finished':'scheduled',
+                home_score:[2,51].includes(i)?6:null,away_score:[2,51].includes(i)?3:null,score_unit:i===3?'goals':'legs',first_to:i===3?null:6,
                 start_time_confirmed:true,needs_review:false,predictions_enabled:true}));
               const t={id:'tour',name:'QA <img src=x onerror=alert(1)>',status:'published',starts_at:'2026-10-16T13:00:00Z'};
               let data={profiles:{username:'QA'},user_roles:{role:'user'},tournaments:one?t:[t],
                 tournament_entries:window.qaJoined?[{tournament_id:'tour'}]:[],matches:ms.slice(from,to+1),
-                tournament_rounds:[{id:'round',name:'Ronde 1',round_order:1}],
+                tournament_rounds:[{id:'round',name:'Ronde 1',round_order:1},{id:'round-2',name:'Ronde 2',round_order:2}],
                 tournament_scoring:[{scoring_mode:'replacement'}],round_scoring:[{round_id:'round',winner_points:1,exact_score_points:3}],
                 match_predictions:window.qaPredictions.filter(p=>filters.match_id?.includes(p.match_id)),pool_members:[],pools:[]}[table] || [];
               return Promise.resolve({data,count:table==='matches'?53:undefined}).then(resolve,reject);
@@ -66,24 +66,27 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     assert.equal(await page.evaluate(()=>window.qaCalls.filter(c=>c.name==='submit_match_prediction').length),0);
     await page.locator('[data-online-match="match-3"] [name="home"]').fill('2');
     await card.locator('[name="away"]').fill('4');await card.getByRole('button').click();
-    await card.getByText('Opgeslagen in Predict.').waitFor();
+    await card.getByRole('button',{name:'Opgeslagen',exact:true}).waitFor();assert(await card.getByRole('button').isDisabled());assert.equal(await card.locator('.hint').count(),0);assert.equal(await card.locator('[data-prediction-message]').textContent(),'');
     assert.equal(await page.locator('[data-online-match="match-3"] [name="home"]').inputValue(),'2','Saving one card preserves other drafts');
     await page.locator('[data-detail-tab=results]').click();assert.equal(await page.locator('[data-detail-panel=results]').isVisible(),true);
     await page.locator('[data-detail-tab=predictions]').click();assert.equal(await page.locator('[data-online-match="match-3"] [name="home"]').inputValue(),'2');
     const football=page.locator('[data-online-match="match-3"]');
     await football.locator('[name="away"]').fill('2');await football.getByRole('button').click();
-    await football.getByText('Opgeslagen in Predict.').waitFor();
+    await football.getByRole('button',{name:'Opgeslagen',exact:true}).waitFor();
     assert(await page.evaluate(()=>window.qaCalls.some(c=>c.name==='submit_match_prediction'&&c.args.p_match_id==='match-3'&&c.args.p_home_score===2&&c.args.p_away_score===2)),'Football draw allowed');
     assert.equal(await page.locator('[data-online-match="match-1"] button').isDisabled(),true,'Postponed closed');
     assert.equal(await page.locator('[data-online-match="match-2"] button').isDisabled(),true,'Finished closed');
+    await page.getByRole('button',{name:'Home',exact:true}).click();await page.getByRole('button',{name:'Wedstrijden en voorspellingen'}).click();await card.getByRole('button',{name:'Opgeslagen',exact:true}).waitFor();assert(await card.getByRole('button').isDisabled());
+    fs.mkdirSync(path.join(__dirname,'..','test-results'),{recursive:true});for(const width of [320,390,1280]){await page.setViewportSize({width,height:900});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(__dirname,'..','test-results','saved-predictions-'+width+'.png')});}await page.setViewportSize({width:390,height:844});
+    await card.locator('[name=away]').fill('3');assert.equal(await card.getByRole('button').textContent(),'Opslaan');assert(await card.getByRole('button').isEnabled());
     await page.evaluate(()=>window.qaFailSave=true);
     await card.locator('[name="away"]').fill('3');await card.getByRole('button').click();
-    await card.getByText('Opslaan mislukt:',{exact:false}).waitFor();
+    await card.getByText('Opslaan mislukt:',{exact:false}).waitFor();assert.equal(await card.getByRole('button').textContent(),'Opslaan');assert(await card.getByRole('button').isEnabled());
     assert.equal(await card.locator('[name="away"]').inputValue(),'3','Server error preserves draft');
     page.once('dialog',dialog=>dialog.dismiss());
     await page.getByRole('button',{name:'Home',exact:true}).click();
     assert.equal(await card.isVisible(),true,'Declining discard preserves the current form');
-    assert.equal(await page.locator('#online-show-all,#online-refresh').count(),0);assert((await card.locator('.match-meta').textContent()).includes('10:01'));assert.equal(await card.locator('h3').count(),0);assert.equal(await card.locator('label').first().textContent(),'Speler 0');assert.equal(await card.locator('[data-open-state]').textContent(),'Open');assert.equal(await page.locator('[data-detail-tab=champion]').isVisible(),false);assert.equal(await page.locator('[data-online-match="match-2"]').isVisible(),true);
+    assert.equal(await page.locator('#online-show-all,#online-refresh,#online-day,#online-back').count(),0);assert((await card.locator('.match-meta').textContent()).includes('10:01'));assert.equal(await card.locator('h3').count(),0);assert.equal(await card.locator('label').first().textContent(),'Speler 0');assert.equal(await card.locator('[data-open-state]').textContent(),'Open');assert.equal(await page.locator('[data-detail-tab=champion]').isVisible(),false);assert.equal(await page.locator('[data-online-match="match-2"]').isVisible(),true);
     await page.clock.fastForward(61000);
     assert.equal(await card.locator('form button').isDisabled(),true,'Open tab closes at deadline');assert.equal(await card.locator('[data-open-state]').getAttribute('class'),'pill is-closed');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Mobile width');
@@ -93,16 +96,16 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     page.on('dialog',dialog=>dialog.accept());
     await page.getByRole('button',{name:'Volgende',exact:true}).click();
     await page.locator('[data-online-match="match-50"]').waitFor();
-    assert.equal(await page.getByRole('button',{name:'Volgende',exact:true}).isDisabled(),true);assert((await page.locator('[data-online-match="match-52"] .match-meta').textContent()).includes('20:30'));assert.equal(await page.locator('#online-day').inputValue(),'2026-10-16');
+    assert.equal(await page.getByRole('button',{name:'Volgende',exact:true}).isDisabled(),true);assert((await page.locator('[data-online-match="match-52"] .match-meta').textContent()).includes('20:30'));assert.equal(await page.locator('[data-online-match="match-51"]').isVisible(),true);
     await page.getByRole('button',{name:'Vorige',exact:true}).click();
     await page.locator('[data-online-match="match-0"]').waitFor();
     assert.equal(await page.locator('[data-online-match="match-0"] [name="away"]').inputValue(),'3','Paging preserves unsaved input');
     await page.evaluate(()=>window.qaFailRead=true);
-    await page.locator('#online-day').selectOption('2026-10-17');
+    await page.locator('#online-round').selectOption('round-2');
     await page.getByText('Ophalen mislukt: Testverbinding verbroken').waitFor();
     await page.evaluate(()=>window.qaFailRead=false);
     await page.getByRole('button',{name:'Opnieuw proberen',exact:true}).click();
-    await page.locator('[data-online-match="match-51"]').waitFor();assert.equal(await page.locator('[data-pagination]').isVisible(),false);assert.equal(await page.locator('[data-online-match]').count(),1);
+    await page.locator('[data-online-match="match-51"]').waitFor();assert.equal(await page.locator('[data-pagination]').isVisible(),false);assert.equal(await page.locator('[data-online-match]').count(),2);await page.locator('[data-detail-tab=results]').click();assert((await page.locator('[data-detail-panel=results]').textContent()).includes('Speler 51'));await page.locator('#online-round').selectOption('');await page.locator('[data-detail-panel=results] tbody tr').first().waitFor();assert.equal(await page.locator('[data-detail-panel=results] tbody tr').count(),2);
     await page.getByRole('button',{name:'Home',exact:true}).click();
     await page.getByRole('button',{name:'Wedstrijden en voorspellingen'}).waitFor();await page.locator('.prediction-attention.remaining').waitFor();assert((await page.locator('.prediction-attention.remaining').textContent()).includes('Nog 48 te voorspellen'));
     assert.equal(await page.evaluate(()=>Object.values(localStorage).some(v=>v.includes('match-0'))),false,'No online predictions cached locally');

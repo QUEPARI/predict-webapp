@@ -3,8 +3,6 @@ const labels = {published:'Gepubliceerd',active:'Actief',completed:'Afgerond',ar
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const date = value => value && Number.isFinite(Date.parse(value))
   ? new Intl.DateTimeFormat('nl-NL',{dateStyle:'medium',timeStyle:'short'}).format(new Date(value)) : 'Nog niet bevestigd';
-const dayKey=value=>{if(!value||!Number.isFinite(Date.parse(value)))return 'undated';const d=new Date(value),pad=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;};
-const dayLabel=key=>key==='undated'?'Zonder begintijd':new Intl.DateTimeFormat('nl-NL',{weekday:'short',day:'numeric',month:'short'}).format(new Date(key+'T12:00:00'));
 const current = (target,ctx) => target.isConnected && !ctx.signal.aborted && ctx.isCurrent();
 const open = (m,t) => ['published','active'].includes(t.status) && m.predictions_enabled === true &&
   m.needs_review === false && m.start_time_confirmed === true && m.round_id != null &&
@@ -45,7 +43,7 @@ function showError(target,ctx,error,retry) {
   target.append(message,button);
 }
 
-export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'predictions',round:'',day:''}) {
+export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'predictions',round:''}) {
   const target=document.createElement('section');target.className='stack tournament-detail';target.textContent='Toernooi laden...';host.replaceChildren(target);
   try {
     const [tour,entry] = await Promise.all([
@@ -70,9 +68,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
     const bracket=!bracketResponse.error&&Array.isArray(bracketResponse.data?.matches)&&Array.isArray(bracketResponse.data?.rounds)?bracketResponse.data:null;
     const byes=new Set((bracket?.matches||[]).filter(m=>m.bye).map(m=>m.id));
     const allMatches=(matches.data||[]).filter(m=>!byes.has(m.id));
-    const days=[...new Set(allMatches.map(m=>dayKey(m.scheduled_start)))].sort((a,b)=>a==='undated'?1:b==='undated'?-1:a.localeCompare(b));
-    if(!days.includes(view.day)){const today=dayKey(new Date().toISOString());view.day=days.includes(today)?today:days.find(d=>d!=='undated'&&d>=today)||days.filter(d=>d!=='undated').at(-1)||days[0]||'';}
-    const selected=allMatches.filter(m=>(!view.day||dayKey(m.scheduled_start)===view.day)&&(!view.round||m.round_id===view.round));
+    const selected=allMatches.filter(m=>!view.round||m.round_id===view.round);
     const resultMatches=selected.filter(m=>m.home_score!=null);
     let activeMatches=view.tab==='results'?resultMatches:selected;
     page=Math.max(0,Math.min(page,Math.ceil(activeMatches.length/size)-1));
@@ -89,13 +85,13 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
     const roundRules=new Map((rules.data || []).map(r=>[r.round_id,r]));
     const scoringMode=scoring.data?.[0]?.scoring_mode;
     const total=(points.data || []).reduce((sum,r)=>sum+Number(r.earned_points),0);
-    target.innerHTML=`<div class="breadcrumb"><button type="button" id="online-back">← Toernooioverzicht</button></div>
+    target.innerHTML=`
       <div class="tournament-title"><h1>${esc(t.name)}</h1><p class="muted mini">${esc(labels[t.status] || t.status)}</p></div>
       <p role="status" id="online-notice">${esc(notice)}</p>
       ${joined ? `<div class="participation-line">Je doet mee · Punten uit afgeronde wedstrijden: ${esc(total)}.</div>` :
       `<div class="panel stack"><p>Neem deel om je voorspellingen centraal op te slaan.</p>
         ${['published','active'].includes(t.status) ? '<button class="btn" id="online-join">Deelnemen aan dit toernooi</button>' : '<p>Dit toernooi staat niet meer open voor nieuwe deelnemers.</p>'}</div>`}
-      <nav class="detail-tabs" aria-label="Toernooionderdelen">${[['predictions','Voorspellingen'],['results','Uitslagen'],['schema','Schema'],['champion','Toernooiwinnaar'],['ranking','Klassement'],['rules','Spelregels & puntentelling']].map(([id,label])=>`<button type="button" data-detail-tab="${id}">${label}</button>`).join('')}</nav><div data-round-controls class="match-controls"><h2 data-list-title>Wedstrijden</h2><select id="online-day" aria-label="Speeldag">${days.map(d=>`<option value="${esc(d)}" ${view.day===d?'selected':''}>${esc(dayLabel(d))}</option>`).join('')}</select><select id="online-round" aria-label="Ronde"><option value="">Alle rondes</option>${(rounds.data||[]).map(r=>`<option value="${esc(r.id)}" ${view.round===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select></div><section data-detail-panel="predictions">
+      <nav class="detail-tabs" aria-label="Toernooionderdelen">${[['predictions','Voorspellingen'],['results','Uitslagen'],['schema','Schema'],['champion','Toernooiwinnaar'],['ranking','Klassement'],['rules','Spelregels & puntentelling']].map(([id,label])=>`<button type="button" data-detail-tab="${id}">${label}</button>`).join('')}</nav><div data-round-controls class="match-controls"><h2 data-list-title>Wedstrijden</h2><select id="online-round" aria-label="Ronde"><option value="">Alle rondes</option>${(rounds.data||[]).map(r=>`<option value="${esc(r.id)}" ${view.round===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select></div><section data-detail-panel="predictions">
       <div class="grid online-matches">${predictionMatches.map(m=>{
         const p=myPredictions.get(m.id),earned=myPoints.get(m.id);
         const allowed=joined && open(m,t);
@@ -104,8 +100,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
           ${joined ? `<form class="prediction-inline" data-online-predict="${esc(m.id)}"><div class="two">
             <div class="field"><label for="online-home-${esc(m.id)}">${esc(m.home_name)}</label><input id="online-home-${esc(m.id)}" aria-label="Score ${esc(m.home_name)}" name="home" inputmode="numeric" type="number" min="0" max="99" step="1" required value="${esc(p?.home_score ?? '')}" ${allowed?'':'disabled'}></div>
             <div class="field"><label for="online-away-${esc(m.id)}">${esc(m.away_name)}</label><input id="online-away-${esc(m.id)}" aria-label="Score ${esc(m.away_name)}" name="away" inputmode="numeric" type="number" min="0" max="99" step="1" required value="${esc(p?.away_score ?? '')}" ${allowed?'':'disabled'}></div>
-            </div><p class="hint">${p ? `Opgeslagen: ${esc(p.home_score)}–${esc(p.away_score)}` : allowed?'Nog geen voorspelling opgeslagen.':'Niet voorspeld.'}</p>
-            <p role="status" data-prediction-message></p><button class="btn" ${allowed?'':'hidden disabled'}>Opslaan</button></form>` : `<div class="teams">${esc(m.home_name)} – ${esc(m.away_name)}</div>`}
+            </div><p role="status" data-prediction-message></p><button class="btn" aria-live="polite" ${allowed?(p?'disabled':''):'hidden disabled'}>${p?'Opgeslagen':'Opslaan'}</button></form>` : `<div class="teams">${esc(m.home_name)} – ${esc(m.away_name)}</div>`}
           <table class="score-summary" data-score-summary ${allowed?'hidden':''}><thead><tr><th>Jouw voorspelling</th><th class="result-column">Uitslag</th><th>Punten</th></tr></thead><tbody><tr><td>${p?p.home_score+'–'+p.away_score:'—'}</td><td class="result-column">${m.home_score!=null?m.home_score+'–'+m.away_score:'—'}</td><td>${earned?.earned_points??'—'}</td></tr></tbody></table>
         </article>`;
       }).join('') || '<p>Er zijn nog geen wedstrijden beschikbaar op deze pagina.</p>'}</div>
@@ -137,9 +132,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
     window.addEventListener('beforeunload',event=>{
       if(current(target,ctx)&&hasDraft()){event.preventDefault();event.returnValue='';}
     },{signal:ctx.signal});
-    target.querySelector('#online-back').onclick=()=>{if(discard())ctx.onBack();};
     showTab(view.tab);
-    target.querySelector('#online-day').onchange=e=>{if(discard()){view.day=e.target.value;loadTournamentDetail(host,ctx,0,'',view);}else e.target.value=view.day;};
     target.querySelector('#online-round').onchange=e=>{if(discard()){view.round=e.target.value;loadTournamentDetail(host,ctx,0,'',view);}else e.target.value=view.round;};
     target.querySelector('#online-previous').onclick=()=>{page--;updatePage();};
     target.querySelector('#online-next').onclick=()=>{page++;updatePage();};
@@ -156,6 +149,13 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
     target.querySelectorAll('[data-online-predict]').forEach(form=>{
       const m=list.find(m=>m.id===form.dataset.onlinePredict);
       const message=form.querySelector('[data-prediction-message]');
+      const button=form.querySelector('button');
+      const syncSaved=()=>{
+        const saved=myPredictions.has(m.id)&&['home','away'].every(name=>form.elements[name].value===form.elements[name].defaultValue);
+        button.textContent=saved?'Opgeslagen':'Opslaan';button.disabled=!open(m,t)||saved;
+      };
+      form.addEventListener('input',()=>{message.textContent='';message.className='';syncSaved();});
+
       const disable=()=>{
         form.querySelectorAll('input,button').forEach(e=>e.disabled=true);
         const state=form.closest('article').querySelector('[data-open-state]');state.textContent='Gesloten';state.className='pill is-closed';form.querySelector('button').hidden=true;const summary=form.closest('article').querySelector('[data-score-summary]');if(summary)summary.hidden=false;
@@ -179,18 +179,17 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
           (m.score_unit!=='goals' && !((home===m.first_to && away<m.first_to)||(away===m.first_to && home<m.first_to)))) {
           message.textContent='Vul een geldige eindstand voor dit wedstrijdformaat in.';return;
         }
-        const button=form.querySelector('button');button.disabled=true;message.textContent='Opslaan...';
+        button.disabled=true;button.textContent='Opslaan…';message.textContent='';
         const fields=[...form.querySelectorAll('input')];fields.forEach(i=>i.disabled=true);
         try {
           const {error}=await ctx.supabase.rpc('submit_match_prediction',{p_match_id:m.id,p_home_score:home,p_away_score:away});
           if (!current(target,ctx)) return;
           if(error) throw new Error(error.message);
           // Preserve unsaved input on other cards; only update the submitted form.
-          form.elements.home.defaultValue=String(home);form.elements.away.defaultValue=String(away);myPredictions.set(m.id,{home_score:home,away_score:away});const cell=form.closest('article').querySelector('[data-score-summary] td');if(cell)cell.textContent=home+'–'+away;
-          form.querySelector('.hint').textContent=`Opgeslagen: ${home}–${away}`;
-          button.textContent='Opslaan';message.textContent='✓ Opgeslagen in Predict.';message.className='success';
-        } catch(error) {if(current(target,ctx)){message.textContent='Opslaan mislukt: '+error.message;message.className='error';}}
-        finally {if(current(target,ctx)){const allowed=open(m,t);button.disabled=!allowed;fields.forEach(i=>i.disabled=!allowed);if(!allowed)disable();}}
+          form.elements.home.value=form.elements.home.defaultValue=String(home);form.elements.away.value=form.elements.away.defaultValue=String(away);myPredictions.set(m.id,{home_score:home,away_score:away});const cell=form.closest('article').querySelector('[data-score-summary] td');if(cell)cell.textContent=home+'–'+away;
+          syncSaved();message.textContent='';message.className='';
+        } catch(error) {if(current(target,ctx)){button.textContent='Opslaan';message.textContent='Opslaan mislukt: '+error.message;message.className='error';}}
+        finally {if(current(target,ctx)){const allowed=open(m,t);syncSaved();fields.forEach(i=>i.disabled=!allowed);if(!allowed)disable();}}
       };
     });
   } catch(error) {showError(target,ctx,error,()=>loadTournamentDetail(host,ctx,page,'',view));}

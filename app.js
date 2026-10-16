@@ -1,6 +1,6 @@
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=daily-20261016';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=saved-20261017';
 import {loadOnlineProfile} from './online-profile.js?v=account-20261016';
 
 // Route native Auth callbacks to the isolated, non-persistent account flow.
