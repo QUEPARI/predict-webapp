@@ -2,6 +2,16 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen en echte privépoules. Andere delen van de interface bevatten nog lokale demonstraties. **Geen volledig afgeronde productie-app.**
 
+## Online toernooien en voorspellingen
+- **Home** toont je werkelijke toernooideelnames; **Toernooien** toont het gepubliceerde aanbod uit Supabase.
+- Je kunt deelnemen zonder poule. Deelname voegt alleen je eigen account toe en is herhaalbaar zonder dubbele records. Concepten en gesloten toernooien accepteren geen nieuwe deelname.
+- Open een toernooi voor de werkelijke wedstrijden, je eigen voorspellingen en serverberekende punten. Alleen goedgekeurde, vrijgegeven wedstrijden met een bevestigde toekomstige individuele starttijd zijn bewerkbaar.
+- Voorspellen en wijzigen verlopen via de bestaande `submit_match_prediction`-RPC. Darts gebruikt het vastgestelde sets-/legsformaat; voetbal staat gelijkspel toe en telt geen strafschoppen mee.
+- Geen online voorspellingen in lokale opslag. Niet-opgeslagen invoer op andere wedstrijdkaarten blijft behouden na opslaan. Navigeren met niet-opgeslagen wijzigingen vraagt om bevestiging.
+- Maximaal 50 wedstrijden per pagina. Ververs bewust voor tussentijdse beheerwijzigingen; de server bewaakt de deadline en rechten bij iedere opslag. Een open formulier wordt ook op de individuele deadline lokaal geblokkeerd.
+- Migraties `20261016140215_tournament_self_entry.sql` en `20261016140415_restrict_tournament_entry_grants.sql` zijn toegepast. De tweede verwijdert overbodige directe browserrechten op deelnames; bestaande RLS en beheerdersfuncties blijven actief.
+- Tests: `supabase/tests/tournament_entry.sql` (rollback) en `tests/tournaments-ui.cjs` (mockbackend). Zie [de testnotities](docs/online-predictions-milestone.md).
+
 ## Online privépoules
 - Open **Mijn poules**, kies een gepubliceerd/actief toernooi en maak een poule aan. Je wordt automatisch toernooideelnemer en poulebeheerder.
 - De beheerder maakt een uitnodigingscode voor een e-mailadres en deelt die zelf. Er wordt geen e-mail verzonden. De ontvanger heeft een bestaand Predict-account met dat bevestigde e-mailadres nodig.

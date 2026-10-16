@@ -1,5 +1,6 @@
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js';
 
 const SUPABASE_URL =
   'https://sfcozzjcuppfypetbbzn.supabase.co';
@@ -1529,3 +1530,38 @@ async function loadPrivatePoolDetail(pool) {
     finally {if (button.isConnected) button.disabled = false;}
   };
 }
+
+// Replace the remaining tournament demo routes with authenticated online screens.
+// Obsolete local demo IDs must never select an online tournament or prediction.
+state.tournament = null;
+let onlineTournamentId = null;
+let onlineScreenController = null;
+home = discover = function () {return '<section id="online-tournaments" class="stack" aria-label="Toernooien">Toernooien laden...</section>';};
+const renderBeforeOnlineTournaments = render;
+render = function () {
+  onlineScreenController?.abort();
+  renderBeforeOnlineTournaments();
+  if (!currentUser) {onlineTournamentId=null;return;}
+  document.querySelectorAll('.nav button').forEach(button=>{
+    const navigate=button.onclick;
+    button.onclick=event=>{
+      const dirty=[...document.querySelectorAll('[data-online-predict] input')].some(i=>i.value!==i.defaultValue);
+      if(dirty&&!confirm('Niet-opgeslagen wijzigingen laten vervallen?'))return;
+      onlineTournamentId=null;navigate(event);
+    };
+  });
+  if (state.tab !== 'profile') {
+    const badge=document.querySelector('.top .badge');if(badge)badge.textContent='ONLINE';
+    const footer=document.querySelector('.footer');if(footer)footer.textContent='Predict · Toernooien, voorspellingen en poules uit Supabase';
+  }
+  const target=document.getElementById('online-tournaments');
+  if (!target) return;
+  onlineScreenController=new AbortController();
+  const userId=currentUser.id;
+  const ctx={supabase,userId,signal:onlineScreenController.signal,isCurrent:()=>currentUser?.id===userId,
+    mode:state.tab,tournamentId:onlineTournamentId,
+    onOpen:id=>{onlineTournamentId=id;render();},
+    onBack:()=>{onlineTournamentId=null;render();}};
+  if (onlineTournamentId) loadTournamentDetail(target,ctx);
+  else loadTournamentCatalog(target,ctx);
+};

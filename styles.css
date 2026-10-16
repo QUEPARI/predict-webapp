@@ -2,6 +2,7 @@
 /* Keep signed-in account actions and private-pool content usable on phones. */
 .stack > * { min-width: 0; }
 #private-pools h2 { overflow-wrap: anywhere; }
+#online-tournaments h1, #online-tournaments h2, .online-matches h3 { overflow-wrap: anywhere; }
 @media(max-width:740px) {
   .top, .top-actions { flex-wrap: wrap; }
   .top-actions { max-width: 100%; }
