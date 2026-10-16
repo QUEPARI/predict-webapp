@@ -1,0 +1,43 @@
+# Volledige productbouw – voortgang en acceptatie
+
+De doelomvang is de volledige algemene voorspelapp; er is bewust geen aparte MVP-scope.
+
+## 1. Basis en veiligheid [gestart]
+- [x] Offline responsive UI en sportonafhankelijke tabellen als beginpunt
+- [ ] React/TypeScript app initialiseren zodra npm/dependencies beschikbaar zijn
+- [ ] Supabase-project, migrations, seeding en schema-consistentie
+- [ ] Invite-only Auth, token-hashing, e-mailbevestiging en wachtwoordherstel
+- [ ] RLS-policies en beveiligde RPC's voor alle schrijfhandelingen
+- [ ] Meerdere systeembeheerders, beheerdersaudit en rechtentests
+
+## 2. Toernooi, poules en voorspellingen
+- [ ] Adminbeheer voor sporten, competities, edities, fasen en deelnemers
+- [ ] Deelname zonder poule; één voorspelling telt in iedere poule van dat toernooi
+- [ ] Pouleaanmaak, uitnodigen, verwijderen, eigendomsoverdracht en accountverwijdering
+- [ ] Wedstrijdvoorspelling als transactionele serverfunctie met UTC-deadlinebewaking
+- [ ] Ongeldigverklaring voorspellingen bij deelnemersvervanging
+- [ ] Extra antwoorden met uniciteit, max-aantal en gelijktijdige deadline
+- [ ] Afgeschermde voorspellingen tot deadline, ook op databaseniveau
+
+## 3. Scoring en uitslagen
+- [ ] Regel-engine: darts sets/legs, voetbal eindscore exclusief strafschoppen
+- [ ] WK Darts 2027-definitieve regels; geen punten voor walk-overs
+- [ ] Configureerbare toernooipuntenschema's, vergrendeling en auditcorrecties
+- [ ] Gedeelde officiële winnaars en punten per correct antwoord
+- [ ] Reproduceerbare klassementen per toernooi, poule en ronde
+- [ ] Tiebreakers: punten, correcte winnaars, exact, dan gedeeld
+
+## 4. Gegevensbronnen
+- [ ] DartsAPI-fixtures ophalen met paginering en rate-budget
+- [ ] DartsAPI gisterenresultaten ophalen; fixture/result match met conflictwachtrij
+- [ ] TheSportsDB voor voetbal testen (recorddekking en latency)
+- [ ] Adaptieve sync en server-side cron; idempotente verwerking
+- [ ] Handmatige voorlopige uitslag + latere API-verificatie, conflictreview
+- [ ] Bij uitstel veilig heropenen alleen bij bevestigde niet-start
+
+## 5. PWA, privacy en kwaliteit
+- [ ] Werkende installable PWA met iconen en service worker
+- [ ] Web Push: 2 uur voor sessie en maximaal één keer, ontbrekende voorspellingen
+- [ ] Privacy, accountverwijdering, backups en wettelijke bewaarplichten
+- [ ] Integratie-, deadline-, autorisatie- en regressietests
+- [ ] CI voor GitHub Pages + staging/production deploy
