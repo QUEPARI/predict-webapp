@@ -313,6 +313,13 @@ render = function () {
     </div>
 
     <div class="section-head">
+      <h2>Echte klassementen</h2>
+    </div>
+    <div class="panel stack" id="admin-leaderboards">
+      Klassementen laden...
+    </div>
+
+    <div class="section-head">
       <h2>Wedstrijden</h2>
       <button class="btn secondary"
               id="admin-refresh">
@@ -335,6 +342,7 @@ render = function () {
   loadAdminMatches();
   loadAdminTournamentPublications();
   loadQaPredictionForm();
+  loadAdminLeaderboards();
 };
 
 // Gebruik dezelfde beschikbaarheidscontrole in de tabel en de uitslagpop-up.
@@ -1180,4 +1188,110 @@ async function loadQaPredictionForm() {
     feedback.textContent = `Opgeslagen in Supabase (ID: ${savedId}).`;
     await loadQaPredictionForm();
   };
+}
+
+
+/*
+ * Klassementen zijn volledig serverberekend en omvatten alle officiële
+ * afgeronde wedstrijden van een toernooi, ook bij later poulelidmaatschap.
+ * Het filter op ronde of poule wordt eveneens op de server afgedwongen.
+ */
+async function loadAdminLeaderboards() {
+  const panel = document.getElementById('admin-leaderboards');
+  if (!panel || !currentUser) return;
+  const {data: tournaments, error} = await supabase.rpc('admin_list_tournaments');
+  if (!panel.isConnected) return;
+  if (error) {
+    panel.textContent = 'Toernooien ophalen mislukt: ' + error.message;
+    return;
+  }
+  const list = (tournaments || []).filter(t => t.status !== 'draft');
+  if (!list.length) {
+    panel.textContent = 'Er zijn nog geen gepubliceerde toernooien.';
+    return;
+  }
+  panel.innerHTML = `
+    <p class="hint">Live uit Supabase. Punten worden per toernooi berekend; bij een
+       gelijke stand telt het aantal juist voorspelde winnaars.</p>
+    <div class="two">
+      <div class="field"><label for="leaderboard-tournament">Toernooi</label>
+        <select id="leaderboard-tournament">${list.map(t =>
+          `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label for="leaderboard-pool">Poule</label>
+        <select id="leaderboard-pool"><option value="">Alle deelnemers</option></select>
+      </div>
+      <div class="field"><label for="leaderboard-round">Ronde</label>
+        <select id="leaderboard-round"><option value="">Alle rondes</option></select>
+      </div>
+    </div>
+    <div id="leaderboard-results" class="table-wrap" role="status">Laden...</div>
+    <button class="btn secondary" id="leaderboard-refresh" type="button">Vernieuwen</button>
+  `;
+  const tour = panel.querySelector('#leaderboard-tournament');
+  const pool = panel.querySelector('#leaderboard-pool');
+  const round = panel.querySelector('#leaderboard-round');
+  const results = panel.querySelector('#leaderboard-results');
+  let version = 0;
+
+  async function refreshOptions() {
+    const request = ++version;
+    const tournamentId = tour.value;
+    pool.innerHTML = '<option value="">Alle deelnemers</option>';
+    round.innerHTML = '<option value="">Alle rondes</option>';
+    results.textContent = 'Filters laden...';
+    const [poolsResponse, roundsResponse] = await Promise.all([
+      supabase.from('pools').select('id,name').eq('tournament_id', tournamentId).order('name'),
+      supabase.rpc('admin_get_tournament_rounds', {p_tournament_id: tournamentId})
+    ]);
+    if (!panel.isConnected || request !== version) return;
+    if (!poolsResponse.error) {
+      for (const p of poolsResponse.data || []) {
+        const option = document.createElement('option');
+        option.value = p.id;
+        option.textContent = p.name;
+        pool.appendChild(option);
+      }
+    }
+    if (!roundsResponse.error) {
+      for (const r of roundsResponse.data || []) {
+        const option = document.createElement('option');
+        option.value = r.round_id;
+        option.textContent = r.round_name;
+        round.appendChild(option);
+      }
+    }
+    await refreshRows();
+  }
+
+  async function refreshRows() {
+    const request = ++version;
+    results.textContent = 'Klassement laden...';
+    const {data, error} = await supabase.rpc('get_tournament_leaderboard', {
+      p_tournament_id: tour.value,
+      p_pool_id: pool.value || null,
+      p_round_id: round.value || null
+    });
+    if (!panel.isConnected || request !== version) return;
+    if (error) {
+      results.textContent = 'Klassement ophalen mislukt: ' + error.message;
+      return;
+    }
+    const rows = data || [];
+    results.innerHTML = rows.length
+      ? `<table><thead><tr><th>#</th><th>Deelnemer</th><th class="num">Punten</th>
+          <th class="num">Winnaars</th><th class="num">Exact</th></tr></thead>
+          <tbody>${rows.map(r => `<tr><td>${r.rank_position}</td>
+            <td>${esc(r.display_name)}</td>
+            <td class="num"><strong>${r.earned_points}</strong></td>
+            <td class="num">${r.correct_winners}</td>
+            <td class="num">${r.exact_scores}</td></tr>`).join('')}</tbody></table>`
+      : '<p class="hint">Nog geen deelnemers in dit klassement.</p>';
+  }
+
+  tour.onchange = refreshOptions;
+  pool.onchange = refreshRows;
+  round.onchange = refreshRows;
+  panel.querySelector('#leaderboard-refresh').onclick = refreshRows;
+  await refreshOptions();
 }
