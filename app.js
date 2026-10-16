@@ -332,10 +332,9 @@ render = function () {
   const section = document.createElement('section');
 
   section.innerHTML = `
-    <h1>Wedstrijdbeheer</h1>
+    <h1>Beheer</h1>
     <p class="sub">
-      Controleer geïmporteerde wedstrijden
-      van alle toernooien.
+      Beheer je toernooien, wedstrijden en accounts.
     </p>
 
     <div class="notice">
@@ -963,32 +962,22 @@ async function recordAdminMatchStart(matchId) {
 // Toernooipublicatie: de backend controleert beheerdersrechten,
 // compleetheid van de puntentelling, de status en auditregistratie.
 // Deze handeling opent GEEN wedstrijden voor voorspellingen.
-async function loadAdminTournamentPublications() {
-  const target = document.getElementById('admin-tournament-publications');
-  if (!target || !['admin','super_admin'].includes(currentRole)) return;
-  target.textContent = 'Toernooistatus laden...';
-  const { data, error } = await supabase.rpc('admin_list_tournaments');
-  if (!target.isConnected) return;
-  if (error) {
-    console.error('Toernooistatus:', error);
-    target.textContent = `Toernooien laden mislukt: ${error.message}`;
-    return;
-  }
-  if (!data || data.length === 0) {
-    target.textContent = 'Geen toernooien zichtbaar.';
-    return;
-  }
-  target.innerHTML = `<p class="muted mini">Publiceren vergrendelt de puntentelling. Het opent geen voorspellingen.</p>
-    <table><thead><tr><th>Toernooi</th><th>Status</th><th>Toernooistart</th><th>Actie</th></tr></thead>
-    <tbody>${data.map(t => `<tr>
-      <td>${esc(t.name)}</td><td>${esc(t.status)}</td>
-      <td>${t.starts_at ? esc(fmt(t.starts_at)) : 'Onbekend'}</td>
-      <td><button class="btn secondary" data-publish-tournament="${esc(t.id)}"
-        ${t.status !== 'draft' ? 'disabled title="Alleen concepttoernooien kunnen worden gepubliceerd"' : ''}>
-        Publiceren</button></td></tr>`).join('')}</tbody></table>`;
-  target.querySelectorAll('[data-publish-tournament]').forEach(button => {
-    button.onclick = () => showPublishTournamentDialog(data.find(t => t.id === button.dataset.publishTournament));
-  });
+async function loadAdminTournamentPublications(force=false) {
+  const target=document.getElementById('admin-tournament-publications');
+  if(!target||!['admin','super_admin'].includes(currentRole))return;
+  if(!force&&target.querySelector('[data-ko-dirty="true"]'))return;
+  tournamentManagementController?.abort();tournamentManagementController=new AbortController();const managementSignal=tournamentManagementController.signal;
+  const userId=currentUser.id;
+  try{const {loadTournamentManagement}=await import('./tournament-management.js');
+    if(!target.isConnected||managementSignal.aborted)return;
+    await loadTournamentManagement(target,{supabase,signal:managementSignal,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole),
+      onSaved:()=>loadAdminMatches(),onEdit:(id,knockout)=>{showAdminSection(knockout?'schema':'matches');if(knockout)document.dispatchEvent(new CustomEvent('predict-knockout-select',{detail:id}));},
+      onPublish:async t=>{if(!t.knockout){showPublishTournamentDialog(t);return;}
+        if(!confirm('Publiceren vergrendelt de puntentelling en opent complete toekomstige wedstrijden. Doorgaan?'))return;
+        const r=await supabase.rpc('edit_knockout',{p_tournament:t.id,p_action:'publish',p_match:null,p_values:{}});
+        if(!target.isConnected)return;if(r.error){alert(r.error.message);return;}loadAdminTournamentPublications();loadAdminMatches();
+      }});
+  }catch(error){if(target.isConnected)target.textContent='Toernooibeheer laden mislukt: '+error.message;}
 }
 
 function showPublishTournamentDialog(tournament) {
@@ -1678,4 +1667,23 @@ render=function(){
   import('./knockout.js').then(({loadKnockoutAdmin})=>{
     if(!signal.aborted&&target.isConnected)loadKnockoutAdmin(target,{supabase,signal,isCurrent:()=>currentUser?.id===userId,onSaved:()=>{loadAdminMatches();loadAdminTournamentPublications();}});
   }).catch(()=>{if(!signal.aborted&&target.isConnected)target.textContent='Knock-outbeheer laden mislukt. Open Beheer opnieuw.';});
+};
+
+let tournamentManagementController=null;
+let selectedAdminSection='tournaments';
+function showAdminSection(id){
+ selectedAdminSection=id;
+ document.querySelectorAll('[data-admin-panel]').forEach(panel=>panel.hidden=panel.dataset.adminPanel!==id);
+ document.querySelectorAll('[data-admin-section]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.adminSection===id)));
+}
+const renderBeforeAdminNavigation=render;
+render=function(){
+ tournamentManagementController?.abort();renderBeforeAdminNavigation();if(!currentUser||!['admin','super_admin'].includes(currentRole)||state.tab!=='admin')return;
+ const publication=document.getElementById('admin-tournament-publications'),old=publication?.closest('section');if(!old)return;
+ const shell=document.createElement('section');shell.className='admin-shell stack';shell.innerHTML='<h1>Beheer</h1><nav class="admin-subnav" aria-label="Beheeronderdelen"></nav>';
+ document.querySelector('.nav')?.after(shell);
+ const nav=shell.querySelector('nav');
+ const groups=[['tournaments','Toernooien',publication],['schema','Schema’s',document.getElementById('admin-knockout')],['matches','Wedstrijden',document.getElementById('admin-matches')?.closest('.panel')],['accounts','Accounts',document.getElementById('account-invitations')],['rankings','Klassementen',document.getElementById('admin-leaderboards')],['qa','Testomgeving',document.getElementById('qa-prediction-panel')]];
+ groups.forEach(([id,label,content])=>{if(!content)return;const panel=document.createElement('section');panel.dataset.adminPanel=id;panel.className='stack';panel.setAttribute('aria-label',label);const button=document.createElement('button');button.type='button';button.textContent=label;button.dataset.adminSection=id;button.onclick=()=>showAdminSection(id);nav.append(button);if(id==='matches'){const refresh=document.getElementById('admin-refresh');if(refresh)panel.append(refresh);}panel.append(content);shell.append(panel);});
+ old.remove();showAdminSection(selectedAdminSection);
 };
