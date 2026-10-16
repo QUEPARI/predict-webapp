@@ -299,6 +299,13 @@ render = function () {
     </div>
 
     <div class="section-head">
+      <h2>Toernooipublicatie</h2>
+    </div>
+    <div class="panel" id="admin-tournament-publications">
+      Toernooistatus laden...
+    </div>
+
+    <div class="section-head">
       <h2>Wedstrijden</h2>
       <button class="btn secondary"
               id="admin-refresh">
@@ -319,6 +326,7 @@ render = function () {
     loadAdminMatches;
 
   loadAdminMatches();
+  loadAdminTournamentPublications();
 };
 
 let adminMatchesCache = [];
@@ -870,5 +878,97 @@ async function recordAdminMatchStart(matchId) {
     }
     dialog.close();
     await loadAdminMatches();
+  };
+}
+
+
+// Toernooipublicatie: de backend controleert beheerdersrechten,
+// compleetheid van de puntentelling, de status en auditregistratie.
+// Deze handeling opent GEEN wedstrijden voor voorspellingen.
+async function loadAdminTournamentPublications() {
+  const target = document.getElementById('admin-tournament-publications');
+  if (!target || !['admin','super_admin'].includes(currentRole)) return;
+  target.textContent = 'Toernooistatus laden...';
+  const { data, error } = await supabase.from('tournaments')
+    .select('id,name,status,starts_at').order('name');
+  if (!target.isConnected) return;
+  if (error) {
+    console.error('Toernooistatus:', error);
+    target.textContent = 'Toernooien niet leesbaar voor dit account. Controleer de SELECT-rechten en RLS.';
+    return;
+  }
+  if (!data || data.length === 0) {
+    target.textContent = 'Geen toernooien zichtbaar.';
+    return;
+  }
+  target.innerHTML = `<p class="muted mini">Publiceren vergrendelt de puntentelling. Het opent geen voorspellingen.</p>
+    <table><thead><tr><th>Toernooi</th><th>Status</th><th>Toernooistart</th><th>Actie</th></tr></thead>
+    <tbody>${data.map(t => `<tr>
+      <td>${esc(t.name)}</td><td>${esc(t.status)}</td>
+      <td>${t.starts_at ? esc(fmt(t.starts_at)) : 'Onbekend'}</td>
+      <td><button class="btn secondary" data-publish-tournament="${esc(t.id)}"
+        ${t.status !== 'draft' ? 'disabled title="Alleen concepttoernooien kunnen worden gepubliceerd"' : ''}>
+        Publiceren</button></td></tr>`).join('')}</tbody></table>`;
+  target.querySelectorAll('[data-publish-tournament]').forEach(button => {
+    button.onclick = () => showPublishTournamentDialog(data.find(t => t.id === button.dataset.publishTournament));
+  });
+}
+
+function showPublishTournamentDialog(tournament) {
+  if (!tournament || tournament.status !== 'draft' ||
+      !['admin','super_admin'].includes(currentRole)) return;
+  const prior = document.getElementById('admin-publish-dialog');
+  if (prior) prior.close();
+  const dialog = document.createElement('dialog');
+  dialog.id = 'admin-publish-dialog';
+  dialog.setAttribute('aria-labelledby','publish-dialog-title');
+  Object.assign(dialog.style, {
+    width: 'min(540px, calc(100% - 32px))', maxHeight: '85vh',
+    overflowY: 'auto', margin: 'auto', padding: '28px', borderRadius: '16px',
+    border: '1px solid #cbd5e1',
+    background: state.theme === 'dark' ? '#1e293b' : '#ffffff',
+    color: state.theme === 'dark' ? '#ffffff' : '#111827'
+  });
+  document.body.appendChild(dialog);
+  dialog.addEventListener('close', () => dialog.remove(), {once:true});
+  dialog.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center">
+      <h2 id="publish-dialog-title">Toernooi publiceren</h2>
+      <button type="button" class="btn secondary" id="publish-close" aria-label="Sluiten">✕</button>
+    </div>
+    <p><strong>${esc(tournament.name)}</strong></p>
+    <p>Publicatie vergrendelt de puntentelling en wordt vastgelegd in het auditlog.
+    Deze actie opent <strong>geen</strong> wedstrijden voor voorspellingen.</p>
+    <p>Een nog onbevestigde wedstrijdstart blijft onbevestigd.</p>
+    <form id="publish-form" class="stack">
+      <label><input id="publish-confirm" type="checkbox" required>
+        Ik bevestig dat de puntentelling voor dit toernooi definitief is.</label>
+      <p id="publish-message" role="status"></p>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <button class="btn" type="submit">Publiceren en puntentelling vergrendelen</button>
+        <button class="btn secondary" type="button" id="publish-cancel">Annuleren</button>
+      </div>
+    </form>`;
+  dialog.querySelector('#publish-close').onclick = () => dialog.close();
+  dialog.querySelector('#publish-cancel').onclick = () => dialog.close();
+  dialog.querySelector('#publish-form').onsubmit = async event => {
+    event.preventDefault();
+    if (!dialog.querySelector('#publish-confirm').checked) return;
+    if (!window.confirm(`Publiceer ${tournament.name} en vergrendel de puntentelling? Dit opent geen voorspellingen.`)) return;
+    const submit = dialog.querySelector('button[type="submit"]');
+    const message = dialog.querySelector('#publish-message');
+    submit.disabled = true;
+    message.textContent = 'Publicatie verwerken...';
+    const { error } = await supabase.rpc('admin_publish_tournament', {
+      p_tournament_id: tournament.id
+    });
+    if (!dialog.isConnected) return;
+    if (error) {
+      console.error('Publiceren:',error);
+      message.textContent = `Publicatie mislukt: ${error.message}`;
+      submit.disabled = false;
+      return;
+    }
+    dialog.close();
+    await loadAdminTournamentPublications();
   };
 }
