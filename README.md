@@ -1,6 +1,14 @@
 # Predict – algemene sportvoorspelwebapp
 
-**Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen en echte privépoules. Andere delen van de interface bevatten nog lokale demonstraties. **Geen volledig afgeronde productie-app.**
+**Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
+
+## Profiel en voorkeuren
+- Het profiel toont je eigen gebruikersnaam, bewerkbare weergavenaam en thema: systeeminstelling, licht of donker.
+- Weergavenaam (1–40 tekens) en thema worden via `update_my_profile` bij je account opgeslagen. Gebruikersnaam en rol kunnen hiermee niet worden gewijzigd.
+- De themaknop bovenaan gebruikt dezelfde accountvoorkeur, zonder andere invoer te wissen. Systeeminstelling volgt wijzigingen in de apparaatvoorkeur.
+- Mijn voorspellingen toont je eigen opgeslagen voorspellingen, uitslagen en serverberekende punten per toernooi, met 25 voorspellingen per pagina.
+- De oude lokale demo-opslag wordt verwijderd. Alleen thema en navigatietab staan nog in een lokale UI-cache; accountnamen en echte voorspellingen niet. Supabase-sessies worden daarbij niet verwijderd.
+- Migratie `20261016145640_own_profile_preferences.sql` is toegepast. Tests en grenzen staan in [de profielmijlpaal](docs/profile-milestone.md).
 
 ## Online toernooien en voorspellingen
 - **Home** toont je werkelijke toernooideelnames; **Toernooien** toont het gepubliceerde aanbod uit Supabase.
