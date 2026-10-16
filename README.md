@@ -3,7 +3,14 @@
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
 ## Profiel en voorkeuren
-De vervolgmijlpaal voor [gebruikersnaam en wachtwoord zonder e-mail](docs/manual-accounts-milestone.md) is voorbereid. Deelnemers activeren hun account met een eenmalige code van een beheerder. Wachtwoordherstel gebruikt ook een beheerderscode. SMTP en een eigen domein zijn niet nodig. Backend is toegepast en de echte ketentest met een fictief account slaagt; de frontend staat nog in concept-PR #4.
+De mijlpaal voor [gebruikersnaam en wachtwoord zonder e-mail](docs/manual-accounts-milestone.md) is gepubliceerd via PR #4 (`aa45d6f`) en door de gebruiker getest. Deelnemers activeren hun account met een eenmalige code van een beheerder. Wachtwoordherstel gebruikt ook een beheerderscode. SMTP en een eigen domein zijn niet nodig.
+
+## Gecontroleerde sportimport (voorbereid)
+- [DartsAPI-wedstrijd- en uitslagvoorstellen](docs/reviewed-imports-milestone.md) komen eerst in een private controlewachtrij.
+- Een nieuwe wedstrijd blijft gesloten tot de bestaande goedkeurings- en vrijgaveprocedures zijn doorlopen. Uitslagen vereisen expliciete controle en kunnen bestaande afwijkende scores niet overschrijven.
+- Backendmigratie en `sync-darts-data` zijn toegepast; de nieuwe frontend is nog niet gepubliceerd. Er zijn geen officiële brongegevens verwerkt. Zie het verslag voor testresultaten en grenzen.
+
+## Profiel en voorkeuren (vervolg)
 
 - Het profiel toont je eigen gebruikersnaam, bewerkbare weergavenaam en thema: systeeminstelling, licht of donker.
 - Weergavenaam (1–40 tekens) en thema worden via `update_my_profile` bij je account opgeslagen. Gebruikersnaam en rol kunnen hiermee niet worden gewijzigd.
