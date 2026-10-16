@@ -24,6 +24,23 @@ export function knockoutStatus(m,now=Date.now()){
   if(m.status==='live'||Date.parse(m.start)<=now)return 'Uitslag nodig';
   return m.enabled?'Gepland · voorspellen open':'Gepland · voorspellen gesloten';
 }
+export function predictionState(m,t,now=Date.now()){
+ let reason='';
+ if(m.bye)reason='vrijstelling';
+ else if(m.status==='finished')reason='wedstrijd afgerond';
+ else if(m.status==='cancelled')reason='wedstrijd geannuleerd';
+ else if(m.status==='postponed')reason='wedstrijd uitgesteld';
+ else if(m.status==='live'||m.actual_start)reason='wedstrijd gestart';
+ else if(m.names_missing||!m.home_slot||!m.away_slot)reason='tegenstander of naam nog onbekend';
+ else if(!m.start)reason='begintijd ontbreekt';
+ else if(Date.parse(m.start)<=now)reason='deadline verstreken';
+ else if(!['published','active'].includes(t))reason='toernooi niet vrijgegeven';
+ else if(m.needs_review||!m.unit||(['legs','sets'].includes(m.unit)&&!m.first_to))reason='wedstrijdgegevens nog aanvullen';
+ else if(!m.enabled)reason='door beheerder gesloten';
+ return {open:!reason,label:reason?'Voorspellen gesloten — '+reason:'Voorspellen open'};
+}
+const won=(m,side)=>m.status==='finished'&&(m.winner_slot!=null?m.winner_slot===m[side+'_slot']:side==='home'?m.home_score>m.away_score:m.away_score>m.home_score);
+const person=(m,side)=>`<div class="ko-person ${won(m,side)?'ko-winner':''}"><span>${esc(m[side+'_slot']||'—')}.</span><span>${esc(m[side])}</span>${m[side+'_score']!=null?`<b>${m[side+'_score']}</b>`:''}</div>`;
 export const euroTourRules=()=>[6,6,6,6,7,8].map(first_to=>({unit:'legs',first_to}));
 const alive=(target,ctx)=>target.isConnected&&!ctx.signal.aborted&&ctx.isCurrent();
 export async function loadKnockoutSchema(target,ctx,id){
@@ -34,7 +51,7 @@ export async function loadKnockoutSchema(target,ctx,id){
   }catch(e){if(alive(target,ctx))target.textContent='Schema laden mislukt: '+e.message;}
 }
 function drawSchema(target,data){
-  target.innerHTML=`<h2>Volledig toernooischema</h2><p>Alle tijden: Nederland. Vrijstellingen leveren geen voorspelpunten op.</p><div class="ko-bracket">${data.rounds.map(r=>`<section class="stack ko-round"><h3>${esc(r.name)}</h3>${data.matches.filter(m=>m.round===r.order).map(m=>`<article class="panel stack"><div class="hint">Wedstrijd ${m.number} · ${esc(knockoutStatus(m))}</div><strong>${esc(m.home)} – ${esc(m.away)}</strong><div>${m.bye?'Automatisch door naar de volgende ronde':esc(dutchTime(m.start))}</div>${m.status==='finished'?`<div>Uitslag ${m.home_score}–${m.away_score}</div>`:''}</article>`).join('')}</section>`).join('')}</div>`;
+ target.innerHTML=`<h2>Volledig toernooischema</h2><div class="ko-bracket">${data.rounds.map(r=>`<section class="stack ko-round"><h3>${esc(r.name)}</h3>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel ko-node"><div class="hint">Wedstrijd ${m.number}</div>${person(m,'home')}${person(m,'away')}<small>${esc(dutchTime(m.start))}</small></article>`).join('')}</section>`).join('')}</div>`;
 }
 export async function loadKnockoutAdmin(target,ctx){
   target.innerHTML='<h2>Knock-outtoernooien</h2><p>Maak een schema met spelers of teams. Namen en tijden beheer je zelf; er wordt geen sport-API gebruikt.</p><div id="ko-create"></div><label for="ko-tour">Toernooi beheren</label><select id="ko-tour"><option value="">Kies een knock-outtoernooi</option></select><p id="ko-message" role="status"></p><div id="ko-editor" class="stack"></div>';
@@ -50,10 +67,19 @@ export async function loadKnockoutAdmin(target,ctx){
     const id=currentId,next=await rpc('get_knockout_schema',{p_id:id});if(!alive(target,ctx)||id!==currentId)return;data=next;data.matches.forEach(m=>m.names_missing=!!((m.home_slot&&!data.roster[m.home_slot-1])||(m.away_slot&&!data.roster[m.away_slot-1])));renderEditor();
   }
   async function mutate(action,match,values={}){
-    if(busy)return;busy=true;msg.textContent='Opslaan...';target.querySelectorAll('input,select,textarea,button').forEach(x=>x.disabled=true);
-    try{await rpc('edit_knockout',{p_tournament:currentId,p_action:action,p_match:match,p_values:values});if(!alive(target,ctx))return;await read();msg.textContent='Opgeslagen.';ctx.onSaved?.();}
-    catch(e){if(alive(target,ctx))msg.textContent=e.message;}
-    finally{busy=false;if(alive(target,ctx))target.querySelectorAll('input,select,textarea,button').forEach(x=>x.disabled=false);}
+    if(busy)return;
+    const card=match?target.querySelector(`[data-ko-match="${match}"]`):null;
+    const say=(text,error=false)=>{const local=match?target.querySelector(`[data-ko-match="${match}"] [data-save-message]`):action==='roster'?target.querySelector('[data-roster-message]'):msg;if(local){local.textContent=text;local.className=error?'error':'success';local.setAttribute('role',error?'alert':'status');}if(error&&local)local.scrollIntoView({block:'nearest'});};
+    let written=false;const unsaved=card&&action!=='result'?Object.fromEntries(['home','away','winner','reason'].map(name=>[name,card.querySelector(`[name="${name}"]`)?.value])):null;busy=true;say('Opslaan…');
+    const controls=[...target.querySelectorAll('input,select,textarea,button')].map(x=>[x,x.disabled]);controls.forEach(([x])=>x.disabled=true);
+    const expanded=[...target.querySelectorAll('#ko-cards details[open]')].map(x=>x.closest('article').dataset.koMatch),filter=$('ko-filter')?.value;
+    try{await rpc('edit_knockout',{p_tournament:currentId,p_action:action,p_match:match,p_values:values});written=true;if(!alive(target,ctx))return;await read();
+      if(unsaved){const next=target.querySelector(`[data-ko-match="${match}"]`);Object.entries(unsaved).forEach(([name,value])=>{const field=next?.querySelector(`[name="${name}"]`);if(field&&value!=null)field.value=value;});if(next&&['home','away'].some(name=>{const f=next.querySelector(`[name="${name}"]`);return f.value!==f.defaultValue;}))next.dataset.koDirty='true';}
+      expanded.forEach(id=>{const d=target.querySelector(`[data-ko-match="${id}"] details`);if(d)d.open=true;});if(filter){$('ko-filter').value=filter;$('ko-filter').onchange();}
+      say('✓ '+({schedule:'Begintijd en spelvorm opgeslagen',result:'Uitslag opgeslagen',open:'Voorspellen geopend',close:'Voorspellen gesloten',start:'Werkelijke start opgeslagen',postpone:'Uitstel opgeslagen',cancel:'Annulering opgeslagen',roster:'Deelnemersnamen opgeslagen',publish:'Toernooi gepubliceerd'}[action]||'Opgeslagen'));
+      msg.textContent='Opgeslagen.';ctx.onSaved?.();
+    }catch(e){if(alive(target,ctx)){say((written?'Opgeslagen, maar opnieuw laden mislukt: ':'Opslaan mislukt: ')+e.message,true);if(card){const field=/reden/i.test(e.message)?card.querySelector('[name=reason]'):/tijd|datum|deadline/i.test(e.message)?card.querySelector('[name=start]'):null;if(field)field.setAttribute('aria-invalid','true');}}}
+    finally{busy=false;controls.forEach(([x,disabled])=>{if(x.isConnected)x.disabled=disabled;});}
   }
   function renderEditor(){
     const host=$('ko-editor');
@@ -62,41 +88,53 @@ export async function loadKnockoutAdmin(target,ctx){
     if(data.status!=='completed'){
       const rosterForm=document.createElement('form');rosterForm.className='stack';rosterForm.id='ko-roster';
       const seen=new Set();
-      const entrant=(slot,label)=>{
-        if(!slot||seen.has(slot))return `<div>${esc(label)}</div>`;
+      const entrant=(slot,label,winner=false)=>{
+        if(!slot||seen.has(slot))return `<div class="ko-person ${winner?'ko-winner':''}"><span>${slot||'—'}.</span><span>${esc(label)}</span></div>`;
         seen.add(slot);
-        const direct=data.matches.some(m=>m.bye&&m.home_slot===slot);
-        return `<label>${direct?'Geplaatste deelnemer · direct in ronde 2':'Deelnemer'} · plek ${slot}<input data-slot="${slot}" maxlength="80" value="${esc(data.roster[slot-1])}" placeholder="Naam invullen"></label>`;
+        return `<label class="ko-person ${winner?'ko-winner':''}"><span>${slot}.</span><input aria-label="${slot}. Naam" data-slot="${slot}" maxlength="80" value="${esc(data.roster[slot-1])}" placeholder="Naam"></label>`;
       };
-      rosterForm.innerHTML=`<h3>Namen invullen in het schema</h3><p>Vul spelers of teams op hun officiële lotingsplek in. Een winnaarverwijzing wordt automatisch ingevuld na de uitslag. Lege plekken mag je tussentijds opslaan. Namen wijzigen kan zolang er geen voorspellingen, gestarte wedstrijden of ingestelde winnaarsvraag zijn.</p><div class="ko-bracket">${data.rounds.map(r=>`<section class="stack ko-round"><h4>${esc(r.name)}</h4>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel stack"><strong>Wedstrijd ${m.number}</strong>${entrant(m.home_slot,m.home)}${entrant(m.away_slot,m.away)}</article>`).join('')}</section>`).join('')}</div><button class="btn">Deelnemersnamen opslaan</button>`;
+      rosterForm.innerHTML=`<h3>Namen invullen in het schema</h3><p>Vul spelers of teams op hun officiële lotingsplek in. Een winnaarverwijzing wordt automatisch ingevuld na de uitslag. Lege plekken mag je tussentijds opslaan. Namen wijzigen kan zolang er geen voorspellingen, gestarte wedstrijden of ingestelde winnaarsvraag zijn.</p><div class="ko-bracket">${data.rounds.map(r=>`<section class="stack ko-round"><h4>${esc(r.name)}</h4>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel ko-node"><strong>Wedstrijd ${m.number}</strong>${entrant(m.home_slot,m.home,won(m,'home'))}${entrant(m.away_slot,m.away,won(m,'away'))}</article>`).join('')}</section>`).join('')}</div><button class="btn">Deelnemersnamen opslaan</button><p data-roster-message role="status"></p>`;
       // Preserve edit access if a historical bracket contains an unusual slot arrangement.
       if(seen.size!==data.roster.length){for(let slot=1;slot<=data.roster.length;slot++){if(!seen.has(slot))rosterForm.insertAdjacentHTML('beforeend',entrant(slot,''));}}
       host.querySelector('h3').after(rosterForm);rosterForm.oninput=()=>rosterForm.dataset.koDirty='true';
       rosterForm.onsubmit=e=>{e.preventDefault();if([...target.querySelectorAll('[data-ko-dirty="true"]')].some(x=>x!==rosterForm)&&!confirm('Andere niet-opgeslagen wijzigingen laten vervallen?'))return;
         const names=[...data.roster];rosterForm.querySelectorAll('[data-slot]').forEach(input=>names[Number(input.dataset.slot)-1]=input.value.trim());mutate('roster',null,{names});};
     }
-    const now=Date.parse(data.server_now||new Date().toISOString());
+    const now=Date.parse(data.server_now||new Date().toISOString()),receivedAt=Date.now();
     const cards=$('ko-cards');
     for(const m of data.matches){
-      const card=document.createElement('article');card.className='panel stack';card.dataset.koStatus=knockoutStatus(m,now);
-      card.innerHTML=`<h4>Wedstrijd ${m.number}: ${esc(m.home)} – ${esc(m.away)}</h4><p data-ko-status>${esc(knockoutStatus(m,now))}</p>`;
-      cards.append(card);if(m.bye)continue;
-      const form=document.createElement('form');form.className='stack';
-      form.innerHTML=`<label>Begintijd (Nederland)<input name="start" type="datetime-local" value="${esc(dutchInput(m.start))}"></label><div class="two"><label>Spelvorm<select name="unit">${(m.unit==='goals'?['goals']:['legs','sets']).map(u=>`<option value="${u}" ${u===m.unit?'selected':''}>${{goals:'Doelpunten',legs:'Legs',sets:'Sets'}[u]}</option>`).join('')}</select></label>${m.unit!=='goals'?`<label>First-to<input name="first" type="number" min="1" max="99" value="${esc(m.first_to)}"></label>`:''}</div><label>Reden voor wijziging / vrijgave<input name="reason" maxlength="500"></label><button class="btn">Datum en spelvorm opslaan</button><div class="row"><button type="button" data-action="open">Voorspellen vrijgeven / heropenen</button><button type="button" data-action="close">Direct sluiten</button><button type="button" data-action="start">Werkelijk gestart</button><button type="button" data-action="postpone">Uitstellen</button><button type="button" data-action="cancel">Annuleren</button></div><div class="two"><label>Score ${esc(m.home)}<input name="home" type="number" min="0" max="99" value="${esc(m.home_score)}"></label><label>Score ${esc(m.away)}<input name="away" type="number" min="0" max="99" value="${esc(m.away_score)}"></label></div>${m.unit==='goals'?`<label>Winnaar bij gelijkspel (na verlenging / strafschoppen)<select name="winner"><option value="">Kies winnaar</option>${m.home_slot?`<option value="${m.home_slot}">${esc(m.home)}</option>`:''}${m.away_slot?`<option value="${m.away_slot}">${esc(m.away)}</option>`:''}</select></label><p class="hint">Vul de score volgens de bestaande voetbalregels in, exclusief strafschoppen.</p>`:''}<button type="button" data-result>${m.status==='finished'?'Uitslag corrigeren':'Uitslag opslaan'}</button>`;
-      card.append(form);form.oninput=()=>card.dataset.koDirty='true';form.onchange=()=>card.dataset.koDirty='true';
-      function onlyThisDraft(){return ![...target.querySelectorAll('[data-ko-dirty="true"]')].some(x=>x!==card)||confirm('Andere niet-opgeslagen wedstrijdwijzigingen laten vervallen?');}
-      form.onsubmit=e=>{e.preventDefault();if(!onlyThisDraft())return;try{mutate('schedule',m.id,{start:dutchToUTC(form.elements.start.value),unit:form.elements.unit.value,first_to:form.elements.first?Number(form.elements.first.value)||null:null,reason:form.elements.reason.value});}catch(error){msg.textContent=error.message;}};
-      form.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>{if(onlyThisDraft()&&confirm(b.textContent+'?'))mutate(b.dataset.action,m.id,{reason:form.elements.reason.value});});
+      const card=document.createElement('article');card.className='panel ko-match';card.dataset.koMatch=m.id;card.dataset.koStatus=knockoutStatus(m,now);
+      const state=predictionState(m,data.status,now);
+      card.innerHTML=`<details><summary><strong>${esc(m.home)} – ${esc(m.away)}</strong><span>${m.home_score!=null?m.home_score+'–'+m.away_score:esc(dutchTime(m.start))}</span><span data-ko-status>${esc(knockoutStatus(m,now))}</span><span data-ko-open class="pill ${state.open?'is-open':'is-closed'}">${esc(state.label)}</span><span class="edit-hint">Bewerken</span></summary></details><p data-save-message role="status"></p>`;
+      cards.append(card);if(m.bye){card.hidden=true;continue;}
+      const form=document.createElement('form');form.className='stack ko-match-form';form.noValidate=true;
+      form.innerHTML=`<div class="two"><label>Begintijd (Nederland)<input name="start" type="datetime-local" value="${esc(dutchInput(m.start))}"></label><label>Spelvorm<select name="unit">${(m.unit==='goals'?['goals']:['legs','sets']).map(u=>`<option value="${u}" ${u===m.unit?'selected':''}>${{goals:'Doelpunten',legs:'Legs',sets:'Sets'}[u]}</option>`).join('')}</select></label></div>${m.unit!=='goals'?`<label>First-to<input name="first" type="number" min="1" max="99" value="${esc(m.first_to)}"></label>`:''}<label>Reden voor wijziging / vrijgave<input name="reason" maxlength="500"></label><button class="btn action-edit" ${m.status==='finished'?'disabled title="Begintijd van een afgeronde wedstrijd is vergrendeld"':''}>Datum en spelvorm opslaan</button><div class="toolbar"><button type="button" class="action-open" data-action="open">Voorspellen vrijgeven / heropenen</button><button type="button" class="action-pause" data-action="close">Direct sluiten</button><button type="button" class="action-edit" data-action="start">Werkelijk gestart</button><button type="button" class="action-pause" data-action="postpone">Uitstellen</button><button type="button" class="action-danger" data-action="cancel">Annuleren</button></div><div class="two"><label>Score ${esc(m.home)}<input name="home" type="number" min="0" max="99" value="${esc(m.home_score)}"></label><label>Score ${esc(m.away)}<input name="away" type="number" min="0" max="99" value="${esc(m.away_score)}"></label></div>${m.unit==='goals'?`<label>Winnaar bij gelijkspel<select name="winner"><option value="">Kies winnaar</option>${[['home',m.home_slot],['away',m.away_slot]].filter(x=>x[1]).map(([side,slot])=>`<option value="${slot}" ${m.winner_slot===slot?'selected':''}>${esc(m[side])}</option>`).join('')}</select></label>`:''}<button class="btn action-open" type="button" data-result>${m.status==='finished'?'Uitslag corrigeren':'Uitslag opslaan'}</button>`;
+      card.querySelector('details').append(form);
+      const say=(text,field)=>{const message=card.querySelector('[data-save-message]');message.textContent=text;message.className='error';message.setAttribute('role','alert');if(field){field.setAttribute('aria-invalid','true');field.focus();}message.scrollIntoView({block:'nearest'});};
+      form.oninput=()=>{card.dataset.koDirty='true';form.querySelectorAll('[aria-invalid]').forEach(x=>x.removeAttribute('aria-invalid'));};form.onchange=form.oninput;
+      const known=!!m.home_slot&&!!m.away_slot&&!m.names_missing;
+      const terminal=['finished','cancelled'].includes(m.status);
+      const buttons=form.querySelectorAll('[data-action]');buttons.forEach(b=>{if(b.dataset.action==='open')b.disabled=!known||terminal||!m.start||Date.parse(m.start)<=now||!['published','active'].includes(data.status)||!!m.actual_start||m.needs_review;else if(b.dataset.action==='start')b.disabled=!known||terminal||!!m.actual_start;else b.disabled=m.status==='finished';});
+      form.querySelector('[data-result]').disabled=!known||m.bye;
+      function onlyThisDraft(){return ![...target.querySelectorAll('[data-ko-dirty="true"]')].some(x=>x!==card)||confirm('Andere niet-opgeslagen wijzigingen laten vervallen?');}
+      form.onsubmit=e=>{e.preventDefault();if(!onlyThisDraft())return;try{const start=dutchToUTC(form.elements.start.value);if(!start){say('Vul een datum en tijd in.',form.elements.start);return;}if(!form.reportValidity())return;mutate('schedule',m.id,{start,unit:form.elements.unit.value,first_to:form.elements.first?Number(form.elements.first.value)||null:null,reason:form.elements.reason.value});}catch(error){say(error.message,form.elements.start);}};
+      buttons.forEach(b=>b.onclick=()=>{if(form.elements.reason.value.trim().length<3){say('Vul een reden in (minimaal 3 tekens).',form.elements.reason);return;}if(onlyThisDraft()&&confirm(b.textContent+'?'))mutate(b.dataset.action,m.id,{reason:form.elements.reason.value});});
       form.querySelector('[data-result]').onclick=()=>{
-        if(form.elements.home.value===''||form.elements.away.value===''){msg.textContent='Vul beide scores in.';return;}
-        if(onlyThisDraft()&&confirm('Deze uitslag verwerken en de winnaar doorplaatsen?'))mutate('result',m.id,{home_score:Number(form.elements.home.value),away_score:Number(form.elements.away.value),winner_slot:form.elements.winner?Number(form.elements.winner.value)||null:null,reason:form.elements.reason.value});
+        if(!m.start&&!m.actual_start){say('Sla eerst een begintijd op, of registreer de werkelijke start.',form.elements.start);return;}
+        if(dutchInput(m.start)!==form.elements.start.value){say('Sla eerst de gewijzigde begintijd op.',form.elements.start);return;}
+        if(form.elements.home.value===''||form.elements.away.value===''){say('Vul beide scores in.',form.elements.home.value===''?form.elements.home:form.elements.away);return;}
+        const h=Number(form.elements.home.value),a=Number(form.elements.away.value);
+        if(![h,a].every(x=>Number.isInteger(x)&&x>=0&&x<=99)||(m.unit!=='goals'&&!((h===m.first_to&&a<m.first_to)||(a===m.first_to&&h<m.first_to)))){say('Vul een geldige eindstand in voor deze spelvorm.',form.elements.home);return;}
+        if(!m.actual_start&&Date.parse(m.start)>Date.now()+(now-receivedAt)){say('De geplande start ligt nog in de toekomst. Registreer alleen een werkelijke start als de wedstrijd al begonnen is.',form.elements.start);return;}
+        if(m.status==='finished'&&form.elements.reason.value.trim().length<3){say('Geef een reden voor de uitslagcorrectie.',form.elements.reason);return;}
+        if(onlyThisDraft()&&confirm('Deze uitslag verwerken en de winnaar doorplaatsen?'))mutate('result',m.id,{home_score:h,away_score:a,winner_slot:form.elements.winner?Number(form.elements.winner.value)||null:null,reason:form.elements.reason.value});
       };
     }
-    $('ko-filter').onchange=()=>cards.querySelectorAll('article').forEach(c=>c.hidden=$('ko-filter').value!=='all'&&c.dataset.koStatus!==$('ko-filter').value);
+    $('ko-filter').onchange=()=>cards.querySelectorAll('article').forEach(c=>c.hidden=!!data.matches.find(m=>m.id===c.dataset.koMatch)?.bye||($('ko-filter').value!=='all'&&c.dataset.koStatus!==$('ko-filter').value));
     clearInterval(tickTimer);const clockOffset=now-Date.now();
     tickTimer=setInterval(()=>{
       if(!alive(target,ctx)){clearInterval(tickTimer);return;}
-      [...cards.children].forEach((card,index)=>{const state=knockoutStatus(data.matches[index],Date.now()+clockOffset);card.dataset.koStatus=state;card.querySelector('[data-ko-status]').textContent=state;});
+      [...cards.children].forEach((card,index)=>{const state=knockoutStatus(data.matches[index],Date.now()+clockOffset);card.dataset.koStatus=state;card.querySelector('[data-ko-status]').textContent=state;const p=predictionState(data.matches[index],data.status,Date.now()+clockOffset);card.querySelector('[data-ko-open]').textContent=p.label;card.querySelector('[data-ko-open]').className='pill '+(p.open?'is-open':'is-closed');if(!p.open&&Date.parse(data.matches[index].start)<=Date.now()+clockOffset){const b=card.querySelector('[data-action=open]');if(b)b.disabled=true;}});
       $('ko-filter').onchange();
     },1000);
     $('ko-refresh').onclick=()=>{if(!busy&&(!dirty()||confirm('Niet-opgeslagen wijzigingen laten vervallen?')))read().catch(e=>msg.textContent=e.message);};

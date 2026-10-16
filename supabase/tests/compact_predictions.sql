@@ -1,0 +1,35 @@
+begin;
+do $$
+declare a uuid:=gen_random_uuid();u uuid:=gen_random_uuid();v uuid:=gen_random_uuid();sid uuid;tid uuid;mid uuid;pid uuid;rows jsonb;rules jsonb:='[{"unit":"legs","first_to":6,"winner_points":1,"exact_points":3}]';counts jsonb;
+begin
+ if to_regclass('auth.users') is not null then insert into auth.users(id,email,email_confirmed_at,aud,role) values(a,a||'@compact-qa.invalid',now(),'authenticated','authenticated'),(u,u||'@compact-qa.invalid',now(),'authenticated','authenticated'),(v,v||'@compact-qa.invalid',now(),'authenticated','authenticated');end if;
+ insert into public.profiles(id,username) values(a,'compact-'||substr(a::text,1,20)),(u,'compact-'||substr(u::text,1,20)),(v,'compact-'||substr(v::text,1,20)) on conflict do nothing;
+ insert into public.user_roles values(a,'admin'),(u,'user'),(v,'user');select id into sid from public.sports where slug='darts';
+ perform set_config('request.jwt.claim.sub',a::text,true);perform set_config('role','authenticated',true);
+ tid:=public.create_knockout_tournament('QA compact',sid,'players',array['QA A','QA B'],now()+interval '1 day',rules);mid:=(public.get_knockout_schema(tid)->'matches'->0->>'id')::uuid;
+ perform public.edit_knockout(tid,'schedule',mid,jsonb_build_object('start',now()+interval '1 day','unit','legs','first_to',6));perform public.edit_knockout(tid,'publish');
+ perform set_config('role','postgres',true);insert into public.tournament_entries values(tid,u),(tid,v);insert into public.pools(tournament_id,owner_id,name) values(tid,u,'QA compact') returning id into pid;insert into public.pool_members(pool_id,user_id) values(pid,u),(pid,v);
+ perform set_config('role','authenticated',true);perform set_config('request.jwt.claim.sub',u::text,true);perform public.submit_match_prediction(mid,6,4);perform set_config('request.jwt.claim.sub',v::text,true);perform public.submit_match_prediction(mid,6,3);
+ perform set_config('request.jwt.claim.sub',a::text,true);perform public.edit_knockout(tid,'close',mid,'{"reason":"QA manually closed"}');
+ perform set_config('request.jwt.claim.sub',u::text,true);
+ if jsonb_array_length(public.get_pool_prediction_comparison(pid,v))<>0 or public.can_view_match_prediction(mid,v) then raise exception 'FAIL manual close revealed predictions';end if;
+ perform set_config('role','postgres',true);update public.matches set actual_start=now()+interval '1 hour' where id=mid;
+ perform set_config('role','authenticated',true);
+ if jsonb_array_length(public.get_pool_prediction_comparison(pid,v))<>0 or public.can_view_match_prediction(mid,v) then raise exception 'FAIL future actual start revealed';end if;
+ perform set_config('role','postgres',true);update public.matches set actual_start=now()-interval '1 minute',status='live' where id=mid;
+ perform set_config('role','authenticated',true);rows:=public.get_pool_prediction_comparison(pid,v);
+ if jsonb_array_length(rows)<>1 or rows->0->>'my_home'<>'6' or rows->0->>'their_away'<>'3' then raise exception 'FAIL comparison';end if;
+ perform set_config('request.jwt.claim.sub',a::text,true);
+ begin perform public.get_pool_prediction_comparison(pid,v);raise exception 'FAIL nonmember access';exception when insufficient_privilege then null;end;
+ perform public.edit_knockout(tid,'result',mid,'{"home_score":6,"away_score":4}');
+ perform set_config('request.jwt.claim.sub',u::text,true);rows:=public.get_pool_prediction_comparison(pid,v);
+ if rows->0->>'my_points'<>'3' or rows->0->>'their_points'<>'1' then raise exception 'FAIL comparison scoring';end if;
+ perform set_config('role','postgres',true);delete from public.pool_members where pool_id=pid and user_id=v;perform set_config('role','authenticated',true);
+ begin perform public.get_pool_prediction_comparison(pid,v);raise exception 'FAIL removed member access';exception when insufficient_privilege then null;end;
+ perform set_config('request.jwt.claim.sub',a::text,true);
+ tid:=public.create_knockout_tournament('QA empty delete',sid,'players',array['QA C','QA D'],now()+interval '1 day',rules);
+ counts:=(select x->'counts' from jsonb_array_elements(public.admin_tournament_catalog())x where x->>'id'=tid::text);
+ perform public.manage_tournament(tid,'delete',jsonb_build_object('confirm_empty',true,'expected',counts,'reason','QA empty delete'));
+end $$;
+select 'PASS: same-pool comparison privacy, manual closure, future actual start, removed member, scores and simple empty deletion' as result;
+rollback;

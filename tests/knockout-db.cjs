@@ -45,9 +45,11 @@ const {PGlite}=require('../.local-test/node_modules/@electric-sql/pglite');
  create trigger protect_match_audit_log before update or delete on public.match_audit_log for each row execute function public.prevent_match_audit_changes();
  create trigger protect_scoring_audit_log before update or delete on public.scoring_audit_log for each row execute function public.prevent_scoring_audit_changes();`);
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261016192203_tournament_management.sql'),'utf8'));
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261016202950_compact_predictions.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/manual_knockout.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/knockout_templates.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/tournament_management.sql'),'utf8'));
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/compact_predictions.sql'),'utf8'));
  const {rows}=await db.query('select count(*)::int n from public.tournaments');assert.equal(rows[0].n,0,'SQL suite rolls back every tournament');
  console.log('PASS: local PostgreSQL migration and transactional knockout integration tests; no hosted connection.');
  }finally{await db.close();}
