@@ -9,8 +9,15 @@ De mijlpaal voor [gebruikersnaam en wachtwoord zonder e-mail](docs/manual-accoun
 - De ontwikkelrichting is handmatig beheer, zonder sport-API's, betaalde databronnen of automatische bronimports.
 - Nieuwe knock-outtoernooien ondersteunen 2–128 spelers of teams, lotingsvolgorde, vrijstellingen, rondeformaten en expliciete puntentelling. Datums/tijden worden als Nederlandse tijd ingevoerd; sluiting blijft op de server bewaakt.
 - Winnaars stromen na handmatige uitslagregistratie door. Het volledige schema is zichtbaar bij een geselecteerd toernooi. Beheer toont ontbrekende gegevens en wedstrijden die een uitslag nodig hebben.
-- Zie [knock-outmijlpaal](docs/manual-knockout-milestone.md) voor verificatie en ingebruikname. Na expliciete toestemming is migratie `20261016181258` toegepast en zijn de hosted rollbacktests geslaagd. De frontend wordt via PR #7 gepubliceerd.
-- Oude bronrecords en importmigraties blijven als historie behouden. De nieuwe code verwijdert het importscherm en vervangt de twee sportimportfuncties door HTTP 410-antwoorden. Dit heeft pas effect nadat de bijbehorende backend en frontend zijn uitgerold.
+- Zie [knock-outmijlpaal](docs/manual-knockout-milestone.md) voor verificatie en ingebruikname. Na expliciete toestemming is migratie `20261016181258` toegepast en zijn de hosted rollbacktests geslaagd. De frontend is via PR #7 gepubliceerd.
+- Oude bronrecords en importmigraties blijven als historie behouden. De nieuwe code verwijdert het importscherm en vervangt de twee sportimportfuncties door HTTP 410-antwoorden. Dit is via PR #7 uitgerold.
+
+## Lege schema’s en sjablonen
+- Kies per sport een vrij knock-outformat of een bewaard eigen sjabloon. Sjablonen bewaren deelnemersaantal, spelers/teams, rondeformaten en punten; geen namen of tijden.
+- Darts heeft een ingebouwd **European Tour**-sjabloon: 48 spelers, 16 direct geplaatst in ronde 2 tegenover de 16 winnaars uit ronde 1. Legs: first-to 6 in de eerste vier rondes, 7 in de halve finales en 8 in de finale. Punten blijven expliciet in te vullen.
+- Maak eerst een leeg conceptschema. Vul namen op de zichtbare lotingsplekken in, ook de geplaatste spelers in ronde 2. Tussentijds opslaan met lege plekken kan; dubbele ingevulde namen worden geweigerd.
+- Alle deelnemers moeten ingevuld zijn vóór publiceren. Ook de bestaande publicatieroute en wedstrijdbeveiliging weigeren onvolledige deelnemers. Datums en tijden blijven apart in te vullen.
+- Zie [mijlpaal lege schema’s en sjablonen](docs/knockout-templates-milestone.md). Migratie `20261016183915` is na toestemming toegepast; de hosted rollbacktests slagen. De frontend is opgenomen in PR #8.
 
 ## Profiel en voorkeuren (vervolg)
 
