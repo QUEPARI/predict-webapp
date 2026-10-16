@@ -49,4 +49,186 @@ function leaderboard(t){return `<div class="panel stack"><h2>Klassement ${esc(t.
 function tournamentView(t){let ms=fixtures.filter(m=>m.tournament===t.id);return `<div class="breadcrumb"><button data-action="back">← Mijn toernooien</button></div><div class="row"><div><span class="sport">${t.sport==='darts'?'DARTS':'VOETBAL'}</span><h1>${esc(t.name)}</h1></div><span class="pill">${esc(t.state)}</span></div><p class="sub">${esc(t.description)}</p><div class="grid three"><div class="panel"><div class="stat-label">Mijn punten</div><div class="stat">${points(t.id)}</div></div><div class="panel"><div class="stat-label">Nog voorspellen</div><div class="stat">${missing(t.id)}</div></div><div class="panel"><div class="stat-label">Wedstrijden (demo)</div><div class="stat">${ms.length}</div></div></div><div class="section-head"><h2>Wedstrijden</h2><span class="mini muted">Nederlandse tijd</span></div><div class="grid">${ms.map(matchCard).join('')}</div><div class="section-head"><h2>Extra voorspellingen</h2></div>${extra(t)}<div class="section-head"><h2>Klassement</h2></div>${leaderboard(t)}${t.sport==='darts'?`<div class="section-head"><h2>Puntentabel WK Darts 2027</h2></div><div class="panel table-wrap"><table><thead><tr><th>Ronde</th><th class="num">Winnaar</th><th class="num">Exact totaal</th></tr></thead><tbody>${Object.entries(dartsPts).map(([round,arr])=>`<tr><td>${esc(round)}</td><td class="num">${arr[0]}</td><td class="num">${arr[1]}</td></tr>`).join('')}</tbody></table></div>`:''}`}
 function render(){document.body.className=state.theme==='dark'?'dark':'';const t=activeTournament();$('app').innerHTML=`<main class="layout">${header()}${t?tournamentView(t):nav()+(state.tab==='home'?home():state.tab==='discover'?discover():state.tab==='pools'?pools():profile())}<div class="footer">Predict · Lokale ontwerp- en functiedemo · Geen officiële sportdata · Geen online accounts</div></main>`;bind()}
 function bind(){document.querySelectorAll('[data-tab]').forEach(el=>el.onclick=()=>{state.tab=el.dataset.tab;save();render()});document.querySelectorAll('[data-open]').forEach(el=>el.onclick=()=>{state.tournament=el.dataset.open;save();render()});document.querySelectorAll('[data-action]').forEach(el=>el.onclick=()=>{if(el.dataset.action==='theme')state.theme=state.theme==='dark'?'light':'dark';if(el.dataset.action==='back'){state.tournament=null;state.tab='home'}if(el.dataset.action==='reset'&&confirm('Alleen lokale demogegevens wissen?'))state=structuredClone(defaults);save();render()});document.querySelectorAll('.prediction-form').forEach(form=>form.onsubmit=e=>{e.preventDefault();const m=fixtures.find(x=>x.id===form.dataset.match);if(locked(m)){alert('De voorspeldeadline is verstreken.');render();return}const data=new FormData(form),a=Number(data.get('home')),b=Number(data.get('away'));if(!Number.isInteger(a)||!Number.isInteger(b)||a<0||b<0||a>99||b>99){alert('Vul twee geldige scores in.');return}if(m.format==='sets'&&!((a===m.firstTo&&b<m.firstTo)||(b===m.firstTo&&a<m.firstTo))){alert(`Eén darter moet precies ${m.firstTo} sets winnen.`);return}state.predictions[m.id]={home:a,away:b,updatedAt:new Date().toISOString()};save();render()});const pool=$('pool-form');if(pool)pool.onsubmit=e=>{e.preventDefault();const name=$('pool-name').value.trim();if(!name)return;state.pools.push({id:crypto.randomUUID(),name,tournament:$('pool-tournament').value,members:[state.user]});save();render()};const profileForm=$('profile-form');if(profileForm)profileForm.onsubmit=e=>{e.preventDefault();const n=$('username').value.trim();if(n)state.user=n;save();render()};const extraForm=$('extra-form');if(extraForm)extraForm.onsubmit=e=>{e.preventDefault();const d=new FormData(extraForm);state.extra={champ:d.get('champ'),scorer:String(d.get('scorer')).trim()};save();render()}}
-render();
+
+let currentUser = null;
+let currentRole = 'user';
+
+const renderDemo = render;
+
+render = function () {
+  if (!currentUser) {
+    document.body.className =
+      state.theme === 'dark' ? 'dark' : '';
+
+    $('app').innerHTML = `
+      <main class="layout">
+        <header class="top">
+          <div class="logo">
+            <div class="logo-mark">P</div>
+            <div>
+              <div class="brand">Predict</div>
+              <div class="tag">SPORTVOORSPELLINGEN</div>
+            </div>
+          </div>
+        </header>
+
+        <div class="panel stack"
+             style="max-width:440px;margin:60px auto">
+          <h1>Inloggen</h1>
+          <p class="sub">
+            Log in met je Predict-account.
+          </p>
+
+          <form id="login-form" class="stack">
+            <div class="field">
+              <label for="login-email">E-mailadres</label>
+              <input
+                id="login-email"
+                type="email"
+                autocomplete="email"
+                required
+              >
+            </div>
+
+            <div class="field">
+              <label for="login-password">Wachtwoord</label>
+              <input
+                id="login-password"
+                type="password"
+                autocomplete="current-password"
+                required
+              >
+            </div>
+
+            <button class="btn" type="submit">
+              Inloggen
+            </button>
+          </form>
+
+          <p id="login-error" role="alert"></p>
+        </div>
+      </main>
+    `;
+
+    $('login-form').onsubmit = async (event) => {
+      event.preventDefault();
+
+      const button =
+        $('login-form').querySelector('button');
+
+      const errorElement = $('login-error');
+
+      button.disabled = true;
+      errorElement.textContent = '';
+
+      const email = $('login-email').value.trim();
+      const password = $('login-password').value;
+
+      const { error } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+
+      if (error) {
+        errorElement.textContent =
+          'Inloggen mislukt. Controleer je gegevens.';
+        button.disabled = false;
+        return;
+      }
+
+      await loadCurrentUser();
+    };
+
+    return;
+  }
+
+  renderDemo();
+
+  // Toon accountgegevens en uitlogknop
+  const actions = document.querySelector('.top-actions');
+
+  if (actions) {
+    const account = document.createElement('span');
+    account.className = 'mini';
+    account.textContent =
+      currentRole === 'super_admin'
+        ? 'Systeembeheerder'
+        : currentRole === 'admin'
+          ? 'Beheerder'
+          : 'Gebruiker';
+
+    const logoutButton = document.createElement('button');
+    logoutButton.className = 'ghost';
+    logoutButton.textContent = 'Uitloggen';
+
+    logoutButton.onclick = async () => {
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        alert('Uitloggen mislukt. Probeer opnieuw.');
+        return;
+      }
+
+      currentUser = null;
+      currentRole = 'user';
+      render();
+    };
+
+    actions.append(account, logoutButton);
+  }
+};
+
+async function loadCurrentUser() {
+  const { data, error } = await supabase.auth.getUser();
+
+  if (error || !data.user) {
+    currentUser = null;
+    currentRole = 'user';
+    render();
+    return;
+  }
+
+  currentUser = data.user;
+
+  const { data: profile, error: profileError } =
+    await supabase
+      .from('profiles')
+      .select('username, display_name')
+      .eq('id', currentUser.id)
+      .single();
+
+  const { data: role, error: roleError } =
+    await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', currentUser.id)
+      .single();
+
+  if (profileError || roleError) {
+    console.error(
+      'Profiel of rol ophalen mislukt',
+      profileError,
+      roleError
+    );
+    currentUser = null;
+    currentRole = 'user';
+    $('app').textContent =
+      'Accountgegevens konden niet worden geladen. Vernieuw de pagina.';
+    return;
+  }
+
+  state.user =
+    profile.display_name ||
+    profile.username ||
+    'Gebruiker';
+
+  currentRole = role.role;
+
+  render();
+}
+
+$('app').textContent = 'Account laden...';
+
+loadCurrentUser();
+
