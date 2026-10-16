@@ -365,6 +365,10 @@ async function loadAdminMatches() {
               !m.needs_review
               ? 'disabled title="Goedkeuren vereist een bevestigde toekomstige starttijd, gesloten voorspellingen en een wedstrijd die nog niet begonnen is"'
               : 'title="Wedstrijdgegevens controleren en goedkeuren"'}>Goedkeuren</button>
+          <button class="btn secondary" data-start-match="${esc(m.match_id)}"
+            ${m.match_status !== 'scheduled' || m.actual_start != null
+              ? 'disabled title="Alleen een nog niet als gestart geregistreerde wedstrijd kan worden gestart"'
+              : 'title="Registreer de waargenomen daadwerkelijke start en sluit voorspellingen"'}>Wedstrijd gestart</button>
           <button class="btn secondary" data-result-match="${esc(m.match_id)}"
             ${m.match_status !== 'scheduled' && m.match_status !== 'live' ||
               !m.scheduled_start || new Date(m.scheduled_start) > new Date() ||
@@ -384,6 +388,9 @@ async function loadAdminMatches() {
   });
   target.querySelectorAll('[data-approve-match]').forEach(button => {
     button.onclick = () => approveAdminMatch(button.dataset.approveMatch);
+  });
+  target.querySelectorAll('[data-start-match]').forEach(button => {
+    button.onclick = () => recordAdminMatchStart(button.dataset.startMatch);
   });
   target.querySelectorAll('[data-result-match]').forEach(button => {
     button.onclick = () => recordAdminMatchResult(button.dataset.resultMatch);
@@ -748,6 +755,91 @@ async function recordAdminMatchResult(matchId) {
     if (error) {
       console.error('Uitslagregistratie:', error);
       message.textContent = `Opslaan mislukt: ${error.message}`;
+      submit.disabled = false;
+      return;
+    }
+    dialog.close();
+    await loadAdminMatches();
+  };
+}
+
+
+// Registreer een daadwerkelijk waargenomen wedstrijdstart.
+// De database bepaalt het registratie- en starttijdstip wanneer er geen
+// afzonderlijk betrouwbaar tijdstip wordt doorgegeven. Dit kan afwijken
+// van het daadwerkelijke aanvangsmoment bij vertraagde melding.
+async function recordAdminMatchStart(matchId) {
+  if (!['admin', 'super_admin'].includes(currentRole)) return;
+  const match = adminMatchesCache.find(m => m.match_id === matchId);
+  if (!match || match.match_status !== 'scheduled' || match.actual_start != null) return;
+
+  document.getElementById('admin-start-dialog')?.close();
+  const dialog = document.createElement('dialog');
+  dialog.id = 'admin-start-dialog';
+  dialog.className = 'panel stack';
+  dialog.setAttribute('aria-labelledby', 'start-title');
+  Object.assign(dialog.style, {
+    width: 'min(540px, calc(100% - 32px))',
+    maxHeight: '85vh', overflowY: 'auto', margin: 'auto',
+    padding: '28px', borderRadius: '16px', border: '1px solid #374151',
+    background: state.theme === 'dark' ? '#1e293b' : '#ffffff',
+    color: state.theme === 'dark' ? '#ffffff' : '#111827',
+    boxShadow: '0 20px 80px rgba(0,0,0,.55)'
+  });
+  if (!document.getElementById('predict-start-modal-style')) {
+    const style = document.createElement('style');
+    style.id = 'predict-start-modal-style';
+    style.textContent = '#admin-start-dialog::backdrop{background:rgba(4,10,25,.75)}';
+    document.head.appendChild(style);
+  }
+  document.body.appendChild(dialog);
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+
+  dialog.innerHTML = `
+    <div class="row" style="justify-content:space-between;align-items:center;gap:12px">
+      <h2 id="start-title" style="margin:0">Werkelijke wedstrijdstart registreren</h2>
+      <button type="button" class="ghost" id="start-close" aria-label="Sluiten">✕</button>
+    </div>
+    <p><strong>${esc(match.home_name)} – ${esc(match.away_name)}</strong></p>
+    <p class="hint">${esc(match.tournament_name)} · ${esc(match.round_name ?? 'Ronde onbekend')} ·
+      geplande start: ${match.scheduled_start ? esc(fmt(match.scheduled_start)) : 'Onbekend'}</p>
+    <div class="notice">Gebruik deze functie alleen wanneer je via een betrouwbare livebron hebt
+      vastgesteld dat de wedstrijd daadwerkelijk begonnen is.
+      De wedstrijd krijgt status <strong>live</strong> en voorspellingen worden onmiddellijk
+      gesloten. Zonder opgegeven exacte aanvang registreert Supabase het meldmoment als starttijd;
+      dit is niet noodzakelijk het werkelijke aanvangsmoment.</div>
+    <form id="start-form" class="stack">
+      <label><input id="start-attested" type="checkbox" required>
+        Ik heb via een betrouwbare bron vastgesteld dat deze wedstrijd begonnen is.</label>
+      <p id="start-message" role="status"></p>
+      <div class="row">
+        <button type="submit" class="btn" id="start-submit">Start registreren</button>
+        <button type="button" class="btn secondary" id="start-cancel">Annuleren</button>
+      </div>
+    </form>`;
+  dialog.showModal();
+  dialog.querySelector('#start-close').onclick = () => dialog.close();
+  dialog.querySelector('#start-cancel').onclick = () => dialog.close();
+  dialog.querySelector('#start-form').onsubmit = async event => {
+    event.preventDefault();
+    const message = dialog.querySelector('#start-message');
+    const submit = dialog.querySelector('#start-submit');
+    if (!dialog.querySelector('#start-attested').checked) {
+      message.textContent = 'Bevestig eerst dat je de werkelijke start hebt vastgesteld.';
+      return;
+    }
+    if (!window.confirm(`Is ${match.home_name} – ${match.away_name} daadwerkelijk begonnen? ` +
+      'Deze actie kan niet via dit scherm ongedaan worden gemaakt en sluit voorspellingen.')) return;
+    submit.disabled = true;
+    message.textContent = 'Wedstrijdstart registreren...';
+    const { error } = await supabase.rpc('admin_record_match_start', {
+      p_match_id: match.match_id,
+      p_actual_start: null
+    });
+    if (!dialog.isConnected) return;
+    if (error) {
+      console.error('Startregistratie:', error);
+      message.textContent = `Registratie mislukt: ${error.message}`;
       submit.disabled = false;
       return;
     }
