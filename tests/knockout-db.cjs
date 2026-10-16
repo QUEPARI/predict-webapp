@@ -23,7 +23,7 @@ const {PGlite}=require('../.local-test/node_modules/@electric-sql/pglite');
  `);
  await db.exec(fs.readFileSync(path.join(__dirname,'fixtures/knockout-legacy-functions.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'fixtures/knockout-legacy-guards.sql'),'utf8'));
- await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261016175608_manual_knockout.sql'),'utf8'));
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261016181258_manual_knockout.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/manual_knockout.sql'),'utf8'));
  const {rows}=await db.query('select count(*)::int n from public.tournaments');assert.equal(rows[0].n,0,'SQL suite rolls back every tournament');
  console.log('PASS: local PostgreSQL migration and transactional knockout integration tests; no hosted connection.');

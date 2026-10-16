@@ -2,6 +2,10 @@ begin;
 do $$
 declare a uuid:=gen_random_uuid();u uuid:=gen_random_uuid();sport uuid; football uuid; tid uuid; m uuid; final uuid; r jsonb; rules jsonb; ft uuid; fmatch uuid; size_test integer; check_tid uuid; check_rules jsonb;
 begin
+ if to_regclass('auth.users') is not null then
+   insert into auth.users(id,email,email_confirmed_at,aud,role) values(a,a||'@knockout-qa.invalid',now(),'authenticated','authenticated'),(u,u||'@knockout-qa.invalid',now(),'authenticated','authenticated');
+   insert into public.profiles(id,username) values(a,'koqa-'||substr(a::text,1,20)),(u,'koqa-'||substr(u::text,1,20)) on conflict do nothing;
+ end if;
  insert into public.user_roles values(a,'admin'),(u,'user');
  select id into sport from public.sports where slug='darts';select id into football from public.sports where slug='football';
  rules:='[{"unit":"legs","first_to":6,"winner_points":1,"exact_points":3},{"unit":"sets","first_to":3,"winner_points":2,"exact_points":5}]';
