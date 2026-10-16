@@ -889,12 +889,11 @@ async function loadAdminTournamentPublications() {
   const target = document.getElementById('admin-tournament-publications');
   if (!target || !['admin','super_admin'].includes(currentRole)) return;
   target.textContent = 'Toernooistatus laden...';
-  const { data, error } = await supabase.from('tournaments')
-    .select('id,name,status,starts_at').order('name');
+  const { data, error } = await supabase.rpc('admin_list_tournaments');
   if (!target.isConnected) return;
   if (error) {
     console.error('Toernooistatus:', error);
-    target.textContent = 'Toernooien niet leesbaar voor dit account. Controleer de SELECT-rechten en RLS.';
+    target.textContent = `Toernooien laden mislukt: ${error.message}`;
     return;
   }
   if (!data || data.length === 0) {
