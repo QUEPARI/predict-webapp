@@ -7,3 +7,8 @@
   .top, .top-actions { flex-wrap: wrap; }
   .top-actions { max-width: 100%; }
 }
+.ko-bracket{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:16px;align-items:start}
+#ko-cards article[hidden]{display:none}
+#ko-cards .row{flex-wrap:wrap}
+#admin-knockout textarea{display:block;background:var(--panel);color:var(--txt);border:1px solid var(--border);border-radius:9px;padding:10px;font:inherit}
+.ko-round{min-width:0}.ko-round article{overflow-wrap:anywhere}#admin-knockout textarea{width:100%;box-sizing:border-box}#admin-knockout input,#admin-knockout select{max-width:100%;min-width:0}#admin-knockout fieldset{min-width:0;border:1px solid #64748b;border-radius:8px;padding:12px}

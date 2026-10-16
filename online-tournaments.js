@@ -103,6 +103,9 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='') {
       }).join('') || '<p>Er zijn nog geen wedstrijden beschikbaar op deze pagina.</p>'}</div>
       <div class="row"><button class="btn secondary" id="online-previous" ${page===0?'disabled':''}>Vorige</button>
         <span>Pagina ${page+1}</span><button class="btn secondary" id="online-next" ${(page+1)*size >= (matches.count ?? list.length)?'disabled':''}>Volgende</button></div>`;
+    const schema=document.createElement('section');schema.className='panel stack';schema.textContent='Toernooischema laden...';
+    target.querySelector('.online-matches').before(schema);
+    import('./knockout.js').then(({loadKnockoutSchema})=>{if(current(target,ctx))loadKnockoutSchema(schema,ctx,t.id);}).catch(()=>{if(current(target,ctx))schema.textContent='Schema laden mislukt. Vernieuw het toernooi.';});
     const hasDraft=()=>[...target.querySelectorAll('input')].some(i=>i.value!==i.defaultValue);
     const discard=()=>!hasDraft() || confirm('Niet-opgeslagen wijzigingen laten vervallen?');
     window.addEventListener('beforeunload',event=>{

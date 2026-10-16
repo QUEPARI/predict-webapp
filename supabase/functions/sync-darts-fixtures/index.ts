@@ -1,0 +1,3 @@
+// Sports automation retired: retain the endpoint only to return a clear response.
+const headers={'Access-Control-Allow-Origin':'https://quepari.github.io','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'POST, OPTIONS','Cache-Control':'no-store'};
+Deno.serve(req=>req.method==='OPTIONS'?new Response(null,{status:204,headers}):Response.json({error:'Sportimport is uitgeschakeld. Beheer wedstrijden handmatig in Predict.'},{status:410,headers}));
