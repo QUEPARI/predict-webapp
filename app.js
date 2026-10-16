@@ -337,6 +337,30 @@ render = function () {
   loadQaPredictionForm();
 };
 
+// Gebruik dezelfde beschikbaarheidscontrole in de tabel en de uitslagpop-up.
+// De databasefunctie admin_record_match_result herhaalt alle controles.
+function canRecordAdminResult(match) {
+  const startedByActualTime =
+    match.match_status === 'live' &&
+    match.actual_start != null &&
+    Number.isFinite(new Date(match.actual_start).getTime()) &&
+    new Date(match.actual_start) <= new Date();
+
+  const startedBySchedule =
+    match.match_status === 'scheduled' &&
+    match.scheduled_start != null &&
+    Number.isFinite(new Date(match.scheduled_start).getTime()) &&
+    new Date(match.scheduled_start) <= new Date();
+
+  const validFormat = match.score_unit === 'goals' ||
+    (['sets', 'legs'].includes(match.score_unit) &&
+     Number.isInteger(match.first_to) &&
+     match.first_to >= 1 && match.first_to <= 99);
+
+  return Boolean((startedByActualTime || startedBySchedule) &&
+    match.round_id && validFormat);
+}
+
 let adminMatchesCache = [];
 
 async function loadAdminMatches() {
@@ -386,11 +410,8 @@ async function loadAdminMatches() {
               ? 'disabled title="Alleen een nog niet als gestart geregistreerde wedstrijd kan worden gestart"'
               : 'title="Registreer de waargenomen daadwerkelijke start en sluit voorspellingen"'}>Wedstrijd gestart</button>
           <button class="btn secondary" data-result-match="${esc(m.match_id)}"
-            ${m.match_status !== 'scheduled' && m.match_status !== 'live' ||
-              !m.scheduled_start || new Date(m.scheduled_start) > new Date() ||
-              !m.round_id || (m.score_unit !== 'goals' &&
-              (!Number.isInteger(m.first_to) || m.first_to < 1))
-              ? 'disabled title="Uitslag invoeren vereist een verstreken geplande starttijd, vastgelegde ronde en geldig wedstrijdformaat"'
+            ${!canRecordAdminResult(m)
+              ? 'disabled title="Uitslag vereist een geregistreerde werkelijke start of verstreken geplande starttijd, plus geldige ronde en formaat"'
               : 'title="Handmatige eindstand met auditregistratie invoeren"'}>Uitslag invoeren</button>
         </div>
       </td>
@@ -702,10 +723,7 @@ async function recordAdminMatchResult(matchId) {
   }
   document.body.appendChild(dialog);
   dialog.addEventListener('close', () => dialog.remove(), { once: true });
-  const eligible = ['scheduled', 'live'].includes(match.match_status) &&
-    match.scheduled_start && new Date(match.scheduled_start) <= new Date() &&
-    Boolean(match.round_id) && (match.score_unit === 'goals' ||
-    (Number.isInteger(match.first_to) && match.first_to > 0));
+  const eligible = canRecordAdminResult(match);
   const formatHint = match.score_unit === 'goals'
     ? 'Voetbal: eindstand na eventuele verlenging, zonder strafschoppen.'
     : `Darts: de winnaar moet exact ${esc(String(match.first_to ?? '?'))} ` +
