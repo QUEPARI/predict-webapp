@@ -131,11 +131,12 @@ render = function () {
 
           <form id="login-form" class="stack">
             <div class="field">
-              <label for="login-email">E-mailadres</label>
+              <label for="login-email">Gebruikersnaam</label>
               <input
                 id="login-email"
-                type="email"
-                autocomplete="email"
+                type="text"
+                autocomplete="username"
+                maxlength="128"
                 required
               >
             </div>
@@ -175,20 +176,19 @@ render = function () {
       const email = $('login-email').value.trim();
       const password = $('login-password').value;
 
-      const { error } =
-        await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-
-      if (error) {
-        errorElement.textContent =
-          'Inloggen mislukt. Controleer je gegevens.';
-        button.disabled = false;
-        return;
-      }
-
-      await loadCurrentUser();
+      try {
+        // Existing email/password accounts keep working while usernames become the default.
+        if(email.includes('@')){
+          const r=await supabase.auth.signInWithPassword({email,password});if(r.error)throw Error();
+        }else{
+          const r=await supabase.functions.invoke('username-login',{body:{username:email,password}});
+          if(r.error||!r.data?.access_token||!r.data?.refresh_token)throw Error();
+          const session=await supabase.auth.setSession(r.data);if(session.error)throw Error();
+        }
+        await loadCurrentUser();
+      }catch{
+        if(errorElement.isConnected)errorElement.textContent='Inloggen mislukt. Controleer je gegevens of probeer over vijftien minuten opnieuw.';
+      }finally{if(button.isConnected)button.disabled=false;}
     };
 
     return;
@@ -1461,7 +1461,7 @@ async function loadPrivatePools() {
     </form>
     <form id="private-accept-form" class="panel stack"><h2>Uitnodiging accepteren</h2>
       <label for="private-invite-code">Uitnodigingscode</label><input id="private-invite-code" required pattern="[0-9a-f]{64}" maxlength="64" autocomplete="off" spellcheck="false">
-      <p class="hint">Log in met het bevestigde e-mailadres waarvoor je bent uitgenodigd. Een code is zeven dagen geldig en eenmalig bruikbaar.</p>
+      <p class="hint">Log in met het account waarvoor je bent uitgenodigd. Een code is zeven dagen geldig en eenmalig bruikbaar.</p>
       <button class="btn">Lid worden</button>
     </form><div id="private-pool-detail" class="stack"></div>`;
   const message = target.querySelector('#pool-message');
@@ -1516,7 +1516,7 @@ async function loadPrivatePoolDetail(pool) {
       ${rounds.data.map(r => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('')}</select>
     <div id="private-pool-ranking" class="table-wrap" role="status"></div>
     ${owner ? `<form id="private-invite-form" class="stack"><h3>Lid uitnodigen</h3>
-      <label for="private-invite-email">E-mailadres</label><input id="private-invite-email" type="email" required maxlength="254" autocomplete="off">
+      <label for="private-invite-email">Gebruikersnaam van het lid</label><input id="private-invite-email" required maxlength="254" autocomplete="off">
       <button class="btn">Uitnodigingscode maken</button>
       <p class="hint">Deel de code zelf met de bedoelde ontvanger. Die heeft een bestaand Predict-account nodig.
       Een nieuwe code voor hetzelfde adres maakt de vorige ongeldig.</p>
@@ -1643,24 +1643,26 @@ render=function(){
   renderBeforeAccountInvitations();
   if(!currentUser||!['admin','super_admin'].includes(currentRole)||state.tab!=='admin')return;
   const panel=document.createElement('section');panel.className='panel stack';panel.id='account-invitations';
-  panel.innerHTML='<h2>Accountuitnodigingen</h2><p>Maak een eenmalige uitnodiging voor een nieuw account. Deze blijft zeven dagen geldig. Deel de link zelf met de ontvanger; die bevestigt daarna het e-mailadres.</p><form class="stack"><label for="account-invite-email">E-mailadres nieuw account</label><input id="account-invite-email" type="email" autocomplete="off" maxlength="254" required><button class="btn">Account uitnodigen</button><button class="ghost" type="button" id="revoke-account-invite">Uitnodigingen voor dit adres intrekken</button></form><p id="account-invite-message" role="status"></p><div id="account-invite-result"></div>';
+  panel.innerHTML='<h2>Accounts en herstelcodes</h2><p>Deel een eenmalige link rechtstreeks met de juiste persoon. Activatie is zeven dagen geldig, wachtwoordherstel één uur. De gebruiker kiest zelf een wachtwoord; er wordt geen e-mail verstuurd.</p><form class="stack"><label for="account-invite-username">Gebruikersnaam voor accountbeheer</label><input id="account-invite-username" autocomplete="off" maxlength="128" required spellcheck="false"><button class="btn" value="activate">Account uitnodigen</button><button class="ghost" value="reset">Herstelcode maken</button><button class="ghost" type="button" id="revoke-account-invite">Openstaande codes intrekken</button></form><p id="account-invite-message" role="status"></p><div id="account-invite-result"></div>';
   document.querySelector('.nav')?.after(panel);
-  const form=panel.querySelector('form'), email=panel.querySelector('input'), message=panel.querySelector('#account-invite-message'),result=panel.querySelector('#account-invite-result');
-  async function submit(revoke){
+  const form=panel.querySelector('form'),username=panel.querySelector('input'),message=panel.querySelector('#account-invite-message'),result=panel.querySelector('#account-invite-result');
+  async function submit(kind){
     if(!form.reportValidity())return;
     const userId=currentUser.id;form.querySelectorAll('button').forEach(b=>b.disabled=true);message.textContent='';result.textContent='';
     try{
-      const response=await supabase.rpc(revoke?'revoke_account_invitations':'create_account_invitation',{p_email:email.value.trim()});
+      const revoke=kind==='revoke';
+      const args={p_username:username.value.trim(),...(!revoke?{p_kind:kind}:{})};
+      const response=await supabase.rpc(revoke?'revoke_manual_account_codes':'issue_manual_account_code',args);
       if(!panel.isConnected||currentUser?.id!==userId)return;
       if(response.error)throw response.error;
-      if(revoke){message.textContent='Openstaande accountuitnodigingen ingetrokken.';return;}
-      const link=new URL('./account.html',location.href);link.hash='invite='+response.data;
-      const label=document.createElement('label');label.textContent='Kopieer deze uitnodigingslink voor de ontvanger';
-      const output=document.createElement('input');output.readOnly=true;output.autocomplete='off';output.value=link.href;output.setAttribute('aria-label','Accountuitnodigingslink');output.onclick=()=>output.select();
-      result.append(label,output);message.textContent='Uitnodiging aangemaakt. De link wordt alleen nu getoond.';
+      if(revoke){message.textContent='Openstaande codes ingetrokken. Een code die al wordt verwerkt kan niet meer worden ingetrokken.';return;}
+      const link=new URL('./account.html',location.href);link.hash=new URLSearchParams({kind,username:username.value.trim().toLowerCase(),code:response.data}).toString();
+      const label=document.createElement('label');label.textContent='Kopieer deze eenmalige link voor de ontvanger';
+      const output=document.createElement('input');output.readOnly=true;output.autocomplete='off';output.value=link.href;output.setAttribute('aria-label','Accountlink');output.onclick=()=>output.select();
+      result.append(label,output);message.textContent='Code aangemaakt. De link wordt alleen nu getoond.';
     }catch(error){if(panel.isConnected&&currentUser?.id===userId)message.textContent=error.message||'Verbinding mislukt. Probeer opnieuw.';}
     finally{if(panel.isConnected)form.querySelectorAll('button').forEach(b=>b.disabled=false);}
   }
-  form.onsubmit=e=>{e.preventDefault();submit(false);};
-  panel.querySelector('#revoke-account-invite').onclick=()=>submit(true);
+  form.onsubmit=e=>{e.preventDefault();submit(e.submitter?.value||'activate');};
+  panel.querySelector('#revoke-account-invite').onclick=()=>submit('revoke');
 };

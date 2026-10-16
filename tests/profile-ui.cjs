@@ -90,7 +90,7 @@ const {chromium}=require('playwright');const http=require('node:http');const fs=
     await page.getByRole('button',{name:'Profiel',exact:true}).click();await page.waitForFunction(()=>!!window.qaResolve);
     await page.getByRole('button',{name:'Home',exact:true}).click();await page.evaluate(()=>{window.qaSlow=false;window.qaResolve();});
     assert.equal(await page.locator('#account-predictions').count(),0,'Late response cannot replace another screen');
-    await page.getByRole('button',{name:'Uitloggen'}).click();await page.getByLabel('E-mailadres').fill('b@example.invalid');await page.getByLabel('Wachtwoord').fill('test-only');
+    await page.getByRole('button',{name:'Uitloggen'}).click();await page.getByLabel('Gebruikersnaam',{exact:true}).fill('b@example.invalid');await page.getByLabel('Wachtwoord').fill('test-only');
     await page.getByRole('button',{name:'Inloggen',exact:true}).click();await page.getByRole('button',{name:'Profiel',exact:true}).click();
     await page.getByRole('button',{name:'Profiel opslaan'}).waitFor();assert.equal(await page.getByLabel('Weergavenaam',{exact:true}).inputValue(),'Ander account');
     assert.equal(profiles.a.display_name,'Niet kwijt');assert.equal(profiles.b.display_name,'Ander account');assert.deepEqual(errors,[]);

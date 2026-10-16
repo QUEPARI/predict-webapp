@@ -53,7 +53,7 @@ const assert = require('node:assert/strict');
     assert.equal(await page.locator('#private-pools img').count(),0,'Names must be escaped');
     await page.getByRole('button',{name:'Leden en klassement'}).click();
     await page.getByRole('heading',{name:'Leden (2)'}).waitFor();
-    await page.getByLabel('E-mailadres',{exact:true}).fill('friend@example.invalid');
+    await page.getByLabel('Gebruikersnaam van het lid',{exact:true}).fill('friend@example.invalid');
     await page.getByRole('button',{name:'Uitnodigingscode maken'}).click();
     await page.locator('#private-created-code').waitFor();
     assert.equal(await page.locator('#private-created-code').inputValue(),'a'.repeat(64));

@@ -1,0 +1,72 @@
+begin;
+do $$
+declare a uuid:=gen_random_uuid(); outsider uuid:=gen_random_uuid(); other_admin uuid:=gen_random_uuid();
+  name text:='qa-'||substr(a::text,1,8); token text; old_token text; claim jsonb; target uuid; session uuid:=gen_random_uuid(); n integer; t uuid; pool uuid;
+begin
+  insert into auth.users(id,email,email_confirmed_at,aud,role) values
+    (a,a||'@manual-account-qa.invalid',now(),'authenticated','authenticated'),
+    (outsider,outsider||'@manual-account-qa.invalid',now(),'authenticated','authenticated'),
+    (other_admin,other_admin||'@manual-account-qa.invalid',now(),'authenticated','authenticated');
+  insert into public.profiles(id,username) values(a,'admin-'||a),(outsider,'outsider-'||outsider),(other_admin,'admin-'||other_admin);
+  insert into public.user_roles values(a,'admin'),(outsider,'user'),(other_admin,'admin');
+  perform set_config('request.jwt.claim.sub',outsider::text,true);perform set_config('role','authenticated',true);
+  begin perform public.issue_manual_account_code(name,'activate');raise exception 'FAIL ordinary issuance';exception when insufficient_privilege then null;end;
+  begin perform public.resolve_username_login(name);raise exception 'FAIL public username directory';exception when insufficient_privilege then null;end;
+  begin perform public.claim_manual_account_code(name,'activate',repeat('a',64));raise exception 'FAIL public consume';exception when insufficient_privilege then null;end;
+  begin perform 1 from predict_private.manual_account_codes;raise exception 'FAIL code read';exception when insufficient_privilege then null;end;
+  perform set_config('request.jwt.claim.sub',a::text,true);
+  begin perform public.issue_manual_account_code('admin-'||other_admin,'reset');raise exception 'FAIL other admin takeover';exception when insufficient_privilege then null;end;
+  token:=public.issue_manual_account_code(upper(name),'activate');old_token:=token;
+  token:=public.issue_manual_account_code(name,'activate');
+  perform set_config('role','service_role',true);
+  if public.claim_manual_account_code(name,'activate',old_token) is not null then raise exception 'FAIL replaced code';end if;
+  if public.claim_manual_account_code('wrong-name','activate',token) is not null then raise exception 'FAIL wrong username';end if;
+  if public.claim_manual_account_code(name,'reset',token) is not null then raise exception 'FAIL wrong purpose';end if;
+  claim:=public.claim_manual_account_code(upper(name),'activate',token);target:=(claim->>'user_id')::uuid;
+  if target is null then raise exception 'FAIL valid claim';end if;
+  if public.claim_manual_account_code(name,'activate',token) is not null then raise exception 'FAIL replay';end if;
+  perform set_config('role','postgres',true);
+  if exists(select 1 from predict_private.manual_account_codes where token_hash=token) then raise exception 'FAIL plaintext token';end if;
+  insert into auth.users(id,email,email_confirmed_at,aud,role,raw_user_meta_data)
+    values(target,claim->>'email',now(),'authenticated','authenticated','{"role":"super_admin"}');
+  if not exists(select 1 from public.profiles where id=target and username=name) then raise exception 'FAIL provisioning';end if;
+  if not exists(select 1 from public.user_roles where user_id=target and role='user') then raise exception 'FAIL role escalation';end if;
+  if not exists(select 1 from predict_private.manual_account_codes where id=(claim->>'code_id')::uuid and completed_at is not null) then raise exception 'FAIL complete activation';end if;
+  perform set_config('role','service_role',true);
+  if public.resolve_username_login(upper(name))<>claim->>'email' then raise exception 'FAIL casefold login';end if;
+  for n in 2..20 loop perform public.resolve_username_login(name);end loop;
+  if public.resolve_username_login(name) is not null then raise exception 'FAIL login budget';end if;
+  perform set_config('role','authenticated',true);perform set_config('request.jwt.claim.sub',a::text,true);
+  token:=public.issue_manual_account_code(name,'reset');perform public.revoke_manual_account_codes(name);
+  perform set_config('role','service_role',true);
+  if public.claim_manual_account_code(name,'reset',token) is not null then raise exception 'FAIL revoked';end if;
+  perform set_config('role','authenticated',true);
+  token:=public.issue_manual_account_code(name,'reset');
+  perform set_config('role','postgres',true);
+  update predict_private.manual_account_codes set expires_at=now()-interval '1 second' where token_hash=encode(extensions.digest(token,'sha256'),'hex');
+  perform set_config('role','service_role',true);
+  if public.claim_manual_account_code(name,'reset',token) is not null then raise exception 'FAIL expired';end if;
+  perform set_config('role','authenticated',true);token:=public.issue_manual_account_code(name,'reset');
+  perform set_config('role','service_role',true);claim:=public.claim_manual_account_code(name,'reset',token);
+  if (claim->>'user_id')::uuid<>target then raise exception 'FAIL reset target';end if;
+  perform set_config('role','postgres',true);insert into auth.sessions(id,user_id,created_at,updated_at) values(session,target,now(),now());
+  perform set_config('role','service_role',true);perform public.complete_manual_password_reset((claim->>'code_id')::uuid);
+  perform set_config('role','postgres',true);
+  if exists(select 1 from auth.sessions where id=session) then raise exception 'FAIL reset session revocation';end if;
+  if not exists(select 1 from public.user_roles where user_id=target and role='user') then raise exception 'FAIL reset role changed';end if;
+  if not exists(select 1 from public.profiles where id=target and username=name) then raise exception 'FAIL reset profile changed';end if;
+  select tour.id into strict t from public.tournaments tour where tour.name='Predict QA - dartstest';
+  perform set_config('request.jwt.claim.sub',a::text,true);perform set_config('role','authenticated',true);
+  pool:=public.create_pool(t,'QA gebruikersnaam-poule');token:=public.invite_pool_member(pool,upper(name));
+  perform set_config('request.jwt.claim.sub',outsider::text,true);
+  begin perform public.invite_pool_member(pool,name);raise exception 'FAIL outsider username lookup';exception when insufficient_privilege then null;end;
+  begin perform public.invite_pool_member(pool,'nonexistent-name');raise exception 'FAIL outsider missing username lookup';exception when insufficient_privilege then null;end;
+  begin perform public.accept_pool_invitation(token);raise exception 'FAIL wrong pool recipient';exception when others then if sqlerrm like 'FAIL%' then raise;end if;end;
+  perform set_config('request.jwt.claim.sub',target::text,true);perform public.accept_pool_invitation(token);
+  if not exists(select 1 from public.pool_members where pool_id=pool and user_id=target) then raise exception 'FAIL username pool invitation';end if;
+  perform set_config('role','anon',true);perform set_config('request.jwt.claim.sub','',true);
+  begin perform public.issue_manual_account_code(name,'activate');raise exception 'FAIL anon issuance';exception when insufficient_privilege then null;end;
+  perform set_config('role','postgres',true);
+end $$;
+select 'PASS: manual accounts, role checks, hashed one-time codes, username binding, login budget, expiry, revocation and refresh-session deletion; rollback' as result;
+rollback;

@@ -1,5 +1,7 @@
 # Accountuitnodigingen en wachtwoordherstel — 16 oktober 2026
 
+**Historisch verslag:** de gebruikersstroom is vervangen door [gebruikersnaam en wachtwoord zonder e-mail](manual-accounts-milestone.md). De e-mailactivatiefunctie is gepauzeerd; SMTP en mailtemplates zijn voorlopig geen publicatievoorwaarde. De onderstaande migraties blijven toegepaste historie.
+
 Gebouwd vanaf `04102a5`. GitHub en Supabase zijn vooraf gecontroleerd; project `sfcozzjcuppfypetbbzn` is ACTIVE_HEALTHY. De actuele repository staat lokaal in `predict-webapp/`; de gesynchroniseerde projectbronnen zijn niet gewijzigd.
 
 ## Uitnodigen en activeren

@@ -9,12 +9,15 @@ Deno.serve(async(req:Request)=>{
   const user=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:authorization}},auth:{persistSession:false,autoRefreshToken:false}});
   const auth=await user.auth.getUser();if(auth.error||!auth.data.user)return Response.json({error:'Inloggen vereist'},{status:401,headers});
   try{
-    const body=await req.json();if(typeof body.email!=='string'||body.email.length>254)return Response.json({error:'Ongeldig adres'},{status:400,headers});
+    const body=await req.json();
     // Reuse exactly the controlled DB paths. The legacy endpoint cannot bypass the account budget.
     const pool=body.pool_id!=null;
-    const result=await user.rpc(pool?'invite_pool_member':'create_account_invitation',pool?{p_pool_id:body.pool_id,p_email:body.email}:{p_email:body.email});
+    const name=pool?(body.username||body.email):body.username;
+    if(typeof name!=='string'||name.length>254)return Response.json({error:'Gebruikersnaam ontbreekt'},{status:400,headers});
+    const kind=body.kind||'activate';
+    const result=await user.rpc(pool?'invite_pool_member':'issue_manual_account_code',pool?{p_pool_id:body.pool_id,p_email:name}:{p_username:name,p_kind:kind});
     if(result.error)return Response.json({error:'Uitnodiging geweigerd'},{status:403,headers});
-    const invitation_link=pool?null:origin+'/predict-webapp/account.html#invite='+result.data;
-    return Response.json({success:true,invitation_link,invitation_code:pool?result.data:undefined,expires_in_days:7},{headers});
+    const invitation_link=pool?null:origin+'/predict-webapp/account.html#'+new URLSearchParams({kind,username:name.trim().toLowerCase(),code:result.data});
+    return Response.json({success:true,invitation_link,invitation_code:pool?result.data:undefined,expires_in_days:pool||kind==='activate'?7:undefined,expires_in_hours:!pool&&kind==='reset'?1:undefined},{headers});
   }catch{return Response.json({error:'Ongeldige aanvraag'},{status:400,headers});}
 });
