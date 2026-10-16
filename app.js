@@ -947,6 +947,7 @@ function showPublishTournamentDialog(tournament) {
         <button class="btn secondary" type="button" id="publish-cancel">Annuleren</button>
       </div>
     </form>`;
+  dialog.showModal();
   dialog.querySelector('#publish-close').onclick = () => dialog.close();
   dialog.querySelector('#publish-cancel').onclick = () => dialog.close();
   dialog.querySelector('#publish-form').onsubmit = async event => {
