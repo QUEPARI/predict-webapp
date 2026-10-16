@@ -46,6 +46,11 @@ De mijlpaal voor [gebruikersnaam en wachtwoord zonder e-mail](docs/manual-accoun
 - Een open toekomstige knock-outwedstrijd blijft na een zuivere tijdcorrectie open als de nieuwe tijd ook toekomstig is. Verlopen of handmatig gesloten wedstrijden vereisen bewuste heropening; gewijzigde spelvorm sluit voorspellingen.
 - Zie [mijlpaal lokale speeldagen](docs/daily-matches-milestone.md). Migratie `20261016215435` is toegepast en transactioneel getest.
 
+## Eenvoudiger voorspellingen opslaan
+- De terugknop Toernooioverzicht en de datumfilter zijn verwijderd. Voorspellingen en uitslagen kunnen per ronde over alle datums bekeken worden.
+- De knop toont **Opgeslagen** zodra een voorspelling is opgeslagen, ook na opnieuw openen. Bij een wijziging wordt het weer **Opslaan**. Overbodige bevestigingsteksten onder de velden zijn verwijderd; fouten blijven zichtbaar.
+- Zie [opslagstatus en rondeoverzicht](docs/prediction-save-status-milestone.md).
+
 ## Account en voorkeuren (vervolg)
 
 - **Account** vervangt het navigatielabel Profiel. Gebruikersnaam, licht/donker/systeeminstelling en Uitloggen staan op deze pagina; de header bevat alleen de huisstijl.
