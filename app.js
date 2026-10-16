@@ -1589,7 +1589,7 @@ render = function () {
     const navigate=button.onclick;
     button.onclick=event=>{
       const dirty=[...document.querySelectorAll('[data-online-predict] input')].some(i=>i.value!==i.defaultValue)||
-        document.querySelector('[data-profile-form][data-dirty="true"]');
+        document.querySelector('[data-profile-form][data-dirty="true"]')||document.querySelector('[data-import-dirty="true"]');
       if(dirty&&!confirm('Niet-opgeslagen wijzigingen laten vervallen?'))return;
       onlineTournamentId=null;navigate(event);
     };
@@ -1665,4 +1665,17 @@ render=function(){
   }
   form.onsubmit=e=>{e.preventDefault();submit(e.submitter?.value||'activate');};
   panel.querySelector('#revoke-account-invite').onclick=()=>submit('revoke');
+};
+
+let importScreenController=null;
+const renderBeforeImports=render;
+render=function(){
+  importScreenController?.abort();renderBeforeImports();
+  if(!currentUser||!['admin','super_admin'].includes(currentRole)||state.tab!=='admin')return;
+  const target=document.createElement('section');target.id='admin-imports';target.className='panel stack';
+  document.querySelector('#account-invitations')?.after(target);
+  importScreenController=new AbortController();const signal=importScreenController.signal,userId=currentUser.id;
+  import('./admin-imports.js').then(({loadAdminImports})=>{
+    if(!signal.aborted&&target.isConnected)loadAdminImports(target,{supabase,signal,isCurrent:()=>currentUser?.id===userId,onApplied:loadAdminMatches});
+  }).catch(()=>{if(!signal.aborted&&target.isConnected)target.textContent='Importscherm laden mislukt. Open Beheer opnieuw.';});
 };

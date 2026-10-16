@@ -6,7 +6,7 @@ De doelomvang is de volledige algemene voorspelapp; er is bewust geen aparte MVP
 - [x] Offline responsive UI en sportonafhankelijke tabellen als beginpunt
 - [ ] React/TypeScript app initialiseren zodra npm/dependencies beschikbaar zijn
 - [ ] Supabase-project, migrations, seeding en schema-consistentie
-- [ ] Invite-only Auth, token-hashing, e-mailbevestiging en wachtwoordherstel
+- [x] Invite-only Auth met gehashte eenmalige codes en handmatig wachtwoordherstel; e-mail voorlopig overgeslagen
 - [ ] RLS-policies en beveiligde RPC's voor alle schrijfhandelingen
 - [ ] Meerdere systeembeheerders, beheerdersaudit en rechtentests
 
@@ -28,8 +28,8 @@ De doelomvang is de volledige algemene voorspelapp; er is bewust geen aparte MVP
 - [ ] Tiebreakers: punten, correcte winnaars, exact, dan gedeeld
 
 ## 4. Gegevensbronnen
-- [ ] DartsAPI-fixtures ophalen met paginering en rate-budget
-- [ ] DartsAPI gisterenresultaten ophalen; fixture/result match met conflictwachtrij
+- [x] DartsAPI-fixtures ophalen met paginering en rate-budget; handmatige controle vóór vrijgave
+- [x] DartsAPI-gisterenresultaten ophalen met controlewachtrij en expliciete beoordeling; geen automatische conflictcorrectie
 - [ ] TheSportsDB voor voetbal testen (recorddekking en latency)
 - [ ] Adaptieve sync en server-side cron; idempotente verwerking
 - [ ] Handmatige voorlopige uitslag + latere API-verificatie, conflictreview
