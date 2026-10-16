@@ -354,8 +354,19 @@ async function loadAdminMatches() {
       <td>${m.start_time_confirmed ? 'Bevestigd' : 'Niet bevestigd'}</td>
       <td>${m.needs_review ? 'Controle nodig' : 'Gecontroleerd'}</td>
       <td>${m.predictions_enabled ? 'Open' : 'Gesloten'}</td>
-      <td><button class="btn secondary" data-edit-match="${esc(m.match_id)}"
-        ${lockedForEdit ? 'disabled title="Wedstrijd niet wijzigbaar via deze procedure"' : 'title="Ronde en starttijd bewerken"'}>Bewerken</button></td>
+      <td>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn secondary" data-edit-match="${esc(m.match_id)}"
+            ${lockedForEdit ? 'disabled title="Wedstrijd niet wijzigbaar via deze procedure"' : 'title="Ronde en starttijd bewerken"'}>Bewerken</button>
+          <button class="btn secondary" data-approve-match="${esc(m.match_id)}"
+            ${m.match_status !== 'scheduled' || m.actual_start != null ||
+              m.predictions_enabled || !m.start_time_confirmed ||
+              !m.scheduled_start || new Date(m.scheduled_start) <= new Date() ||
+              !m.needs_review
+              ? 'disabled title="Goedkeuren vereist een bevestigde toekomstige starttijd, gesloten voorspellingen en een wedstrijd die nog niet begonnen is"'
+              : 'title="Wedstrijdgegevens controleren en goedkeuren"'}>Goedkeuren</button>
+        </div>
+      </td>
     </tr>`;
   }).join('');
   target.innerHTML = `<p class="muted mini">${adminMatchesCache.length} wedstrijden gevonden. ${reviewCount} vereisen controle.</p>
@@ -363,6 +374,9 @@ async function loadAdminMatches() {
   <tbody>${rows}</tbody></table>`;
   target.querySelectorAll('[data-edit-match]').forEach(button => {
     button.onclick = () => editAdminMatch(button.dataset.editMatch);
+  });
+  target.querySelectorAll('[data-approve-match]').forEach(button => {
+    button.onclick = () => approveAdminMatch(button.dataset.approveMatch);
   });
 }
 
@@ -475,6 +489,152 @@ async function editAdminMatch(matchId) {
       return;
     }
     editor.close();
+    await loadAdminMatches();
+  };
+}
+
+
+// Goedkeuring is een afzonderlijke handeling; openen van voorspellingen
+// gebeurt NIET via dit formulier.
+async function approveAdminMatch(matchId) {
+  if (!['admin', 'super_admin'].includes(currentRole)) return;
+  const match = adminMatchesCache.find(m => m.match_id === matchId);
+  if (!match) return;
+
+  const oldDialog = document.getElementById('admin-approval-dialog');
+  if (oldDialog) oldDialog.close();
+
+  const dialog = document.createElement('dialog');
+  dialog.id = 'admin-approval-dialog';
+  dialog.className = 'panel stack';
+  dialog.setAttribute('aria-labelledby', 'approval-title');
+  Object.assign(dialog.style, {
+    width: 'min(520px, calc(100% - 32px))',
+    maxHeight: '85vh',
+    overflowY: 'auto',
+    margin: 'auto',
+    padding: '28px',
+    borderRadius: '16px',
+    border: '1px solid #374151',
+    background: state.theme === 'dark' ? '#1e293b' : '#ffffff',
+    color: state.theme === 'dark' ? '#ffffff' : '#111827',
+    boxShadow: '0 20px 80px rgba(0,0,0,.55)'
+  });
+  document.body.appendChild(dialog);
+  dialog.addEventListener('close', () => dialog.remove(), { once: true });
+  dialog.textContent = 'Wedstrijdgegevens laden...';
+  dialog.showModal();
+
+  const { data: rounds, error } = await supabase.rpc(
+    'admin_get_tournament_rounds',
+    { p_tournament_id: match.tournament_id }
+  );
+  if (!dialog.isConnected) return;
+
+  if (error) {
+    console.error('Rondes ophalen:', error);
+    dialog.textContent = 'Kon de beschikbare rondes niet ophalen.';
+    return;
+  }
+
+  const isEligible = match.match_status === 'scheduled' &&
+    match.actual_start == null &&
+    !match.predictions_enabled &&
+    match.start_time_confirmed === true &&
+    Boolean(match.scheduled_start) &&
+    new Date(match.scheduled_start) > new Date() &&
+    match.needs_review === true;
+
+  const roundOptions = [
+    '<option value="">Selecteer een ronde</option>',
+    ...(rounds ?? []).map(r =>
+      `<option value="${esc(r.round_id)}" ${r.round_id === match.round_id ? 'selected' : ''}>${esc(r.round_name)}</option>`
+    )
+  ].join('');
+
+  const darts = match.score_unit === 'sets' || match.score_unit === 'legs';
+  const formatField = darts
+    ? `<div class="field">
+         <label for="approval-first-to">Aantal ${match.score_unit === 'legs' ? 'legs' : 'sets'} om te winnen (first_to)</label>
+         <input id="approval-first-to" type="number" min="1" max="99"
+                step="1" required value="${Number.isInteger(match.first_to) ? match.first_to : ''}">
+         <div class="hint">Controleer dit aan de hand van het officiële wedstrijdformaat.</div>
+       </div>`
+    : `<p class="hint">Voor voetbal is first_to niet van toepassing.</p>`;
+
+  dialog.innerHTML = `
+    <div class="row" style="justify-content:space-between;align-items:center;gap:12px">
+      <h2 id="approval-title" style="margin:0">Wedstrijd goedkeuren</h2>
+      <button type="button" class="ghost" id="approval-close" aria-label="Sluiten">✕</button>
+    </div>
+    <p><strong>${esc(match.home_name)} – ${esc(match.away_name)}</strong></p>
+    <p class="hint">
+      Geplande starttijd: ${match.scheduled_start ? esc(fmt(match.scheduled_start)) : 'Onbekend'}.
+      Starttijd bevestigd: ${match.start_time_confirmed ? 'ja' : 'nee'}.
+    </p>
+    <div class="notice">
+      Goedkeuren bevestigt de gegevens en schrijft een auditregistratie.
+      <strong>Voorspellingen blijven gesloten.</strong>
+    </div>
+    <form id="approval-form" class="stack">
+      <div class="field">
+        <label for="approval-round">Gecontroleerde ronde</label>
+        <select id="approval-round" required>${roundOptions}</select>
+      </div>
+      ${formatField}
+      <label>
+        <input id="approval-attest" type="checkbox" required>
+        Ik heb de ronde, het wedstrijdformaat en de starttijd
+        gecontroleerd aan de hand van een betrouwbare bron.
+      </label>
+      <p id="approval-message" role="status"></p>
+      <div class="row">
+        <button class="btn" type="submit" ${isEligible ? '' : 'disabled'}>
+          Goedkeuring opslaan
+        </button>
+        <button class="btn secondary" type="button" id="approval-cancel">
+          Annuleren
+        </button>
+      </div>
+    </form>
+  `;
+
+  dialog.querySelector('#approval-close').onclick = () => dialog.close();
+  dialog.querySelector('#approval-cancel').onclick = () => dialog.close();
+  dialog.querySelector('#approval-form').onsubmit = async (event) => {
+    event.preventDefault();
+    const message = dialog.querySelector('#approval-message');
+    const submit = dialog.querySelector('button[type="submit"]');
+    const roundId = dialog.querySelector('#approval-round').value;
+    const firstTo = darts
+      ? Number(dialog.querySelector('#approval-first-to').value)
+      : null;
+
+    if (!isEligible || !roundId ||
+        (darts && (!Number.isInteger(firstTo) || firstTo < 1 || firstTo > 99))) {
+      message.textContent = 'De wedstrijdgegevens zijn nog niet geschikt voor goedkeuring.';
+      return;
+    }
+    if (!dialog.querySelector('#approval-attest').checked) {
+      message.textContent = 'Bevestig eerst dat de gegevens gecontroleerd zijn.';
+      return;
+    }
+
+    submit.disabled = true;
+    message.textContent = 'Goedkeuring opslaan...';
+    const { error: saveError } = await supabase.rpc('admin_approve_match', {
+      p_match_id: match.match_id,
+      p_round_id: roundId,
+      p_first_to: firstTo
+    });
+    if (!dialog.isConnected) return;
+    if (saveError) {
+      console.error('Goedkeuring:', saveError);
+      message.textContent = `Goedkeuren mislukt: ${saveError.message}`;
+      submit.disabled = false;
+      return;
+    }
+    dialog.close();
     await loadAdminMatches();
   };
 }
