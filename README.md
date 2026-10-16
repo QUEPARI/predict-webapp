@@ -25,6 +25,12 @@ De mijlpaal voor [gebruikersnaam en wachtwoord zonder e-mail](docs/manual-accoun
 - Naam, schema en punten wijzigen blijft aan de bestaande voorspellingen/gestarte wedstrijden gebonden. Verlopen deadlines worden niet automatisch heropend. Toernooien met een startdatum in het verleden kunnen als concept worden ingevoerd.
 - Zie [beheerverbeteringen, testresultaten en verdere bevindingen](docs/tournament-management-milestone.md).
 
+## Compacte schermen en poulegenoten vergelijken
+- Toernooien hebben aparte tabbladen voor Voorspellingen, Uitslagen (beide per ronde), Schema, Toernooiwinnaar en Klassement. Gesloten kaarten tonen de opgeslagen voorspelling, uitslag en punten compact naast elkaar.
+- Beheer toont compacte inklapbare wedstrijden, expliciete Open/Gesloten-labels, gekleurde acties en opslag-/foutmeldingen bij de betreffende kaart. Winnaars zijn lichtgroen gemarkeerd in het schema.
+- Klik in een poule op een lid om diens voorspellingen naast je eigen voorspellingen en de uitslagen te bekijken. De server onthult alleen wedstrijden waarvan de individuele deadline is verstreken of de werkelijke start is bereikt; handmatig sluiten onthult niets.
+- Zie [testresultaten en details](docs/compact-predictions-milestone.md).
+
 ## Profiel en voorkeuren (vervolg)
 
 - Het profiel toont je eigen gebruikersnaam, bewerkbare weergavenaam en thema: systeeminstelling, licht of donker.

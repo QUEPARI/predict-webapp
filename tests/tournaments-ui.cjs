@@ -2,7 +2,7 @@
 const {chromium}=require('playwright');
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
 (async()=>{
-  const files={'/':'index.html','/app.js':'app.js','/knockout.js':'knockout.js','/tournament-management.js':'tournament-management.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'};
+  const files={'/':'index.html','/app.js':'app.js','/pool-comparison.js':'pool-comparison.js','/knockout.js':'knockout.js','/tournament-management.js':'tournament-management.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'};
   const server=http.createServer((req,res)=>{
     const file=files[req.url];if(!file){res.writeHead(404).end();return;}
     res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');
@@ -67,6 +67,8 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     await card.locator('[name="away"]').fill('4');await card.getByRole('button').click();
     await card.getByText('Opgeslagen in Predict.').waitFor();
     assert.equal(await page.locator('[data-online-match="match-3"] [name="home"]').inputValue(),'2','Saving one card preserves other drafts');
+    await page.locator('[data-detail-tab=results]').click();assert.equal(await page.locator('[data-detail-panel=results]').isVisible(),true);
+    await page.locator('[data-detail-tab=predictions]').click();assert.equal(await page.locator('[data-online-match="match-3"] [name="home"]').inputValue(),'2');
     const football=page.locator('[data-online-match="match-3"]');
     await football.locator('[name="away"]').fill('2');await football.getByRole('button').click();
     await football.getByText('Opgeslagen in Predict.').waitFor();
@@ -80,8 +82,9 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     page.once('dialog',dialog=>dialog.dismiss());
     await page.getByRole('button',{name:'Home',exact:true}).click();
     assert.equal(await card.isVisible(),true,'Declining discard preserves the current form');
+    await page.locator('#online-show-all').check();
     await page.clock.fastForward(61000);
-    assert.equal(await card.getByRole('button').isDisabled(),true,'Open tab closes at deadline');
+    assert.equal(await card.locator('form button').isDisabled(),true,'Open tab closes at deadline');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Mobile width');
     fs.mkdirSync(path.join(__dirname,'..','test-results'),{recursive:true});
     await page.evaluate(()=>scrollTo(0,0));

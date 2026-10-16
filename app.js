@@ -413,25 +413,30 @@ function canRecordAdminResult(match) {
 }
 
 let adminMatchesCache = [];
+let adminShowAllMatches=false;
 
 async function loadAdminMatches() {
   const target = document.getElementById('admin-matches');
   if (!target) return;
   target.textContent = 'Wedstrijden laden...';
-  const { data, error } = await supabase.rpc('admin_get_matches');
+  const [response,resultResponse]=await Promise.all([supabase.rpc('admin_get_matches'),supabase.rpc('admin_match_results')]);
+  const {data,error}=response;
   if (!target.isConnected) return;
   if (error) {
     console.error('Wedstrijdbeheer:', error);
     target.textContent = 'Wedstrijden laden mislukt.';
     return;
   }
-  adminMatchesCache = data ?? [];
+  const results=new Map((resultResponse.data||[]).map(x=>[x.id,x]));
+  adminMatchesCache = (data??[]).map(m=>({...m,...results.get(m.match_id)}));
   if (adminMatchesCache.length === 0) {
     target.textContent = 'Geen wedstrijden gevonden.';
     return;
   }
   const reviewCount = adminMatchesCache.filter(m => m.needs_review).length;
-  const rows = adminMatchesCache.map(m => {
+  const isOpen=m=>m.predictions_enabled&&m.match_status==='scheduled'&&!m.actual_start&&!m.needs_review&&m.start_time_confirmed&&Date.parse(m.scheduled_start)>Date.now();
+  const visible=adminMatchesCache.filter(m=>adminShowAllMatches||isOpen(m));
+  const rows = visible.map(m => {
     const start = m.scheduled_start ? fmt(m.scheduled_start) : 'Onbekend';
     const lockedForEdit = m.match_status !== 'scheduled' ||
       m.actual_start != null || m.predictions_enabled ||
@@ -444,7 +449,7 @@ async function loadAdminMatches() {
       <td>${esc(start)}</td>
       <td>${m.start_time_confirmed ? 'Bevestigd' : 'Niet bevestigd'}</td>
       <td>${m.needs_review ? 'Controle nodig' : 'Gecontroleerd'}</td>
-      <td>${m.predictions_enabled ? 'Open' : 'Gesloten'}</td>
+      <td>${isOpen(m) ? 'Open' : 'Gesloten'}</td><td class="result-column">${m.home_score!=null?esc(m.home_score)+'–'+esc(m.away_score):'—'}</td>
       <td>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn secondary" data-edit-match="${esc(m.match_id)}"
@@ -468,9 +473,10 @@ async function loadAdminMatches() {
       </td>
     </tr>`;
   }).join('');
-  target.innerHTML = `<p class="muted mini">${adminMatchesCache.length} wedstrijden gevonden. ${reviewCount} vereisen controle.</p>
-  <table><thead><tr><th>Toernooi</th><th>Speler 1</th><th>Speler 2</th><th>Ronde</th><th>Starttijd</th><th>Starttijdstatus</th><th>Controle</th><th>Voorspellen</th><th>Actie</th></tr></thead>
+  target.innerHTML = `<p class="muted mini">${resultResponse.error?'Uitslagen laden mislukt: '+esc(resultResponse.error.message)+'. ':''}${visible.length} van ${adminMatchesCache.length} wedstrijden. ${reviewCount} vereisen controle.</p><label class="choice"><input type="checkbox" id="admin-show-all" ${adminShowAllMatches?'checked':''}>Toon alle wedstrijden</label>${!visible.length?'<p>Geen open wedstrijden.</p>':''}
+  <table><thead><tr><th>Toernooi</th><th>Speler 1</th><th>Speler 2</th><th>Ronde</th><th>Starttijd</th><th>Starttijdstatus</th><th>Controle</th><th>Voorspellen</th><th class="result-column">Uitslag</th><th>Actie</th></tr></thead>
   <tbody>${rows}</tbody></table>`;
+  target.querySelector('#admin-show-all').onchange=e=>{adminShowAllMatches=e.target.checked;loadAdminMatches();};
   target.querySelectorAll('[data-edit-match]').forEach(button => {
     button.onclick = () => editAdminMatch(button.dataset.editMatch);
   });
@@ -1483,7 +1489,8 @@ async function loadPrivatePoolDetail(pool) {
   if (!pool || !host || !currentUser) return;
   // A new element invalidates outstanding requests from a previously selected pool.
   const target = document.createElement('div'); target.className = 'panel stack';
-  host.replaceChildren(target); target.textContent = 'Leden en klassement laden...';
+  const overview=host.parentElement;[...overview.children].forEach(x=>{if(x!==host){x.dataset.poolOverviewHidden='true';x.hidden=true;}});host.replaceChildren(target);host.scrollIntoView({block:'start'}); target.textContent = 'Leden en klassement laden...';
+  try{
   const userId = currentUser.id;
   const owner = pool.owner_id === userId;
   const [members, rows, rounds] = await Promise.all([
@@ -1493,12 +1500,12 @@ async function loadPrivatePoolDetail(pool) {
   ]);
   if (!target.isConnected || currentUser?.id !== userId) return;
   if (members.error || rows.error || rounds.error) {
-    target.textContent = 'Poule laden mislukt: ' + (members.error || rows.error || rounds.error).message; return;
+    target.innerHTML='<button class="ghost" data-retry-back>← Mijn poules</button><p role="alert">Poule laden mislukt: '+esc((members.error || rows.error || rounds.error).message)+'</p>';target.querySelector('button').onclick=()=>loadPrivatePools();return;
   }
   const names = new Map((rows.data || []).map(r => [r.user_id,r.display_name]));
-  target.innerHTML = `<h2>${esc(pool.name)}</h2><p id="private-detail-message" role="status"></p>
+  target.innerHTML = `<button class="ghost" id="private-detail-back">← Mijn poules</button><h2>${esc(pool.name)}</h2><p id="private-detail-message" role="status"></p>
     <h3>Leden (${members.data.length})</h3><ul>${members.data.map(m => `<li>
-      ${esc(names.get(m.user_id) || 'Gebruiker')}${m.user_id === pool.owner_id ? ' (beheerder)' : ''}
+      <button class="name-link" data-compare-member="${esc(m.user_id)}">${esc(names.get(m.user_id) || 'Gebruiker')}</button>${m.user_id === pool.owner_id ? ' (beheerder)' : ''}
       ${owner && m.user_id !== userId ? `<button class="ghost" data-remove-member="${esc(m.user_id)}">Verwijderen</button>
         <button class="ghost" data-transfer-member="${esc(m.user_id)}">Beheer overdragen</button>` : ''}</li>`).join('')}</ul>
     <label for="private-pool-round">Klassement per ronde</label><select id="private-pool-round"><option value="">Alle rondes</option>
@@ -1512,14 +1519,18 @@ async function loadPrivatePoolDetail(pool) {
       <div id="private-invite-result" role="status"></div></form>
       <button class="btn secondary" id="private-revoke">Alle openstaande uitnodigingen intrekken</button>` :
       '<button class="btn secondary" id="private-leave">Poule verlaten</button>'}`;
+  target.querySelector('#private-detail-back').onclick=()=>loadPrivatePools();
+  const comparison=document.createElement('section');comparison.className='stack';target.append(comparison);
+  const compare=member=>{import('./pool-comparison.js').then(({loadPoolComparison})=>{if(target.isConnected)loadPoolComparison(comparison,{supabase,isCurrent:()=>currentUser?.id===userId},pool,member,names.get(member)||'Poulegenoot');}).catch(()=>comparison.textContent='Vergelijken laden mislukt. Probeer opnieuw.');};
   const message = target.querySelector('#private-detail-message');
   const ranking = target.querySelector('#private-pool-ranking');
   function showRanking(data) {
     ranking.innerHTML = data.length ? `<table><thead><tr><th>#</th><th>Gebruiker</th><th>Punten</th><th>Winnaars</th></tr></thead>
-      <tbody>${data.map(r => `<tr><td>${esc(r.rank_position)}</td><td>${esc(r.display_name)}${r.user_id === userId ? ' (jij)' : ''}</td>
+      <tbody>${data.map(r => `<tr><td>${esc(r.rank_position)}</td><td><button class="name-link" data-compare-member="${esc(r.user_id)}">${esc(r.display_name)}${r.user_id === userId ? ' (jij)' : ''}</button></td>
         <td>${esc(r.earned_points)}</td><td>${esc(r.correct_winners)}</td></tr>`).join('')}</tbody></table>` : 'Nog geen deelnemers.';
   }
-  showRanking(rows.data || []);
+  const bindComparisons=()=>target.querySelectorAll('[data-compare-member]').forEach(b=>b.onclick=()=>compare(b.dataset.compareMember));
+  showRanking(rows.data || []);bindComparisons();
   let generation = 0;
   target.querySelector('#private-pool-round').onchange = async event => {
     const g = ++generation; ranking.textContent = 'Klassement laden...';
@@ -1527,7 +1538,7 @@ async function loadPrivatePoolDetail(pool) {
       p_tournament_id:pool.tournament_id,p_pool_id:pool.id,p_round_id:event.target.value || null
     });
     if (!target.isConnected || g !== generation) return;
-    if (error) ranking.textContent = error.message; else showRanking(data || []);
+    if (error) ranking.textContent = error.message; else {showRanking(data || []);bindComparisons();}
   };
   async function manage(action, member, button) {
     if (!confirm(action === 'transfer' ? 'Poulebeheer overdragen aan dit lid?' :
@@ -1561,6 +1572,7 @@ async function loadPrivatePoolDetail(pool) {
     } catch {if (target.isConnected) result.textContent = 'Verbinding mislukt. Probeer opnieuw.';}
     finally {if (button.isConnected) button.disabled = false;}
   };
+  }catch(error){if(target.isConnected){target.innerHTML='<button class="ghost">← Mijn poules</button><p role="alert"></p>';target.querySelector('p').textContent='Poule laden mislukt: '+error.message;target.querySelector('button').onclick=()=>loadPrivatePools();}}
 }
 
 // Replace the remaining tournament demo routes with authenticated online screens.

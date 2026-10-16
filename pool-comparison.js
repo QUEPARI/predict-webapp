@@ -1,0 +1,11 @@
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const score=(h,a)=>h==null||a==null?'—':esc(h)+'–'+esc(a);
+export async function loadPoolComparison(host,ctx,pool,member,name){
+ const target=document.createElement('section');host.replaceChildren(target);
+ const active=()=>target.isConnected&&ctx.isCurrent();target.innerHTML='<h3>Voorspellingen vergelijken</h3><p role="status">Laden…</p>';target.scrollIntoView({block:'nearest'});
+ try{const r=await ctx.supabase.rpc('get_pool_prediction_comparison',{p_pool:pool.id,p_member:member,p_round:null});if(!active())return;if(r.error)throw r.error;const rows=r.data||[];
+ const rounds=[...new Map(rows.map(x=>[x.round_id,x.round_name])).entries()];
+ target.innerHTML=`<h3>Jij en ${esc(name)}</h3><p class="hint">Alleen wedstrijden waarvan de deadline verstreken is of die werkelijk gestart zijn.</p><label>Ronde<select data-compare-round><option value="">Alle rondes</option>${rounds.map(([id,n])=>`<option value="${esc(id)}">${esc(n)}</option>`).join('')}</select></label><div class="table-wrap" data-comparison></div>`;
+ const draw=()=>{const round=target.querySelector('select').value,list=rows.filter(x=>!round||x.round_id===round);target.querySelector('[data-comparison]').innerHTML=list.length?`<table class="comparison-table"><thead><tr><th>Ronde / wedstrijd</th><th>Jouw voorspelling</th><th>${esc(name)}</th><th class="result-column">Uitslag</th><th>Jouw punten</th><th>Punten medespeler</th></tr></thead><tbody>${list.map(x=>`<tr><td><small>${esc(x.round_name)}</small><br>${esc(x.home_name)} – ${esc(x.away_name)}</td><td>${score(x.my_home,x.my_away)}</td><td>${score(x.their_home,x.their_away)}</td><td class="result-column">${score(x.home_score,x.away_score)}</td><td>${x.my_points??'—'}</td><td>${x.their_points??'—'}</td></tr>`).join('')}</tbody></table>`:'<p>Er zijn nog geen voorspellingen beschikbaar om te vergelijken.</p>';};target.querySelector('select').onchange=draw;draw();
+ }catch(e){if(active()){target.innerHTML='<p class="error" role="alert"></p><button class="ghost">Opnieuw proberen</button>';target.querySelector('p').textContent=e.message;target.querySelector('button').onclick=()=>loadPoolComparison(host,ctx,pool,member,name);}}
+}
