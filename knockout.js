@@ -1,4 +1,4 @@
-import {layoutBracket} from './bracket.js';
+import {layoutBracket} from './bracket.js?v=daily-20261016';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const tournamentLabel=s=>({draft:'Concept',published:'Gepubliceerd',active:'Actief',completed:'Afgerond',archived:'Gepauzeerd / archief'}[s]||s);
 export const dutchTime=value=>value?new Intl.DateTimeFormat('nl-NL',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Amsterdam'}).format(new Date(value)):'Nog in te vullen';
@@ -44,15 +44,15 @@ const won=(m,side)=>m.status==='finished'&&(m.winner_slot!=null?m.winner_slot===
 const person=(m,side)=>`<div class="ko-person ${won(m,side)?'ko-winner':''}"><span>${esc(m[side+'_slot']||'—')}.</span><span>${esc(m[side])}</span>${m[side+'_score']!=null?`<b>${m[side+'_score']}</b>`:''}</div>`;
 export const euroTourRules=()=>[6,6,6,6,7,8].map(first_to=>({unit:'legs',first_to}));
 const alive=(target,ctx)=>target.isConnected&&!ctx.signal.aborted&&ctx.isCurrent();
-export async function loadKnockoutSchema(target,ctx,id){
+export async function loadKnockoutSchema(target,ctx,id,prefetched){
   try{
-    const r=await ctx.supabase.rpc('get_knockout_schema',{p_id:id});if(!alive(target,ctx))return;if(r.error)throw r.error;
+    const r=prefetched?{data:prefetched}:await ctx.supabase.rpc('get_knockout_schema',{p_id:id});if(!alive(target,ctx))return;if(r.error)throw r.error;
     if(!r.data){target.textContent='Voor dit bestaande toernooi is nog geen knock-outschema ingericht. Bestaande wedstrijden staan hieronder.';return;}
     drawSchema(target,r.data);return r.data;
   }catch(e){if(alive(target,ctx))target.textContent='Schema laden mislukt: '+e.message;}
 }
-function drawSchema(target,data){
- target.innerHTML=`<h2>Volledig toernooischema</h2><div class="ko-bracket">${data.rounds.map(r=>`<section class="stack ko-round"><h3>${esc(r.name)}</h3>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel ko-node" data-node="${esc(m.id)}"><div class="hint">Wedstrijd ${m.number}</div>${person(m,'home')}${person(m,'away')}<small>${esc(dutchTime(m.start))}</small></article>`).join('')}</section>`).join('')}</div>`;
+function drawSchema(target,data,admin=false){
+ target.innerHTML=`<h2>Volledig toernooischema</h2><div class="ko-bracket">${data.rounds.map(r=>`<section class="stack ko-round"><h3>${esc(r.name)}</h3>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel ko-node" data-node="${esc(m.id)}">${person(m,'home')}${person(m,'away')}<small>${esc(m.start?new Intl.DateTimeFormat('nl-NL',{dateStyle:'short',timeStyle:'short',...(admin?{timeZone:'Europe/Amsterdam'}:{})}).format(new Date(m.start)):'Nog in te vullen')}</small></article>`).join('')}</section>`).join('')}</div>`;
  layoutBracket(target.querySelector('.ko-bracket'),data);
 }
 export async function loadKnockoutAdmin(target,ctx){
@@ -78,15 +78,15 @@ export async function loadKnockoutAdmin(target,ctx){
     try{await rpc('edit_knockout',{p_tournament:currentId,p_action:action,p_match:match,p_values:values});written=true;if(!alive(target,ctx))return;await read();
       if(unsaved){const next=target.querySelector(`[data-ko-match="${match}"]`);Object.entries(unsaved).forEach(([name,value])=>{const field=next?.querySelector(`[name="${name}"]`);if(field&&value!=null)field.value=value;});if(next&&['home','away'].some(name=>{const f=next.querySelector(`[name="${name}"]`);return f.value!==f.defaultValue;}))next.dataset.koDirty='true';}
       expanded.forEach(id=>{const d=target.querySelector(`[data-ko-match="${id}"] details`);if(d)d.open=true;});if(filter){$('ko-filter').value=action==='result'?'all':filter;$('ko-filter').onchange();}
-      say('✓ '+({schedule:'Begintijd en first-to opgeslagen',result:'Uitslag opgeslagen',open:'Voorspellen geopend',close:'Voorspellen gesloten',start:'Werkelijke start opgeslagen',postpone:'Uitstel opgeslagen',cancel:'Annulering opgeslagen',roster:'Deelnemersnamen opgeslagen',publish:'Toernooi gepubliceerd'}[action]||'Opgeslagen'));
+      say('✓ '+({schedule:'Begintijd en first-to opgeslagen; actuele status staat bij de wedstrijd',result:'Uitslag opgeslagen',open:'Voorspellen geopend',close:'Voorspellen gesloten',start:'Werkelijke start opgeslagen',postpone:'Uitstel opgeslagen',cancel:'Annulering opgeslagen',roster:'Deelnemersnamen opgeslagen',publish:'Toernooi gepubliceerd'}[action]||'Opgeslagen'));
       msg.textContent='Opgeslagen.';ctx.onSaved?.();
     }catch(e){if(alive(target,ctx)){say((written?'Opgeslagen, maar opnieuw laden mislukt: ':'Opslaan mislukt: ')+e.message,true);if(card){const field=/reden/i.test(e.message)?card.querySelector('[name=reason]'):/tijd|datum|deadline/i.test(e.message)?card.querySelector('[name=start]'):null;if(field)field.setAttribute('aria-invalid','true');}}}
     finally{busy=false;controls.forEach(([x,disabled])=>{if(x.isConnected)x.disabled=disabled;});}
   }
   function renderEditor(){
     const host=$('ko-editor');
-    host.innerHTML=`<h3>${esc(data.name)}</h3><p>Status: ${esc(tournamentLabel(data.status))}</p>${data.status==='draft'?'<button class="btn" id="ko-publish">Publiceren en complete wedstrijden openen</button>':''}<button class="ghost" id="ko-refresh">Schema vernieuwen</button><p>Bij verstreken begintijd sluit voorspellen automatisch. “Uitslag nodig” is geen bevestiging dat de wedstrijd werkelijk begonnen is. Opslaan van een gewijzigde tijd sluit voorspellingen; vrijgeven/heropenen doe je bewust. Alle acties worden automatisch gelogd.</p><div class="row"><label>Toon<select id="ko-filter"><option value="pending">Nog af te handelen</option><option value="all">Alle wedstrijden</option><option>Uitslag nodig</option><option>Nog aanvullen</option><option>Afgerond</option></select></label></div><div id="ko-cards" class="stack"></div><div id="ko-full"></div>`;
-    drawSchema($('ko-full'),data);
+    host.innerHTML=`<h3>${esc(data.name)}</h3><p>Status: ${esc(tournamentLabel(data.status))}</p>${data.status==='draft'?'<button class="btn" id="ko-publish">Publiceren en complete wedstrijden openen</button>':''}<button class="ghost" id="ko-refresh">Schema vernieuwen</button><p>Bij verstreken begintijd sluit voorspellen automatisch. “Uitslag nodig” is geen bevestiging dat de wedstrijd werkelijk begonnen is. Een open toekomstige wedstrijd blijft bij een tijdcorrectie open. Gesloten of verlopen wedstrijden heropen je bewust. Alle acties worden automatisch gelogd.</p><div class="row"><label>Toon<select id="ko-filter"><option value="pending">Nog af te handelen</option><option value="all">Alle wedstrijden</option><option>Uitslag nodig</option><option>Nog aanvullen</option><option>Afgerond</option></select></label></div><div id="ko-cards" class="stack"></div><div id="ko-full"></div>`;
+    drawSchema($('ko-full'),data,true);
     if(data.status!=='completed'){
       const rosterForm=document.createElement('form');rosterForm.className='stack';rosterForm.id='ko-roster';
       const seen=new Set();
@@ -95,7 +95,7 @@ export async function loadKnockoutAdmin(target,ctx){
         seen.add(slot);
         return `<label class="ko-person ${winner?'ko-winner':''}"><span>${slot}.</span><input aria-label="${slot}. Naam" data-slot="${slot}" maxlength="80" value="${esc(data.roster[slot-1])}" placeholder="Naam"></label>`;
       };
-      rosterForm.innerHTML=`<h3>Namen invullen in het schema</h3><p>Vul spelers of teams op hun officiële lotingsplek in. Een winnaarverwijzing wordt automatisch ingevuld na de uitslag. Lege plekken mag je tussentijds opslaan. Namen wijzigen kan zolang er geen voorspellingen, gestarte wedstrijden of ingestelde winnaarsvraag zijn.</p><div class="ko-bracket">${data.rounds.map(r=>`<section class="stack ko-round"><h4>${esc(r.name)}</h4>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel ko-node" data-node="${esc(m.id)}"><strong>Wedstrijd ${m.number}</strong>${entrant(m.home_slot,m.home,won(m,'home'))}${entrant(m.away_slot,m.away,won(m,'away'))}</article>`).join('')}</section>`).join('')}</div><button type="submit" class="btn">Deelnemersnamen opslaan</button><p data-roster-message role="status"></p>`;
+      rosterForm.innerHTML=`<h3>Namen invullen in het schema</h3><p>Vul spelers of teams op hun officiële lotingsplek in. Een winnaarverwijzing wordt automatisch ingevuld na de uitslag. Lege plekken mag je tussentijds opslaan. Namen wijzigen kan zolang er geen voorspellingen, gestarte wedstrijden of ingestelde winnaarsvraag zijn.</p><div class="ko-bracket">${data.rounds.map(r=>`<section class="stack ko-round"><h4>${esc(r.name)}</h4>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel ko-node" data-node="${esc(m.id)}">${entrant(m.home_slot,m.home,won(m,'home'))}${entrant(m.away_slot,m.away,won(m,'away'))}</article>`).join('')}</section>`).join('')}</div><button type="submit" class="btn">Deelnemersnamen opslaan</button><p data-roster-message role="status"></p>`;
       // Preserve edit access if a historical bracket contains an unusual slot arrangement.
       if(seen.size!==data.roster.length){for(let slot=1;slot<=data.roster.length;slot++){if(!seen.has(slot))rosterForm.insertAdjacentHTML('beforeend',entrant(slot,''));}}
       host.querySelector('h3').after(rosterForm);layoutBracket(rosterForm.querySelector('.ko-bracket'),data);rosterForm.oninput=()=>rosterForm.dataset.koDirty='true';

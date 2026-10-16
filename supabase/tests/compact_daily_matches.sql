@@ -1,0 +1,35 @@
+begin;
+do $$
+declare a uuid:=gen_random_uuid();u uuid:=gen_random_uuid();sid uuid;tid uuid;mid uuid;rules jsonb:='[{"unit":"legs","first_to":6,"winner_points":1,"exact_points":3}]';
+begin
+ if to_regclass('auth.users') is not null then insert into auth.users(id,email,email_confirmed_at,aud,role) values(a,a||'@daily-qa.invalid',now(),'authenticated','authenticated'),(u,u||'@daily-qa.invalid',now(),'authenticated','authenticated');end if;
+ insert into public.profiles(id,username) values(a,'daily-'||substr(a::text,1,20)),(u,'daily-'||substr(u::text,1,20)) on conflict do nothing;
+ insert into public.user_roles values(a,'admin'),(u,'user');select id into sid from public.sports where slug='darts';
+ perform set_config('request.jwt.claim.sub',a::text,true);perform set_config('role','authenticated',true);
+ tid:=public.create_knockout_tournament('QA daily',sid,'players',array['QA A','QA B'],now()+interval '1 day',rules);mid:=(public.get_knockout_schema(tid)->'matches'->0->>'id')::uuid;
+ perform public.edit_knockout(tid,'schedule',mid,jsonb_build_object('start',now()+interval '1 day','unit','legs','first_to',6));perform public.edit_knockout(tid,'publish');
+ perform set_config('role','postgres',true);insert into public.tournament_entries values(tid,u);perform set_config('role','authenticated',true);
+ perform set_config('request.jwt.claim.sub',u::text,true);perform public.submit_match_prediction(mid,6,4);perform set_config('request.jwt.claim.sub',a::text,true);
+ perform public.edit_knockout(tid,'schedule',mid,jsonb_build_object('start',now()+interval '2 days','unit','legs','first_to',6,'reason','QA future correction'));
+ if not (public.get_knockout_schema(tid)->'matches'->0->>'enabled')::boolean then raise exception 'FAIL future open fixture closed';end if;
+ begin perform public.edit_knockout(tid,'schedule',mid,jsonb_build_object('start',now()+interval '2 days','unit','legs','first_to',7,'reason','QA format change'));raise exception 'FAIL format with predictions changed';exception when others then if sqlerrm like 'FAIL%' then raise;end if;end;
+ perform public.edit_knockout(tid,'close',mid,'{"reason":"QA manual closure"}');
+ perform public.edit_knockout(tid,'schedule',mid,jsonb_build_object('start',now()+interval '3 days','unit','legs','first_to',6,'reason','QA closed correction'));
+ if (public.get_knockout_schema(tid)->'matches'->0->>'enabled')::boolean then raise exception 'FAIL manual closure reopened';end if;
+ perform public.edit_knockout(tid,'open',mid,'{"reason":"QA open"}');
+ perform public.edit_knockout(tid,'schedule',mid,jsonb_build_object('start',now()-interval '1 minute','unit','legs','first_to',6,'reason','QA deadline moved to past'));
+ if (public.get_knockout_schema(tid)->'matches'->0->>'enabled')::boolean then raise exception 'FAIL past deadline remained open';end if;
+ perform public.edit_knockout(tid,'schedule',mid,jsonb_build_object('start',now()+interval '3 days','unit','legs','first_to',6,'reason','QA expired correction'));
+ if (public.get_knockout_schema(tid)->'matches'->0->>'enabled')::boolean then raise exception 'FAIL expired fixture reopened';end if;
+ tid:=public.create_knockout_tournament('QA elapsed daily',sid,'players',array['QA C','QA D'],now()+interval '1 day',rules);mid:=(public.get_knockout_schema(tid)->'matches'->0->>'id')::uuid;
+ perform public.edit_knockout(tid,'schedule',mid,jsonb_build_object('start',clock_timestamp()+interval '0.15 seconds','unit','legs','first_to',6));perform public.edit_knockout(tid,'publish');perform pg_sleep(0.2);
+ perform public.edit_knockout(tid,'schedule',mid,jsonb_build_object('start',now()+interval '2 days','unit','legs','first_to',6,'reason','QA elapsed open flag'));
+ if (public.get_knockout_schema(tid)->'matches'->0->>'enabled')::boolean then raise exception 'FAIL naturally elapsed fixture reopened';end if;
+ perform public.edit_knockout(tid,'open',mid,'{"reason":"QA format test"}');
+ perform public.edit_knockout(tid,'schedule',mid,jsonb_build_object('start',now()+interval '2 days','unit','legs','first_to',7,'reason','QA changed format without predictions'));
+ if (public.get_knockout_schema(tid)->'matches'->0->>'enabled')::boolean then raise exception 'FAIL changed format remained open';end if;
+ perform set_config('request.jwt.claim.sub',u::text,true);
+ begin perform public.edit_knockout(tid,'open',mid,'{"reason":"QA unauthorized"}');raise exception 'FAIL participant reopened match';exception when insufficient_privilege then null;end;
+end $$;
+select 'PASS: future open schedule stays open, manual/expired closures preserved, format locked and participant cannot edit' as result;
+rollback;

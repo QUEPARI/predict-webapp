@@ -1,6 +1,6 @@
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=daily-20261016';
 import {loadOnlineProfile} from './online-profile.js?v=account-20261016';
 
 // Route native Auth callbacks to the isolated, non-persistent account flow.
@@ -443,6 +443,9 @@ async function loadAdminMatches() {
   target.innerHTML = `<p class="muted mini">${resultResponse.error?'Uitslagen laden mislukt: '+esc(resultResponse.error.message)+'. ':''}Nog af te handelen · ${visible.length} van ${adminMatchesCache.length} wedstrijden. ${reviewCount} vereisen controle.</p><label class="choice"><input type="checkbox" id="admin-show-all" ${adminShowAllMatches?'checked':''}>Toon alle wedstrijden</label>${!visible.length?'<p>Geen wedstrijden om af te handelen.</p>':''}
   <table><thead><tr><th>Toernooi</th><th>Speler 1</th><th>Speler 2</th><th>Ronde</th><th>Starttijd</th><th>Starttijdstatus</th><th>Controle</th><th>Voorspellen</th><th class="result-column">Uitslag</th><th>Actie</th></tr></thead>
   <tbody>${rows}</tbody></table>`;
+  target.querySelector('table').classList.add('admin-match-table');
+  const columnLabels=['Toernooi','Speler 1','Speler 2','Ronde','Starttijd','Starttijdstatus','Controle','Voorspellen','Uitslag','Actie'];
+  target.querySelectorAll('tbody tr').forEach(row=>[...row.cells].forEach((cell,i)=>cell.dataset.label=columnLabels[i]));
   target.querySelector('#admin-show-all').onchange=e=>{adminShowAllMatches=e.target.checked;loadAdminMatches();};
   target.querySelectorAll('[data-edit-match]').forEach(button => {
     button.onclick = () => editAdminMatch(button.dataset.editMatch);
@@ -512,7 +515,7 @@ async function editAdminMatch(matchId) {
   const options = ['<option value="">Onbekend</option>', ...(rounds ?? []).map(r =>
     `<option value="${esc(r.round_id)}" ${r.round_id === match.round_id ? 'selected' : ''}>${esc(r.round_name)}</option>`
   )].join('');
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=daily-20261016');
   editor.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;gap:12px">
       <h2 id="admin-edit-title" style="margin:0">Wedstrijd bewerken</h2>
       <button type="button" class="ghost" id="admin-edit-close" aria-label="Sluiten">✕</button>
@@ -521,8 +524,8 @@ async function editAdminMatch(matchId) {
     <form id="admin-edit-form" class="stack">
       <div class="field"><label for="edit-round">Ronde</label><select id="edit-round">${options}</select></div>
       <div class="field"><label for="edit-start">Starttijd</label>
-        <input id="edit-start" type="datetime-local" value="${localDateTimeValue(match.scheduled_start)}">
-        <div class="hint">Tijdzone van dit apparaat: ${esc(timezone)}. Controleer dat dit Nederlandse tijd is als je Nederlandse tijden invoert.</div>
+        <input id="edit-start" type="datetime-local" value="${dutchInput(match.scheduled_start)}">
+        <div class="hint">Invoer in Nederlandse tijd (Europe/Amsterdam).</div>
       </div>
       <label><input id="edit-confirmed" type="checkbox" ${match.start_time_confirmed ? 'checked' : ''}> Officiële starttijd bevestigd</label>
       <p id="admin-edit-message" role="status"></p>
@@ -538,7 +541,7 @@ async function editAdminMatch(matchId) {
     const roundId = editor.querySelector('#edit-round').value || null;
     const startInput = editor.querySelector('#edit-start').value;
     const confirmed = editor.querySelector('#edit-confirmed').checked;
-    const parsed = startInput ? new Date(startInput) : null;
+    let parsed;try{parsed=startInput?new Date(dutchToUTC(startInput)):null;}catch(error){message.textContent=error.message;return;}
     if (parsed && Number.isNaN(parsed.getTime())) {
       message.textContent = 'Ongeldige starttijd.';
       return;
@@ -871,7 +874,7 @@ async function recordAdminMatchStart(matchId) {
         <label for="start-actual-time">Geverifieerde werkelijke starttijd (optioneel)</label>
         <input id="start-actual-time" type="datetime-local" step="60">
         <p class="hint">Laat dit veld leeg als je de exacte starttijd niet kent. Supabase registreert dan
-          het moment van melden. Bij invullen geldt de tijdzone van je apparaat
+          het moment van melden. Invoer in Nederlandse tijd
           (<span id="start-timezone"></span>). Gebruik alleen een door een betrouwbare bron bevestigde tijd.</p>
       </div>
       <label><input id="start-attested" type="checkbox" required>
@@ -884,7 +887,7 @@ async function recordAdminMatchStart(matchId) {
     </form>`;
   dialog.showModal();
   dialog.querySelector('#start-timezone').textContent =
-    Intl.DateTimeFormat().resolvedOptions().timeZone || 'lokale tijdzone';
+    'Europe/Amsterdam';
   dialog.querySelector('#start-close').onclick = () => dialog.close();
   dialog.querySelector('#start-cancel').onclick = () => dialog.close();
   dialog.querySelector('#start-form').onsubmit = async event => {
@@ -898,7 +901,7 @@ async function recordAdminMatchStart(matchId) {
     const enteredTime = dialog.querySelector('#start-actual-time').value;
     let verifiedStart = null;
     if (enteredTime) {
-      const parsed = new Date(enteredTime);
+      const {dutchToUTC}=await import('./knockout.js?v=daily-20261016');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
       if (!Number.isFinite(parsed.getTime()) || parsed.getTime() > Date.now()) {
         message.textContent = 'Vul een geldige werkelijke starttijd in die niet in de toekomst ligt.';
         return;
@@ -906,8 +909,8 @@ async function recordAdminMatchStart(matchId) {
       verifiedStart = parsed.toISOString();
     }
     const startDescription = verifiedStart
-      ? `Geverifieerde werkelijke start: ${new Date(verifiedStart).toLocaleString('nl-NL')} ` +
-        `(${Intl.DateTimeFormat().resolvedOptions().timeZone || 'lokale tijdzone'}).`
+      ? `Geverifieerde werkelijke start: ${new Date(verifiedStart).toLocaleString('nl-NL',{timeZone:'Europe/Amsterdam'})} ` +
+        `(Europe/Amsterdam).`
       : 'Exacte start onbekend; Supabase gebruikt het meldmoment.';
     if (!window.confirm(
       `Is ${match.home_name} – ${match.away_name} daadwerkelijk begonnen?\n` +
@@ -941,7 +944,7 @@ async function loadAdminTournamentPublications(force=false) {
   if(!force&&target.querySelector('[data-ko-dirty="true"]'))return;
   tournamentManagementController?.abort();tournamentManagementController=new AbortController();const managementSignal=tournamentManagementController.signal;
   const userId=currentUser.id;
-  try{const {loadTournamentManagement}=await import('./tournament-management.js');
+  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=daily-20261016');
     if(!target.isConnected||managementSignal.aborted)return;
     await loadTournamentManagement(target,{supabase,signal:managementSignal,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole),
       onSaved:()=>loadAdminMatches(),onEdit:(id,knockout)=>{showAdminSection(knockout?'schema':'matches');if(knockout)document.dispatchEvent(new CustomEvent('predict-knockout-select',{detail:id}));},
@@ -1642,7 +1645,7 @@ render=function(){
   const target=document.createElement('section');target.id='admin-knockout';target.className='panel stack';
   document.querySelector('#account-invitations')?.after(target);
   knockoutScreenController=new AbortController();const signal=knockoutScreenController.signal,userId=currentUser.id;
-  import('./knockout.js').then(({loadKnockoutAdmin})=>{
+  import('./knockout.js?v=daily-20261016').then(({loadKnockoutAdmin})=>{
     if(!signal.aborted&&target.isConnected)loadKnockoutAdmin(target,{supabase,signal,isCurrent:()=>currentUser?.id===userId,onSaved:()=>{loadAdminMatches();loadAdminTournamentPublications();}});
   }).catch(()=>{if(!signal.aborted&&target.isConnected)target.textContent='Knock-outbeheer laden mislukt. Open Beheer opnieuw.';});
 };

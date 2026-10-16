@@ -39,6 +39,13 @@ De mijlpaal voor [gebruikersnaam en wachtwoord zonder e-mail](docs/manual-accoun
 - Beheer toont standaard nog af te handelen wedstrijden, inclusief verstreken wedstrijden zonder uitslag. Afgeronde wedstrijden blijven bereikbaar via alle wedstrijden.
 - Zie [mijlpaal compacte rondes](docs/compact-rounds-milestone.md), inclusief de toegepaste tellingmigratie `20261016210334` en verificatie.
 
+## Wedstrijden per lokale speeldag
+- Voorspellingen toont alle wedstrijden van de gekozen lokale dag en ronde, inclusief gesloten wedstrijden en uitslagen. Alleen open wedstrijden zijn bewerkbaar. Overbodige labels en knoppen zijn verwijderd; paginering verschijnt alleen als nodig en behoudt invoer.
+- Resterende voorspellingen vallen op met een oranje label; een volledig ingevulde open lijst krijgt een groene bevestiging. De tab Toernooiwinnaar verschijnt alleen bij een ingestelde vraag.
+- Deelnemers zien tijden in hun eigen apparaattijdzone. Beheer blijft Nederlandse tijden invoeren. Compacte mobiele beheerkaarten en een lager horizontaal schema verbeteren de leesbaarheid.
+- Een open toekomstige knock-outwedstrijd blijft na een zuivere tijdcorrectie open als de nieuwe tijd ook toekomstig is. Verlopen of handmatig gesloten wedstrijden vereisen bewuste heropening; gewijzigde spelvorm sluit voorspellingen.
+- Zie [mijlpaal lokale speeldagen](docs/daily-matches-milestone.md). Migratie `20261016215435` is toegepast en transactioneel getest.
+
 ## Account en voorkeuren (vervolg)
 
 - **Account** vervangt het navigatielabel Profiel. Gebruikersnaam, licht/donker/systeeminstelling en Uitloggen staan op deze pagina; de header bevat alleen de huisstijl.
