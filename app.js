@@ -1,6 +1,7 @@
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js';
+import {loadOnlineProfile} from './online-profile.js';
 
 const SUPABASE_URL =
   'https://sfcozzjcuppfypetbbzn.supabase.co';
@@ -25,10 +26,25 @@ window.predictSupabase = supabase;
 
 // Offline demonstrator. No real users, server security, or live sports data.
 // Offline demonstrator. No real users, server security, or live sports data.
-const STORE='predict-demo-v1';
+const STORE='predict-ui-v2';
 const defaults={theme:'light',user:'Demo-gebruiker',tab:'home',tournament:null,predictions:{},extra:{},pools:[{id:'friends',tournament:'darts27',name:'Vriendengroep',members:['Demo-gebruiker','Thomas','Mark']}],joined:['darts27','football'],showAdmin:false};
-function read(){try{return {...structuredClone(defaults),...JSON.parse(localStorage.getItem(STORE)||'{}')}}catch{return structuredClone(defaults)}}
-let state=read();const save=()=>localStorage.setItem(STORE,JSON.stringify(state));
+function read(){
+  try {
+    localStorage.removeItem('predict-demo-v1');
+    const value=JSON.parse(localStorage.getItem(STORE)||'{}');
+    return {theme:['light','dark','system'].includes(value.theme)?value.theme:'system',
+      tab:['home','discover','pools','profile','leaderboards','admin'].includes(value.tab)?value.tab:'home',user:'Gebruiker',tournament:null};
+  } catch {return {theme:'system',tab:'home',user:'Gebruiker',tournament:null};}
+}
+let state=read();const save=()=>{try{localStorage.setItem(STORE,JSON.stringify({theme:state.theme,tab:state.tab}));}catch{/* Optional UI cache must not block account updates. */}};
+const themeMedia=window.matchMedia('(prefers-color-scheme: dark)');
+function isDarkTheme(){return state.theme==='dark'||(state.theme==='system'&&themeMedia.matches);}
+function applyTheme(){
+  document.body.classList.toggle('dark',isDarkTheme());
+  const button=document.querySelector('[data-action="theme"]');
+  if(button)button.textContent=isDarkTheme()?'☀ Licht':'◐ Donker';
+}
+themeMedia.addEventListener('change',()=>{if(state.theme==='system')applyTheme();});
 const tournaments=[{id:'darts27',name:'WK Darts 2027',sport:'darts',state:'Binnenkort',description:'Exacte setstanden en progressieve punten per ronde.'},{id:'football',name:'Voetbal – demonstratietoernooi',sport:'football',state:'Demo',description:'Wedstrijdscores, kampioen en topscorer.'}];
 // Fixtures here are *fictional* and deliberately not presented as official schedules.
 const fixtures=[{id:'d1',tournament:'darts27',round:'Ronde 1',home:'Speler A',away:'Speler B',format:'sets',firstTo:3,start:'2027-12-18T20:00:00Z',status:'scheduled',official:null},{id:'d2',tournament:'darts27',round:'Ronde 1',home:'Speler C',away:'Speler D',format:'sets',firstTo:3,start:'2027-12-18T21:00:00Z',status:'scheduled',official:null},{id:'f1',tournament:'football',round:'Groepsfase',home:'Nederland',away:'Duitsland',format:'goals',start:'2027-12-18T19:00:00Z',status:'scheduled',official:null},{id:'f2',tournament:'football',round:'Groepsfase',home:'Spanje',away:'Frankrijk',format:'goals',start:'2027-12-19T19:00:00Z',status:'scheduled',official:null}];
@@ -42,7 +58,7 @@ function score(m,p){if(!m.official||!p)return 0;const a=m.official,b=p;const exa
 function points(tid){return fixtures.filter(m=>m.tournament===tid).reduce((s,m)=>s+score(m,state.predictions[m.id]),0)}
 function missing(tid){return fixtures.filter(m=>m.tournament===tid&&!locked(m)&&!state.predictions[m.id]).length}
 function nav(){return `<div class="nav">${[['home','Home'],['discover','Toernooien'],['pools','Mijn poules'],['profile','Profiel']].map(([id,label])=>`<button data-tab="${id}" class="${state.tab===id?'active':''}">${label}</button>`).join('')}</div>`}
-function header(){return `<header class="top"><div class="logo"><div class="logo-mark">P</div><div><div class="brand">Predict</div><div class="tag">SPORTVOORSPELLINGEN</div></div></div><div class="top-actions"><span class="badge">DEMO</span><button class="ghost" data-action="theme" aria-label="Wissel licht/donker">${state.theme==='dark'?'☀ Licht':'◐ Donker'}</button></div></header>`}
+function header(){return `<header class="top"><div class="logo"><div class="logo-mark">P</div><div><div class="brand">Predict</div><div class="tag">SPORTVOORSPELLINGEN</div></div></div><div class="top-actions"><span class="badge">DEMO</span><button class="ghost" data-action="theme" aria-label="Wissel licht/donker">${isDarkTheme()?'☀ Licht':'◐ Donker'}</button></div></header>`}
 function tournamentCard(t){return `<div class="panel stack"><div class="row"><span class="sport">${t.sport==='darts'?'DARTS':'VOETBAL'}</span><span class="pill mutedpill">${esc(t.state)}</span></div><h2 style="margin:0">${esc(t.name)}</h2><div class="muted mini">${esc(t.description)}</div><div class="row"><span class="mini muted">${missing(t.id)} nog te voorspellen</span><span class="mini"><b>${points(t.id)} pt</b></span></div><button class="btn" data-open="${t.id}">Open toernooi →</button></div>`}
 function home(){return `<h1>Mijn toernooien</h1><p class="sub">Welkom, ${esc(state.user)}. Overzicht van jouw toernooien en voorspellingen.</p><div class="notice">Dit is een lokale demonstratie met fictieve wedstrijden. Er worden nog geen echte accounts, poules of uitslagen gesynchroniseerd.</div><div class="grid">${tournaments.filter(t=>state.joined.includes(t.id)).map(tournamentCard).join('')}</div>`}
 function discover(){return `<h1>Toernooien</h1><p class="sub">Kies een beschikbaar toernooi. Alleen systeembeheerders zullen later toernooien kunnen toevoegen.</p><div class="grid">${tournaments.map(tournamentCard).join('')}</div>`}
@@ -52,18 +68,39 @@ function matchCard(m){const p=state.predictions[m.id],isLocked=locked(m);return 
 function extra(t){if(t.sport!=='football')return `<div class="notice">Voor dit demo-dartstoernooi zijn geen extra vragen geconfigureerd.</div>`;return `<div class="panel stack"><h2>Extra toernooivoorspellingen</h2><p class="hint">De definitieve applicatie sluit alle extra vragen vóór de eerste wedstrijd van het toernooi. Dit demonstratieformulier heeft alleen lokale opslag.</p><form id="extra-form" class="stack"><div class="field"><label for="champ">Wie wordt kampioen?</label><select name="champ" id="champ"><option value="">Selecteer een land</option>${['Nederland','Duitsland','Spanje','Frankrijk'].map(x=>`<option ${state.extra.champ===x?'selected':''}>${x}</option>`).join('')}</select></div><div class="field"><label for="scorer">Wie wordt topscorer?</label><input id="scorer" name="scorer" maxlength="80" value="${esc(state.extra.scorer||'')}" placeholder="Naam van de speler"></div><button class="btn">Voorspellingen lokaal opslaan</button></form></div>`}
 function leaderboard(t){return `<div class="panel stack"><h2>Klassement ${esc(t.name)}</h2><p class="hint">Een echt klassement komt uitsluitend uit de beveiligde database. Andere gebruikers en punten worden niet verzonnen in de demo.</p><div class="table-wrap"><table><thead><tr><th>#</th><th>Gebruiker</th><th class="num">Punten</th></tr></thead><tbody><tr><td>1</td><td>${esc(state.user)} (demo)</td><td class="num">${points(t.id)}</td></tr></tbody></table></div></div>`}
 function tournamentView(t){let ms=fixtures.filter(m=>m.tournament===t.id);return `<div class="breadcrumb"><button data-action="back">← Mijn toernooien</button></div><div class="row"><div><span class="sport">${t.sport==='darts'?'DARTS':'VOETBAL'}</span><h1>${esc(t.name)}</h1></div><span class="pill">${esc(t.state)}</span></div><p class="sub">${esc(t.description)}</p><div class="grid three"><div class="panel"><div class="stat-label">Mijn punten</div><div class="stat">${points(t.id)}</div></div><div class="panel"><div class="stat-label">Nog voorspellen</div><div class="stat">${missing(t.id)}</div></div><div class="panel"><div class="stat-label">Wedstrijden (demo)</div><div class="stat">${ms.length}</div></div></div><div class="section-head"><h2>Wedstrijden</h2><span class="mini muted">Nederlandse tijd</span></div><div class="grid">${ms.map(matchCard).join('')}</div><div class="section-head"><h2>Extra voorspellingen</h2></div>${extra(t)}<div class="section-head"><h2>Klassement</h2></div>${leaderboard(t)}${t.sport==='darts'?`<div class="section-head"><h2>Puntentabel WK Darts 2027</h2></div><div class="panel table-wrap"><table><thead><tr><th>Ronde</th><th class="num">Winnaar</th><th class="num">Exact totaal</th></tr></thead><tbody>${Object.entries(dartsPts).map(([round,arr])=>`<tr><td>${esc(round)}</td><td class="num">${arr[0]}</td><td class="num">${arr[1]}</td></tr>`).join('')}</tbody></table></div>`:''}`}
-function render(){document.body.className=state.theme==='dark'?'dark':'';const t=activeTournament();$('app').innerHTML=`<main class="layout">${header()}${t?tournamentView(t):nav()+(state.tab==='home'?home():state.tab==='discover'?discover():state.tab==='pools'?pools():profile())}<div class="footer">Predict · Lokale ontwerp- en functiedemo · Geen officiële sportdata · Geen online accounts</div></main>`;bind()}
-function bind(){document.querySelectorAll('[data-tab]').forEach(el=>el.onclick=()=>{state.tab=el.dataset.tab;save();render()});document.querySelectorAll('[data-open]').forEach(el=>el.onclick=()=>{state.tournament=el.dataset.open;save();render()});document.querySelectorAll('[data-action]').forEach(el=>el.onclick=()=>{if(el.dataset.action==='theme')state.theme=state.theme==='dark'?'light':'dark';if(el.dataset.action==='back'){state.tournament=null;state.tab='home'}if(el.dataset.action==='reset'&&confirm('Alleen lokale demogegevens wissen?'))state=structuredClone(defaults);save();render()});document.querySelectorAll('.prediction-form').forEach(form=>form.onsubmit=e=>{e.preventDefault();const m=fixtures.find(x=>x.id===form.dataset.match);if(locked(m)){alert('De voorspeldeadline is verstreken.');render();return}const data=new FormData(form),a=Number(data.get('home')),b=Number(data.get('away'));if(!Number.isInteger(a)||!Number.isInteger(b)||a<0||b<0||a>99||b>99){alert('Vul twee geldige scores in.');return}if(m.format==='sets'&&!((a===m.firstTo&&b<m.firstTo)||(b===m.firstTo&&a<m.firstTo))){alert(`Eén darter moet precies ${m.firstTo} sets winnen.`);return}state.predictions[m.id]={home:a,away:b,updatedAt:new Date().toISOString()};save();render()});const pool=$('pool-form');if(pool)pool.onsubmit=e=>{e.preventDefault();const name=$('pool-name').value.trim();if(!name)return;state.pools.push({id:crypto.randomUUID(),name,tournament:$('pool-tournament').value,members:[state.user]});save();render()};const profileForm=$('profile-form');if(profileForm)profileForm.onsubmit=e=>{e.preventDefault();const n=$('username').value.trim();if(n)state.user=n;save();render()};const extraForm=$('extra-form');if(extraForm)extraForm.onsubmit=e=>{e.preventDefault();const d=new FormData(extraForm);state.extra={champ:d.get('champ'),scorer:String(d.get('scorer')).trim()};save();render()}}
+function render(){document.body.className=isDarkTheme()?'dark':'';const t=activeTournament();$('app').innerHTML=`<main class="layout">${header()}${t?tournamentView(t):nav()+(state.tab==='home'?home():state.tab==='discover'?discover():state.tab==='pools'?pools():profile())}<div class="footer">Predict · Lokale ontwerp- en functiedemo · Geen officiële sportdata · Geen online accounts</div></main>`;bind()}
+function bind(){document.querySelectorAll('[data-tab]').forEach(el=>el.onclick=()=>{state.tab=el.dataset.tab;save();render()});document.querySelectorAll('[data-open]').forEach(el=>el.onclick=()=>{state.tournament=el.dataset.open;save();render()});document.querySelectorAll('[data-action]').forEach(el=>el.onclick=()=>{if(el.dataset.action==='theme')state.theme=isDarkTheme()?'light':'dark';if(el.dataset.action==='back'){state.tournament=null;state.tab='home'}if(el.dataset.action==='reset'&&confirm('Alleen lokale demogegevens wissen?'))state=structuredClone(defaults);save();render()});document.querySelectorAll('.prediction-form').forEach(form=>form.onsubmit=e=>{e.preventDefault();const m=fixtures.find(x=>x.id===form.dataset.match);if(locked(m)){alert('De voorspeldeadline is verstreken.');render();return}const data=new FormData(form),a=Number(data.get('home')),b=Number(data.get('away'));if(!Number.isInteger(a)||!Number.isInteger(b)||a<0||b<0||a>99||b>99){alert('Vul twee geldige scores in.');return}if(m.format==='sets'&&!((a===m.firstTo&&b<m.firstTo)||(b===m.firstTo&&a<m.firstTo))){alert(`Eén darter moet precies ${m.firstTo} sets winnen.`);return}state.predictions[m.id]={home:a,away:b,updatedAt:new Date().toISOString()};save();render()});const pool=$('pool-form');if(pool)pool.onsubmit=e=>{e.preventDefault();const name=$('pool-name').value.trim();if(!name)return;state.pools.push({id:crypto.randomUUID(),name,tournament:$('pool-tournament').value,members:[state.user]});save();render()};const profileForm=$('profile-form');if(profileForm)profileForm.onsubmit=e=>{e.preventDefault();const n=$('username').value.trim();if(n)state.user=n;save();render()};const extraForm=$('extra-form');if(extraForm)extraForm.onsubmit=e=>{e.preventDefault();const d=new FormData(extraForm);state.extra={champ:d.get('champ'),scorer:String(d.get('scorer')).trim()};save();render()}}
 
 let currentUser = null;
 let currentRole = 'user';
+let currentProfile = null;
+let profileRevision = 0;
+let profileWriteQueue = Promise.resolve();
+function applyAccountProfile(profile){
+  currentProfile={...currentProfile,...profile};
+  state.user=currentProfile.display_name||currentProfile.username||'Gebruiker';
+  state.theme=['system','light','dark'].includes(currentProfile.theme)?currentProfile.theme:'system';
+  save();applyTheme();
+  window.dispatchEvent(new CustomEvent('predict-preferences-saved',{detail:currentProfile}));
+}
+function persistProfile(changes){
+  const userId=currentUser?.id;
+  const request=profileWriteQueue.catch(()=>{}).then(async()=>{
+    if(!userId||currentUser?.id!==userId)throw new Error('Je bent niet meer ingelogd met dit account.');
+    const {data,error}=await supabase.rpc('update_my_profile',changes);
+    if(error)throw new Error(error.message);
+    if(currentUser?.id!==userId)throw new Error('Het actieve account is gewijzigd.');
+    profileRevision++;applyAccountProfile(data);return data;
+  });
+  profileWriteQueue=request;return request;
+}
 
 const renderDemo = render;
 
 render = function () {
   if (!currentUser) {
     document.body.className =
-      state.theme === 'dark' ? 'dark' : '';
+      isDarkTheme() ? 'dark' : '';
 
     $('app').innerHTML = `
       <main class="layout">
@@ -199,7 +236,7 @@ async function loadCurrentUser() {
   const { data: profile, error: profileError } =
     await supabase
       .from('profiles')
-      .select('username, display_name')
+      .select('username, display_name, theme')
       .eq('id', currentUser.id)
       .single();
 
@@ -223,10 +260,7 @@ async function loadCurrentUser() {
     return;
   }
 
-  state.user =
-    profile.display_name ||
-    profile.username ||
-    'Gebruiker';
+  applyAccountProfile(profile);
 
   currentRole = role.role;
 
@@ -470,8 +504,8 @@ async function editAdminMatch(matchId) {
     padding: '28px',
     borderRadius: '16px',
     border: '1px solid #374151',
-    background: state.theme === 'dark' ? '#1e293b' : '#ffffff',
-    color: state.theme === 'dark' ? '#ffffff' : '#111827',
+    background: isDarkTheme() ? '#1e293b' : '#ffffff',
+    color: isDarkTheme() ? '#ffffff' : '#111827',
     boxShadow: '0 20px 80px rgba(0,0,0,.55)'
   });
   // De backdrop hoort bij het modale dialoogelement.
@@ -579,8 +613,8 @@ async function approveAdminMatch(matchId) {
     padding: '28px',
     borderRadius: '16px',
     border: '1px solid #374151',
-    background: state.theme === 'dark' ? '#1e293b' : '#ffffff',
-    color: state.theme === 'dark' ? '#ffffff' : '#111827',
+    background: isDarkTheme() ? '#1e293b' : '#ffffff',
+    color: isDarkTheme() ? '#ffffff' : '#111827',
     boxShadow: '0 20px 80px rgba(0,0,0,.55)'
   });
   document.body.appendChild(dialog);
@@ -720,8 +754,8 @@ async function recordAdminMatchResult(matchId) {
     width: 'min(520px, calc(100% - 32px))',
     maxHeight: '85vh', overflowY: 'auto', margin: 'auto',
     padding: '28px', borderRadius: '16px', border: '1px solid #374151',
-    background: state.theme === 'dark' ? '#1e293b' : '#ffffff',
-    color: state.theme === 'dark' ? '#ffffff' : '#111827',
+    background: isDarkTheme() ? '#1e293b' : '#ffffff',
+    color: isDarkTheme() ? '#ffffff' : '#111827',
     boxShadow: '0 20px 80px rgba(0,0,0,.55)'
   });
   if (!document.getElementById('predict-result-modal-style')) {
@@ -825,8 +859,8 @@ async function recordAdminMatchStart(matchId) {
     width: 'min(540px, calc(100% - 32px))',
     maxHeight: '85vh', overflowY: 'auto', margin: 'auto',
     padding: '28px', borderRadius: '16px', border: '1px solid #374151',
-    background: state.theme === 'dark' ? '#1e293b' : '#ffffff',
-    color: state.theme === 'dark' ? '#ffffff' : '#111827',
+    background: isDarkTheme() ? '#1e293b' : '#ffffff',
+    color: isDarkTheme() ? '#ffffff' : '#111827',
     boxShadow: '0 20px 80px rgba(0,0,0,.55)'
   });
   if (!document.getElementById('predict-start-modal-style')) {
@@ -960,8 +994,8 @@ function showPublishTournamentDialog(tournament) {
     width: 'min(540px, calc(100% - 32px))', maxHeight: '85vh',
     overflowY: 'auto', margin: 'auto', padding: '28px', borderRadius: '16px',
     border: '1px solid #cbd5e1',
-    background: state.theme === 'dark' ? '#1e293b' : '#ffffff',
-    color: state.theme === 'dark' ? '#ffffff' : '#111827'
+    background: isDarkTheme() ? '#1e293b' : '#ffffff',
+    color: isDarkTheme() ? '#ffffff' : '#111827'
   });
   document.body.appendChild(dialog);
   dialog.addEventListener('close', () => dialog.remove(), {once:true});
@@ -1545,7 +1579,8 @@ render = function () {
   document.querySelectorAll('.nav button').forEach(button=>{
     const navigate=button.onclick;
     button.onclick=event=>{
-      const dirty=[...document.querySelectorAll('[data-online-predict] input')].some(i=>i.value!==i.defaultValue);
+      const dirty=[...document.querySelectorAll('[data-online-predict] input')].some(i=>i.value!==i.defaultValue)||
+        document.querySelector('[data-profile-form][data-dirty="true"]');
       if(dirty&&!confirm('Niet-opgeslagen wijzigingen laten vervallen?'))return;
       onlineTournamentId=null;navigate(event);
     };
@@ -1564,4 +1599,32 @@ render = function () {
     onBack:()=>{onlineTournamentId=null;render();}};
   if (onlineTournamentId) loadTournamentDetail(target,ctx);
   else loadTournamentCatalog(target,ctx);
+};
+
+profile=function(){return '<section id="online-profile" class="stack" aria-label="Profiel">Profiel laden...</section>';};
+let profileScreenController=null;
+const renderBeforeOnlineProfile=render;
+render=function(){
+  profileScreenController?.abort();renderBeforeOnlineProfile();
+  if(!currentUser){currentProfile=null;return;}
+  const badge=document.querySelector('.top .badge');if(badge)badge.textContent='ONLINE';
+  const footer=document.querySelector('.footer');if(footer)footer.textContent='Predict · Je account, voorspellingen en poules uit Supabase';
+  const userId=currentUser.id;
+  const themeButton=document.querySelector('[data-action="theme"]');
+  if(themeButton)themeButton.onclick=async()=>{
+    themeButton.disabled=true;
+    try {await persistProfile({p_theme:isDarkTheme()?'light':'dark'});document.getElementById('theme-save-message')?.remove();}
+    catch(error){
+      if(currentUser?.id!==userId||!themeButton.isConnected)return;
+      let message=document.getElementById('theme-save-message');
+      if(!message){message=document.createElement('p');message.id='theme-save-message';message.setAttribute('role','alert');document.querySelector('.top').after(message);}
+      message.textContent='Thema opslaan mislukt: '+error.message;
+    } finally{if(themeButton.isConnected)themeButton.disabled=false;}
+  };
+  applyTheme();
+  const target=document.getElementById('online-profile');if(!target)return;
+  profileScreenController=new AbortController();
+  const revision=profileRevision;
+  loadOnlineProfile(target,{supabase,userId,signal:profileScreenController.signal,isCurrent:()=>currentUser?.id===userId,
+    save:persistProfile,onLoaded:data=>{if(profileRevision===revision)applyAccountProfile(data);return currentProfile;}});
 };
