@@ -16,7 +16,7 @@ const {chromium}=require('playwright'),http=require('node:http'),fs=require('nod
         qaCalls.push([name,args]);
         if(name==='admin_list_tournaments')return {data:[{id:'tour',name:'QA Darts'}]};
         if(name==='list_darts_imports'){if(qaSlow)await new Promise(r=>window.qaRelease=r);return {data:{total:items.length,items:items.slice(args.p_offset,args.p_offset+25)}};}
-        if(name==='admin_get_tournament_rounds')return {data:[{round_id:'round',round_name:'QA ronde'}]};
+        if(name==='admin_get_tournament_rounds')return {data:[{round_id:'round',round_name:'QA ronde'},{round_id:'other',round_name:'Andere ronde'}]};
         if(name==='admin_get_matches')return {data:[{match_id:'match',home_name:'QA A',away_name:'QA B',scheduled_start:'2026-10-16T10:00:00Z',score_unit:'legs'}]};
         if(name==='review_darts_import'){
           if(qaFail)return {error:{message:'QA serverfout'}};
@@ -29,6 +29,12 @@ const {chromium}=require('playwright'),http=require('node:http'),fs=require('nod
     await page.goto('http://127.0.0.1:'+server.address().port+'/');await page.getByLabel('Dartstoernooi',{exact:true}).selectOption('tour');
     await page.locator('article').first().waitFor();assert.equal(await page.locator('article img').count(),0);
     const fixture=page.locator('article').nth(0),result=page.locator('article').nth(1);
+    assert.equal(await fixture.getByLabel('Gecontroleerde ronde',{exact:true}).inputValue(),'round');
+    await fixture.getByText('Bronronde automatisch herkend: QA ronde.').waitFor();
+    await fixture.getByText('Starttijd ontbreekt in het importvoorstel;', {exact:false}).waitFor();
+    assert.equal(await fixture.locator('input[type=checkbox]').isChecked(),false);
+    await fixture.getByLabel('Gecontroleerde ronde',{exact:true}).selectOption('other');
+    assert.equal(await fixture.getByLabel('Gecontroleerde ronde',{exact:true}).inputValue(),'other');
     await fixture.getByLabel('Gecontroleerde ronde',{exact:true}).selectOption('round');await fixture.getByLabel('Gecontroleerde score-eenheid').selectOption('legs');await fixture.getByLabel('Benodigd aantal sets of legs').fill('6');await fixture.locator('input[type=checkbox]').check();
     await page.evaluate(()=>window.qaFail=true);await fixture.getByRole('button',{name:'Wedstrijdconcept maken'}).click();await fixture.getByText('QA serverfout').waitFor();assert.equal(await fixture.getByLabel('Benodigd aantal sets of legs').inputValue(),'6');
     await page.evaluate(()=>window.qaFail=false);await fixture.getByRole('button',{name:'Wedstrijdconcept maken'}).click();await fixture.getByText('Wedstrijdconcept gemaakt.',{exact:false}).waitFor();assert.equal(await page.evaluate(()=>qaApplied),1);
