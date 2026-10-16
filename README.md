@@ -3,6 +3,8 @@
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
 ## Profiel en voorkeuren
+De vervolgmijlpaal voor [gebruikersnaam en wachtwoord zonder e-mail](docs/manual-accounts-milestone.md) is voorbereid. Deelnemers activeren hun account met een eenmalige code van een beheerder. Wachtwoordherstel gebruikt ook een beheerderscode. SMTP en een eigen domein zijn niet nodig. Backend is toegepast en de echte ketentest met een fictief account slaagt; de frontend staat nog in concept-PR #4.
+
 - Het profiel toont je eigen gebruikersnaam, bewerkbare weergavenaam en thema: systeeminstelling, licht of donker.
 - Weergavenaam (1–40 tekens) en thema worden via `update_my_profile` bij je account opgeslagen. Gebruikersnaam en rol kunnen hiermee niet worden gewijzigd.
 - De themaknop bovenaan gebruikt dezelfde accountvoorkeur, zonder andere invoer te wissen. Systeeminstelling volgt wijzigingen in de apparaatvoorkeur.
@@ -22,7 +24,7 @@
 
 ## Online privépoules
 - Open **Mijn poules**, kies een gepubliceerd/actief toernooi en maak een poule aan. Je wordt automatisch toernooideelnemer en poulebeheerder.
-- De beheerder maakt een uitnodigingscode voor een e-mailadres en deelt die zelf. Er wordt geen e-mail verzonden. De ontvanger heeft een bestaand Predict-account met dat bevestigde e-mailadres nodig.
+- De beheerder maakt een uitnodigingscode voor een bestaande gebruikersnaam en deelt die zelf. Er wordt geen e-mail verzonden. De ontvanger moet met het bedoelde Predict-account ingelogd zijn. Bestaande e-mailgebonden uitnodigingscodes blijven werken.
 - Codes zijn eenmalig, zeven dagen geldig en uitsluitend als SHA-256-hash opgeslagen. Een nieuwe code voor hetzelfde adres vervangt de oude. Alle openstaande codes kunnen worden ingetrokken.
 - Leden kunnen vertrekken. De beheerder kan leden verwijderen of het beheer overdragen aan een bestaand lid. De eigenaar moet eerst overdragen voordat die vertrekt.
 - Eén centrale voorspelling per wedstrijd telt in alle poules van dat toernooi, inclusief eerdere punten bij later toetreden. Verlaten/verwijderen wist de voorspellingen niet.
