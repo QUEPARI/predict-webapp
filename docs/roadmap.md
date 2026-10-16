@@ -1,5 +1,11 @@
 # Volledige productbouw – voortgang en acceptatie
 
+## Actuele scope vanaf 16 oktober 2026
+
+Handmatige knock-outtoernooien krijgen voorrang. Geen sport-API's, groepsfase of competitieontwikkeling. De implementatie bevat toernooiaanmaak, 2–128 spelers/teams, vrijstellingen, schema, handmatige tijden/uitslagen, automatische individuele deadlines en winnaar-doorstroming. Na expliciete goedkeuring zijn de migratie en hosted rollbacktests uitgevoerd en de sportimportfuncties uitgeschakeld. De frontend wordt via PR #7 gepubliceerd. Zie `manual-knockout-milestone.md` voor tests en ingebruikname.
+
+Onderstaande oorspronkelijke algemene roadmap is historische context; de API- en andere toernooivormen zijn geen actieve ontwikkelopdracht meer.
+
 De doelomvang is de volledige algemene voorspelapp; er is bewust geen aparte MVP-scope.
 
 ## 1. Basis en veiligheid [gestart]

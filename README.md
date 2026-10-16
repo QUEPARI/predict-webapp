@@ -5,10 +5,12 @@
 ## Profiel en voorkeuren
 De mijlpaal voor [gebruikersnaam en wachtwoord zonder e-mail](docs/manual-accounts-milestone.md) is gepubliceerd via PR #4 (`aa45d6f`) en door de gebruiker getest. Deelnemers activeren hun account met een eenmalige code van een beheerder. Wachtwoordherstel gebruikt ook een beheerderscode. SMTP en een eigen domein zijn niet nodig.
 
-## Gecontroleerde sportimport (voorbereid)
-- [DartsAPI-wedstrijd- en uitslagvoorstellen](docs/reviewed-imports-milestone.md) komen eerst in een private controlewachtrij.
-- Een nieuwe wedstrijd blijft gesloten tot de bestaande goedkeurings- en vrijgaveprocedures zijn doorlopen. Uitslagen vereisen expliciete controle en kunnen bestaande afwijkende scores niet overschrijven.
-- Backendmigratie en `sync-darts-data` zijn toegepast; de nieuwe frontend is nog niet gepubliceerd. Er zijn geen officiële brongegevens verwerkt. Zie het verslag voor testresultaten en grenzen.
+## Handmatige knock-outtoernooien
+- De ontwikkelrichting is handmatig beheer, zonder sport-API's, betaalde databronnen of automatische bronimports.
+- Nieuwe knock-outtoernooien ondersteunen 2–128 spelers of teams, lotingsvolgorde, vrijstellingen, rondeformaten en expliciete puntentelling. Datums/tijden worden als Nederlandse tijd ingevoerd; sluiting blijft op de server bewaakt.
+- Winnaars stromen na handmatige uitslagregistratie door. Het volledige schema is zichtbaar bij een geselecteerd toernooi. Beheer toont ontbrekende gegevens en wedstrijden die een uitslag nodig hebben.
+- Zie [knock-outmijlpaal](docs/manual-knockout-milestone.md) voor verificatie en ingebruikname. Na expliciete toestemming is migratie `20261016181258` toegepast en zijn de hosted rollbacktests geslaagd. De frontend wordt via PR #7 gepubliceerd.
+- Oude bronrecords en importmigraties blijven als historie behouden. De nieuwe code verwijdert het importscherm en vervangt de twee sportimportfuncties door HTTP 410-antwoorden. Dit heeft pas effect nadat de bijbehorende backend en frontend zijn uitgerold.
 
 ## Profiel en voorkeuren (vervolg)
 
