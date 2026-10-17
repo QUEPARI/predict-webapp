@@ -161,14 +161,6 @@
 #ko-message:empty{display:none}
 .admin-shell .game-context,.admin-shell [data-game-context]{position:sticky;top:var(--admin-game-top,76px);z-index:4;align-self:start;background:var(--bg);padding:7px 0}
 .ranking-pagination{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;font-size:12px}
-.compact-match.prediction-pending,.compact-match.prediction-unpredicted{background:#e8ebef;color:#283442;border-color:#c8d0d9}
-.compact-match.prediction-winner{background:#d8efdc;color:#163d23;border-color:#92c59f}
-.compact-match.prediction-exact{background:#1c633c;color:#fff;border-color:#144d2d}
-.compact-match.prediction-wrong{background:#f7d9dc;color:#72202a;border-color:#df9ca4}
-.dark .compact-match.prediction-pending,.dark .compact-match.prediction-unpredicted{background:#2b3037;color:#e4e7ec;border-color:#515a65}
-.dark .compact-match.prediction-winner{background:#345e41;color:#e5f4e9;border-color:#679875}
-.dark .compact-match.prediction-exact{background:#134a2b;color:#fff;border-color:#4f9a6b}
-.dark .compact-match.prediction-wrong{background:#602e35;color:#ffe6e9;border-color:#ab6670}
 .match-comparable{cursor:pointer}
 .match-comparable .score-summary th,.match-comparable .score-summary td,.match-comparable .result-column{background:transparent;color:inherit;border-color:currentColor}
 .match-comparable .muted,.match-comparable .field label,.match-comparable .name-link{color:inherit}
@@ -187,8 +179,6 @@
 .match-pool-dialog th:last-child{width:22%}
 .match-pool-dialog th,.match-pool-dialog td{white-space:normal;overflow-wrap:anywhere}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-.compact-match.prediction-open{background:#e5efff;border-color:#a3bee8;color:#153a69}
-.dark .compact-match.prediction-open{background:#1e3657;border-color:#456d9e;color:#e7f0ff}
 .compact-match{padding:12px!important;gap:10px}
 .compact-match .match-contest{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px;min-height:40px}
 .match-contest strong{font-size:14px;overflow-wrap:anywhere;line-height:1.25}
@@ -204,3 +194,23 @@
 .match-points{grid-column:3;justify-self:end;font-size:12px;font-weight:650}
 .match-comparable:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .compact-match .match-meta small{font-size:10px}
+.score-tone-open{--score-bg:#dceaff;--score-fg:#174379}
+.score-tone-pending,.score-tone-unpredicted{--score-bg:#e6e9ed;--score-fg:#34404f}
+.score-tone-exact{--score-bg:#1c633c;--score-fg:#fff}
+.score-tone-winner{--score-bg:#d8efdc;--score-fg:#163d23}
+.score-tone-wrong{--score-bg:#f7d9dc;--score-fg:#72202a}
+.dark .score-tone-open{--score-bg:#284d7b;--score-fg:#e7f0ff}
+.dark .score-tone-pending,.dark .score-tone-unpredicted{--score-bg:#383f48;--score-fg:#e4e7ec}
+.dark .score-tone-exact{--score-bg:#175c34;--score-fg:#fff}
+.dark .score-tone-winner{--score-bg:#a6d5b1;--score-fg:#173d23}
+.dark .score-tone-wrong{--score-bg:#71323e;--score-fg:#ffe6e9}
+.score-tone{display:inline-block;background:var(--score-bg);color:var(--score-fg);border:1px solid transparent;border-radius:20px;padding:3px 10px;white-space:nowrap;font-weight:700;font-variant-numeric:tabular-nums}
+.compact-match .prediction-inline{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center}
+.compact-match .prediction-inline>.two{grid-column:2;grid-row:1;gap:10px}
+.compact-match .prediction-inline>.btn{grid-column:3;grid-row:1;justify-self:end;padding:7px 9px;font-size:11px;white-space:nowrap}
+.compact-match .prediction-inline input{width:54px;background:var(--score-bg);color:var(--score-fg)}
+.compact-match .prediction-inline [role=status]:not(:empty){grid-column:1/-1;grid-row:2}
+.closed-score-summary{display:flex;position:relative;justify-content:center;min-height:31px}
+.prediction-chip{padding:4px 14px;min-width:60px;text-align:center}
+.match-points{position:absolute;left:33.333333%;transform:translateX(-50%);font-size:11px}
+@media(max-width:380px){.compact-match .prediction-inline>.btn{grid-column:1/-1;grid-row:2;justify-self:end}.compact-match .prediction-inline [role=status]:not(:empty){grid-row:3}.compact-match .prediction-inline input{width:50px}}

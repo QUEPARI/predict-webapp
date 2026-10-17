@@ -2,6 +2,11 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Kleur alleen op voorspelde scores
+- Wedstrijdkaarten gebruiken de normale lichte/donkere paneelachtergrond. Alleen de voorspelde score is blauw (open), grijs (uitslag ontbreekt), donkergroen (exact), lichtgroen (winnaar goed) of rood (onjuist).
+- Dezelfde scorekleurvlakken staan in de wedstrijdpop-up en in de kolom Jouw voorspelling bij Uitslagen. Niet ingevulde voorspellingen blijven neutraal.
+- Afgerond en Gesloten verdwijnen uit de wedstrijdkaart. De scorevelden staan als groep exact in het kaartmidden; de opslagknop staat er rechts naast (op smalle schermen eronder). Punten staan gecentreerd in de linker twee derde van de kaart.
+
 ## Rustige wedstrijdkaarten
 - Open kaarten zijn blauw. Spelers staan links/rechts met de uitslag centraal; jouw voorspelling en punten staan er compact onder. Gesloten kaarten behouden de uitkomstkleur.
 - De teksten Exact goed en Vergelijk poule zijn uit de kaart verwijderd. De hele gesloten kaart opent de bestaande pop-up, ook via toetsenbord (Enter/spatie). Het uitkomstlabel staat in de pop-up.
