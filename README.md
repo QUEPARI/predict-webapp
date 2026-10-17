@@ -2,6 +2,12 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Compacte header en schermindeling
+- Het woordlogo staat gecentreerd, zonder los P-icoon. Links staat Home; rechts staan de kleinere account- en beheericonen. De visuele cirkels zijn 33 px, met behoud van 44 px klikruimte.
+- Mijn spellen toont naam, afbeelding en voorspelstatus; deelname-/publicatietekst en startdatum zijn daar verwijderd. Binnen het toernooi blijven de punten zichtbaar en zijn de dubbele deelnamelabels weg.
+- De toernooinaam staat iets lager. De voettekst staat onderaan korte schermen en volgt de inhoud op langere pagina’s.
+- Zie [verificatie](docs/compact-header-milestone.md).
+
 ## Spellen, uitsnijden en pouleklassementen
 - **PREDICT.** als logo; de startpagina toont **Mijn spellen** en **Beschikbare spellen**, met extra ruimte boven de eerste sectie.
 - Afbeeldingen zijn vierkant uit te snijden: verschuiven, zoomen en een direct voorbeeld. Opslag als JPEG werkt ook zonder WebP-codering in Safari. Bestaande afbeeldingen blijven zichtbaar.
