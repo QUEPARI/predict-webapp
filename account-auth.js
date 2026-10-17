@@ -8,6 +8,8 @@ const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supaba
 const client=createClient('https://sfcozzjcuppfypetbbzn.supabase.co','sb_publishable_1opRVzunD94Sd71rKSJAew_0ydMP2VU',{
   auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}
 });
+// Public branding is independent of the isolated, non-persistent account session.
+import('./branding.js?v=accent-20261017').then(async({applyAccent})=>{if(!client.rpc)return;const r=await client.rpc('get_app_appearance');if(!r.error)applyAccent(r.data?.accent??null);}).catch(()=>{});
 const target=document.getElementById('account-flow'),message=document.getElementById('message'),title=document.getElementById('title');
 title.textContent=initialKind==='activate'?'Account activeren':'Wachtwoord herstellen';
 target.innerHTML='<p>Gebruik de eenmalige code van je beheerder. Je kiest zelf je wachtwoord. Er wordt geen e-mail verstuurd.</p><form class="stack"><label for="kind">Wat wil je doen?</label><select id="kind"><option value="activate">Nieuw account activeren</option><option value="reset">Wachtwoord herstellen</option></select><label for="username">Gebruikersnaam</label><input id="username" autocomplete="username" maxlength="128" required spellcheck="false"><label for="code">Eenmalige code</label><input id="code" autocomplete="off" pattern="[0-9a-f]{64}" maxlength="64" required spellcheck="false"><label for="password">Wachtwoord (minimaal 12 tekens)</label><input id="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required><label for="repeat">Herhaal wachtwoord</label><input id="repeat" type="password" autocomplete="new-password" minlength="12" maxlength="128" required><button class="btn">Wachtwoord opslaan</button></form>';
