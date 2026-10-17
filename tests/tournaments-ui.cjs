@@ -2,7 +2,7 @@
 const {chromium}=require('playwright');
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
 (async()=>{
-  const files={'/':'index.html','/branding.js':'branding.js','/app.js':'app.js','/pool-comparison.js':'pool-comparison.js','/bracket.js':'bracket.js','/knockout.js':'knockout.js','/tournament-management.js':'tournament-management.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'};
+  const files={'/':'index.html','/tournament-images.js':'tournament-images.js','/branding.js':'branding.js','/app.js':'app.js','/pool-comparison.js':'pool-comparison.js','/bracket.js':'bracket.js','/knockout.js':'knockout.js','/tournament-management.js':'tournament-management.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'};
   const server=http.createServer((req,res)=>{req.url=req.url.split('?')[0];
     const file=files[req.url];if(!file){res.writeHead(404).end();return;}
     res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');
@@ -51,6 +51,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     await page.route('https://image-qa.invalid/**',route=>route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect width="200" height="150" fill="#273ab0"/><text x="25" y="85" fill="white" font-size="35">DARTS</text></svg>'}));
     await page.route('https://cdn.jsdelivr.net/**' ,route=>route.fulfill({contentType:'text/javascript',body:'export const createClient=()=>window.qaSupabase;'}));
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
+    await page.getByRole('heading',{name:'Mijn spellen',exact:true}).waitFor();await page.getByRole('heading',{name:'Beschikbare spellen',exact:true}).waitFor();assert.equal(await page.locator('.brand').textContent(),'PREDICT.');
     await page.getByText('Je doet nog niet mee aan een toernooi.',{exact:false}).waitFor();
     assert.equal(await page.locator('[data-my-tournaments] [data-online-open]').count(),0);assert.equal(await page.locator('[data-open-tournaments] [data-online-open]').count(),1);await page.getByRole('button',{name:'Home',exact:true}).click();
     await page.getByText('49 wedstrijden open om te voorspellen',{exact:true}).waitFor();for(const width of [320,390,1280]){await page.setViewportSize({width,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));}await page.setViewportSize({width:390,height:844});await page.evaluate(()=>document.body.classList.add('dark'));await page.locator('.tournament-art img').evaluate(img=>img.decode());await page.screenshot({path:path.join(__dirname,'../test-results/tournament-cards-dark-mobile.png')});await page.getByRole('button',{name:'Bekijk toernooi'}).click();

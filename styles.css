@@ -61,3 +61,24 @@
 .tournament-tile .prediction-attention{justify-self:start}
 .tile-arrow{font-size:26px;color:var(--muted)}
 @media(max-width:600px){.tournament-tile-link{padding:10px;gap:11px;min-height:118px}.tournament-art{flex-basis:98px;width:98px;height:96px}.tournament-tile-body h2{font-size:17px}.tournament-tile .prediction-count:has(strong)>span{display:none}.tournament-tile .prediction-count{font-size:11px}.tournament-tile-body .mini{font-size:11px}.tile-arrow{font-size:22px}}
+
+/* Speloverzicht, beheerkaarten en vierkante afbeeldingselectie. */
+#online-tournaments>h1:first-child{margin-top:14px}
+.tournament-art{height:124px}
+.tournament-tile-body h3{margin:0;overflow-wrap:anywhere}
+.admin-game-tasks{display:grid;gap:4px;color:var(--accent)}
+[data-admin-games][hidden],[data-detail][hidden]{display:none}
+.image-preview{width:112px;height:112px}
+.image-crop{max-width:360px;display:grid;gap:10px}
+.image-crop[hidden]{display:none}
+.image-crop canvas{display:block;width:100%;height:auto;max-width:320px;border-radius:10px;touch-action:none;cursor:grab;background:#fff;border:1px solid var(--border)}
+.image-crop canvas:active{cursor:grabbing}
+.image-crop label{display:grid;gap:4px;font-size:13px}
+.image-crop input[type=range]{padding:4px 0;min-height:36px;accent-color:var(--accent)}
+.pool-ranking{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
+.pool-ranking summary{cursor:pointer;font-weight:700;overflow-wrap:anywhere}
+.pool-ranking[open]>summary{margin-bottom:12px}
+@media(max-width:600px){.tournament-art{height:98px}.image-preview{width:112px;height:112px}}
+
+#admin-tournament-publications [data-message]:empty{display:none}
+[data-global-ranking]>.table-wrap>table,.pool-ranking .table-wrap>table:not(.comparison-table){min-width:0}

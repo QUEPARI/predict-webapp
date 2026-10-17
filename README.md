@@ -2,6 +2,13 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Spellen, uitsnijden en pouleklassementen
+- **PREDICT.** als logo; de startpagina toont **Mijn spellen** en **Beschikbare spellen**, met extra ruimte boven de eerste sectie.
+- Afbeeldingen zijn vierkant uit te snijden: verschuiven, zoomen en een direct voorbeeld. Opslag als JPEG werkt ook zonder WebP-codering in Safari. Bestaande afbeeldingen blijven zichtbaar.
+- Beheer → Toernooien toont spelkaarten met openstaande beheeracties. Open een kaart voor de bestaande beheerfuncties.
+- Klassement binnen een toernooi bevat het algemene klassement en uitklapbare klassementen van je eigen poules. Namen in een poule zijn aanklikbaar voor de bestaande beveiligde vergelijking.
+- Zie [verificatie en migratie](docs/game-management-crop-milestone.md).
+
 ## Toernooikaarten en afbeeldingen
 - Compacte kaarten met toernooiafbeelding, naam en voorspelstatus op de startpagina. Donkere modus gebruikt een neutrale zwarte/anthraciete basis.
 - Beheer → Toernooien: kies een toernooi en upload/verwijder de openbare afbeelding. JPG, PNG en WebP worden verkleind naar WebP; alleen beheerders mogen bestanden wijzigen.

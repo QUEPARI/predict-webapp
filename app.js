@@ -1,7 +1,7 @@
-import {validAccent,accentPalette,applyAccent} from './branding.js?v=cards-20261017';
+import {validAccent,accentPalette,applyAccent} from './branding.js?v=crop-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=cards-20261017';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=crop-20261017';
 import {loadOnlineProfile} from './online-profile.js?v=account-20261016';
 
 // Centrally configured branding; no user data is stored in the public response.
@@ -96,7 +96,7 @@ function score(m,p){if(!m.official||!p)return 0;const a=m.official,b=p;const exa
 function points(tid){return fixtures.filter(m=>m.tournament===tid).reduce((s,m)=>s+score(m,state.predictions[m.id]),0)}
 function missing(tid){return fixtures.filter(m=>m.tournament===tid&&!locked(m)&&!state.predictions[m.id]).length}
 function nav(){return '<div class="nav" hidden></div>';}
-function header(){const initial=Array.from(currentProfile?.username||'G')[0].toLocaleUpperCase('nl-NL');return `<header class="top"><button type="button" class="logo logo-button" data-tab="home" aria-label="Home" title="Naar Mijn toernooien"><span class="logo-mark">P</span><span><span class="brand">Predict</span><span class="tag">SPORTVOORSPELLINGEN</span></span></button><div class="header-actions">${['admin','super_admin'].includes(currentRole)?'<button type="button" class="header-icon" data-tab="admin" aria-label="Beheer" title="Beheer">⚙</button>':''}<button type="button" class="account-avatar" data-tab="profile" aria-label="Account" title="Accountinstellingen">${esc(initial)}</button></div></header>`;}
+function header(){const initial=Array.from(currentProfile?.username||'G')[0].toLocaleUpperCase('nl-NL');return `<header class="top"><button type="button" class="logo logo-button" data-tab="home" aria-label="Home" title="Naar Mijn spellen"><span class="logo-mark">P</span><span><span class="brand">PREDICT.</span><span class="tag">SPORTVOORSPELLINGEN</span></span></button><div class="header-actions">${['admin','super_admin'].includes(currentRole)?'<button type="button" class="header-icon" data-tab="admin" aria-label="Beheer" title="Beheer">⚙</button>':''}<button type="button" class="account-avatar" data-tab="profile" aria-label="Account" title="Accountinstellingen">${esc(initial)}</button></div></header>`;}
 
 function tournamentCard(t){return `<div class="panel stack"><div class="row"><span class="sport">${t.sport==='darts'?'DARTS':'VOETBAL'}</span><span class="pill mutedpill">${esc(t.state)}</span></div><h2 style="margin:0">${esc(t.name)}</h2><div class="muted mini">${esc(t.description)}</div><div class="row"><span class="mini muted">${missing(t.id)} nog te voorspellen</span><span class="mini"><b>${points(t.id)} pt</b></span></div><button class="btn" data-open="${t.id}">Open toernooi →</button></div>`}
 function home(){return `<h1>Mijn toernooien</h1><p class="sub">Welkom, ${esc(state.user)}. Overzicht van jouw toernooien en voorspellingen.</p><div class="notice">Dit is een lokale demonstratie met fictieve wedstrijden. Er worden nog geen echte accounts, poules of uitslagen gesynchroniseerd.</div><div class="grid">${tournaments.filter(t=>state.joined.includes(t.id)).map(tournamentCard).join('')}</div>`}
@@ -147,7 +147,7 @@ render = function () {
           <div class="logo">
             <div class="logo-mark">P</div>
             <div>
-              <div class="brand">Predict</div>
+              <div class="brand">PREDICT.</div>
               <div class="tag">SPORTVOORSPELLINGEN</div>
             </div>
           </div>
@@ -975,7 +975,7 @@ async function loadAdminTournamentPublications(force=false) {
   if(!force&&target.querySelector('[data-ko-dirty="true"]'))return;
   tournamentManagementController?.abort();tournamentManagementController=new AbortController();const managementSignal=tournamentManagementController.signal;
   const userId=currentUser.id;
-  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=cards-20261017');
+  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=crop-20261017');
     if(!target.isConnected||managementSignal.aborted)return;
     await loadTournamentManagement(target,{supabase,signal:managementSignal,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole),
       onSaved:()=>loadAdminMatches(),onEdit:(id,knockout)=>{showAdminSection(knockout?'schema':'matches');if(knockout)document.dispatchEvent(new CustomEvent('predict-knockout-select',{detail:id}));},

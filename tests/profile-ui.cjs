@@ -1,7 +1,7 @@
 // Real browser, mock account backend. No hosted data or real credentials.
 const {chromium}=require('playwright');const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
 (async()=>{
-  const files={'/':'index.html','/branding.js':'branding.js','/app.js':'app.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'};
+  const files={'/':'index.html','/tournament-images.js':'tournament-images.js','/branding.js':'branding.js','/app.js':'app.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'};
   const server=http.createServer((req,res)=>{req.url=req.url.split('?')[0];const f=files[req.url];if(!f){res.writeHead(404).end();return;}res.setHeader('Content-Type',f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(path.join(__dirname,'..',f)));});
   await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
   const profiles={a:{username:'account-a',display_name:'QA <img src=x onerror=alert(1)>',theme:'system'},b:{username:'account-b',display_name:'Ander account',theme:'dark'}};
