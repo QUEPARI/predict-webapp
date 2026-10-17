@@ -1,0 +1,48 @@
+begin;
+do $$
+declare a uuid:=gen_random_uuid();u uuid:=gen_random_uuid();v uuid:=gen_random_uuid();outsider uuid:=gen_random_uuid();sport uuid;tid uuid;mid uuid;rules jsonb:='[{"unit":"legs","first_to":6,"winner_points":10,"exact_points":15}]';snapshot text;row_snapshot jsonb;nodes_snapshot text;rows jsonb;
+begin
+ if to_regclass('auth.users') is not null then
+  insert into auth.users(id,email,email_confirmed_at,aud,role) select x,x||'@refine-qa.invalid',now(),'authenticated','authenticated' from unnest(array[a,u,v,outsider])x;
+  insert into public.profiles(id,username) select x,'rf-'||substr(x::text,1,20) from unnest(array[a,u,v,outsider])x on conflict do nothing;
+ end if;
+ insert into public.user_roles values(a,'admin'),(u,'user'),(v,'user'),(outsider,'user');select id into sport from public.sports where slug='darts';
+ perform set_config('request.jwt.claim.sub',a::text,true);perform set_config('role','authenticated',true);
+ tid:=public.create_knockout_game('QA names and comparison',sport,'players',array['QA A','QA B'],now()+interval '1 day',rules,'replacement',now()+interval '2 days','draft');
+ mid:=(public.get_knockout_schema(tid)->'matches'->0->>'id')::uuid;
+ perform public.edit_knockout(tid,'schedule',mid,jsonb_build_object('start',now()+interval '1 day','unit','legs','first_to',6));
+ perform public.manage_tournament(tid,'champion',jsonb_build_object('deadline',now()+interval '1 hour','points',20,'choices',array['QA A','QA B']));
+ perform public.edit_knockout(tid,'publish');
+ perform set_config('request.jwt.claim.sub',u::text,true);perform public.join_tournament(tid);perform public.submit_match_prediction(mid,6,3);perform public.submit_champion_prediction(tid,'QA A');
+ perform set_config('request.jwt.claim.sub',v::text,true);perform public.join_tournament(tid);perform public.submit_match_prediction(mid,6,2);perform public.submit_champion_prediction(tid,'QA B');
+ perform set_config('request.jwt.claim.sub',u::text,true);
+ if public.get_tournament_prediction_comparison(tid,v)<>'[]' then raise exception 'FAIL future predictions exposed';end if;
+ perform set_config('request.jwt.claim.sub',a::text,true);perform public.edit_knockout(tid,'close',mid);
+ perform set_config('request.jwt.claim.sub',u::text,true);
+ if public.get_tournament_prediction_comparison(tid,v)<>'[]' then raise exception 'FAIL manual closure exposed predictions';end if;
+ begin perform public.edit_knockout(tid,'roster',null,'{"names":["QA bad","QA B"]}');raise exception 'FAIL user rename';exception when insufficient_privilege then null;end;
+ perform set_config('request.jwt.claim.sub',outsider::text,true);
+ begin perform public.get_tournament_prediction_comparison(tid,u);raise exception 'FAIL outsider access';exception when insufficient_privilege then null;end;
+ perform set_config('request.jwt.claim.sub',u::text,true);
+ begin perform public.get_tournament_prediction_comparison(tid,outsider);raise exception 'FAIL outsider target';exception when insufficient_privilege then null;end;
+ perform set_config('request.jwt.claim.sub',a::text,true);perform public.edit_knockout(tid,'start',mid);perform public.edit_knockout(tid,'result',mid,'{"home_score":6,"away_score":3}');
+ perform set_config('role','none',true);
+ select md5(string_agg(to_jsonb(p)::text,'' order by id)) into snapshot from public.match_predictions p where match_id=mid;
+ select to_jsonb(m)-'home_name'-'away_name' into row_snapshot from public.matches m where id=mid;
+ select md5(string_agg(to_jsonb(n)::text,'' order by match_id)) into nodes_snapshot from predict_private.knockout_nodes n where tournament_id=tid;
+ perform set_config('role','authenticated',true);
+ perform public.edit_knockout(tid,'roster',null,'{"names":["QA Correct A","QA Correct B"]}');
+ begin perform public.edit_knockout(tid,'roster',null,'{"names":["","QA Correct B"]}');raise exception 'FAIL blank active name';exception when raise_exception then if sqlerrm like 'FAIL%' then raise;end if;end;
+ begin perform public.edit_knockout(tid,'roster',null,'{"names":["QA Duplicate","QA Duplicate"]}');raise exception 'FAIL duplicate name';exception when raise_exception then if sqlerrm like 'FAIL%' then raise;end if;end;
+ perform set_config('role','none',true);
+ if (select to_jsonb(m)-'home_name'-'away_name' from public.matches m where id=mid) is distinct from row_snapshot then raise exception 'FAIL changed match state';end if;
+ if (select md5(string_agg(to_jsonb(p)::text,'' order by id)) from public.match_predictions p where match_id=mid) is distinct from snapshot then raise exception 'FAIL changed prediction';end if;
+ if (select md5(string_agg(to_jsonb(n)::text,'' order by match_id)) from predict_private.knockout_nodes n where tournament_id=tid) is distinct from nodes_snapshot then raise exception 'FAIL changed slot identity';end if;
+ if (select choice from predict_private.champion_predictions where tournament_id=tid and user_id=u)<>'QA Correct A' or (select choices[1] from predict_private.champion_settings where tournament_id=tid)<>'QA Correct A' then raise exception 'FAIL champion name map';end if;
+ perform set_config('request.jwt.claim.sub',u::text,true);perform set_config('role','authenticated',true);
+ rows:=public.get_tournament_prediction_comparison(tid,v);
+ if jsonb_array_length(rows)<>1 or rows->0->>'home_name'<>'QA Correct A' or rows->0->>'my_points'<>'15' or rows->0->>'their_points'<>'10' then raise exception 'FAIL closed comparison %',rows;end if;
+ perform set_config('role','none',true);delete from public.tournament_entries where tournament_id=tid and user_id=v;perform set_config('role','authenticated',true);
+ begin perform public.get_tournament_prediction_comparison(tid,v);raise exception 'FAIL removed target';exception when insufficient_privilege then null;end;
+end $$;
+rollback;

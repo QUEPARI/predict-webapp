@@ -1,11 +1,20 @@
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const score=(h,a)=>h==null||a==null?'—':esc(h)+'–'+esc(a);
-export async function loadPoolComparison(host,ctx,pool,member,name){
+export async function loadPoolComparison(host,ctx,pool,member,name,kind='pool'){
  const target=document.createElement('section');host.replaceChildren(target);
  const active=()=>target.isConnected&&ctx.isCurrent();target.innerHTML='<h3>Voorspellingen vergelijken</h3><p role="status">Laden…</p>';target.scrollIntoView({block:'nearest'});
- try{const r=await ctx.supabase.rpc('get_pool_prediction_comparison',{p_pool:pool.id,p_member:member,p_round:null});if(!active())return;if(r.error)throw r.error;const rows=r.data||[];
+ try{const r=await ctx.supabase.rpc(kind==='tournament'?'get_tournament_prediction_comparison':'get_pool_prediction_comparison',{[kind==='tournament'?'p_tournament':'p_pool']:pool.id,p_member:member,p_round:null});if(!active())return;if(r.error)throw r.error;const rows=r.data||[];
  const rounds=[...new Map(rows.map(x=>[x.round_id,x.round_name])).entries()];
  target.innerHTML=`<h3>Jij en ${esc(name)}</h3><p class="hint">Alleen wedstrijden waarvan de deadline verstreken is of die werkelijk gestart zijn.</p><label>Ronde<select data-compare-round><option value="">Alle rondes</option>${rounds.map(([id,n])=>`<option value="${esc(id)}">${esc(n)}</option>`).join('')}</select></label><div class="table-wrap" data-comparison></div>`;
  const draw=()=>{const round=target.querySelector('select').value,list=rows.filter(x=>!round||x.round_id===round);target.querySelector('[data-comparison]').innerHTML=list.length?`<table class="comparison-table"><thead><tr><th>Ronde / wedstrijd</th><th>Jouw voorspelling</th><th>${esc(name)}</th><th class="result-column">Uitslag</th><th>Jouw punten</th><th>Punten medespeler</th></tr></thead><tbody>${list.map(x=>`<tr><td><small>${esc(x.round_name)}</small><br>${esc(x.home_name)} – ${esc(x.away_name)}</td><td>${score(x.my_home,x.my_away)}</td><td>${score(x.their_home,x.their_away)}</td><td class="result-column">${score(x.home_score,x.away_score)}</td><td>${x.my_points??'—'}</td><td>${x.their_points??'—'}</td></tr>`).join('')}</tbody></table>`:'<p>Er zijn nog geen voorspellingen beschikbaar om te vergelijken.</p>';};target.querySelector('select').onchange=draw;draw();
- }catch(e){if(active()){target.innerHTML='<p class="error" role="alert"></p><button class="ghost">Opnieuw proberen</button>';target.querySelector('p').textContent=e.message;target.querySelector('button').onclick=()=>loadPoolComparison(host,ctx,pool,member,name);}}
+ }catch(e){if(active()){target.innerHTML='<p class="error" role="alert"></p><button class="ghost">Opnieuw proberen</button>';target.querySelector('p').textContent=e.message;target.querySelector('button').onclick=()=>loadPoolComparison(host,ctx,pool,member,name,kind);}}
+}
+export const loadTournamentComparison=(host,ctx,id,member,name)=>loadPoolComparison(host,ctx,{id},member,name,'tournament');
+
+export function renderLeaderboard(host,rows,onMember,options={}){
+ let page=0;const size=10,pages=Math.max(1,Math.ceil(rows.length/size));
+ function draw(){host.innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th>#</th><th>Naam</th><th>Punten</th>${options.detailed?'<th>Winnaars</th><th>Exact</th>':''}</tr></thead><tbody>${rows.slice(page*size,(page+1)*size).map(r=>`<tr><td>${esc(r.rank_position)}</td><td><button type="button" class="name-link" data-ranking-member="${esc(r.user_id)}">${esc(r.display_name)}</button>${r.user_id===options.userId?' <small>(jij)</small>':''}</td><td>${esc(r.earned_points)}</td>${options.detailed?`<td>${esc(r.correct_winners)}</td><td>${esc(r.exact_scores)}</td>`:''}</tr>`).join('')}</tbody></table></div>${pages>1?`<div class="ranking-pagination"><button class="ghost mini" data-ranking-prev ${page===0?'disabled':''}>Vorige</button><span>Pagina ${page+1} van ${pages}</span><button class="ghost mini" data-ranking-next ${page===pages-1?'disabled':''}>Volgende</button></div>`:''}<section data-ranking-comparison></section>`:'<p>Nog geen deelnemers in het klassement.</p>';
+ host.querySelectorAll('[data-ranking-member]').forEach(b=>b.onclick=()=>onMember(host.querySelector('[data-ranking-comparison]'),b.dataset.rankingMember,b.textContent));
+ host.querySelector('[data-ranking-prev]')?.addEventListener('click',()=>{page--;draw();});host.querySelector('[data-ranking-next]')?.addEventListener('click',()=>{page++;draw();});
+ }draw();
 }
