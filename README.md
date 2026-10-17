@@ -2,6 +2,13 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Concept alvast aanmaken
+- **Beheer → Toernooien → Nieuw toernooi** opent direct het aanmaakformulier.
+- Startdatum, first-to en punten mogen leeg blijven bij het aanmaken van een knock-outconcept. Lege punten blijven onbekend en worden niet als nul opgeslagen.
+- In **Schema’s → Ronde-instellingen en punten** kun je instellingen tussentijds opslaan en later aanvullen. Een overzicht toont wat nog nodig is voor publicatie.
+- Publiceren vereist complete deelnemersnamen, startdatum en ronde-instellingen. De server bewaakt dit bij alle publicatieroutes; bestaande gepubliceerde spellen houden hun vergrendelingen.
+- Zie [verificatie en migratie](docs/incomplete-drafts-milestone.md).
+
 ## Compacte header en schermindeling
 - Het woordlogo staat gecentreerd, zonder los P-icoon. Links staat Home; rechts staan de kleinere account- en beheericonen. De visuele cirkels zijn 33 px, met behoud van 44 px klikruimte.
 - Mijn spellen toont naam, afbeelding en voorspelstatus; deelname-/publicatietekst en startdatum zijn daar verwijderd. Binnen het toernooi blijven de punten zichtbaar en zijn de dubbele deelnamelabels weg.
