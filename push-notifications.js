@@ -21,7 +21,7 @@ export async function disconnectPushDevice(client){
 }
 
 export async function loadPushSettings(host,client){
- host.innerHTML='<h2>Telefoonmeldingen</h2><p>Ontvang een melding bij een nieuw spel en ieder uur zolang je nog open wedstrijden moet voorspellen.</p><p role="status">Meldingen laden…</p>';
+ host.innerHTML='<h2>Telefoonmeldingen</h2><p>Ontvang een melding bij een nieuw spel en om 12:00 en 18:00 Nederlandse tijd als je nog wedstrijden moet voorspellen.</p><p role="status">Meldingen laden…</p>';
  const message=host.querySelector('[role=status]');
  if(ios()&&!standalone()){message.textContent='Open Predict via het icoon op je beginscherm om meldingen aan te zetten. In Safari: Deel → Zet op beginscherm.';return;}
  if(!supported()){message.textContent='Deze browser ondersteunt geen pushmeldingen. Gebruik een recente versie van Chrome, Edge, Firefox of Predict vanaf je iPhone-beginscherm.';return;}
@@ -50,16 +50,16 @@ export async function loadPushAdmin(host,client){
  host.innerHTML='<h2>Pushmeldingen</h2><p role="status">Meldingen laden…</p>';
  try{
   const state=await call(client,'admin');if(!host.isConnected)return;
-  host.innerHTML=`<h2>Pushmeldingen</h2><p>${state.ready?'Automatisch: nieuwe spelaankondigingen en ieder uur ontbrekende voorspellingen.':'De verzendservice is nog niet geactiveerd.'}</p><p>${state.devices} aangemelde apparaten</p>
-   <form class="stack" data-send-push><label>Soort melding<select name="kind"><option value="reminder">Herinnering ontbrekende voorspellingen</option><option value="announcement">Spelaankondiging opnieuw versturen</option><option value="custom">Eigen bericht</option></select></label>
-   <label>Spel<select name="tournament"><option value="">Alle spellen</option>${state.tournaments.map(t=>`<option value="${esc(t.id)}" data-status="${esc(t.status)}">${esc(t.name)}</option>`).join('')}</select></label>
+  host.innerHTML=`<h2>Pushmeldingen</h2><p>${state.ready?'Automatisch: nieuwe spelaankondigingen en om 12:00 en 18:00 Nederlandse tijd herinneringen voor ontbrekende voorspellingen.':'De verzendservice is nog niet geactiveerd.'}</p><p>${state.devices} aangemelde apparaten</p>
+   <form class="stack" data-send-push><label>Soort melding<select name="kind"><option value="reminder">Herinnering ontbrekende voorspellingen</option><option value="announcement">Spelaankondiging opnieuw versturen</option><option value="custom">Aangepast bericht naar alle spelers</option></select></label>
+   <label>Spel<select name="tournament"><option value="">Alle spelers</option>${state.tournaments.map(t=>`<option value="${esc(t.id)}" data-status="${esc(t.status)}">${esc(t.name)}</option>`).join('')}</select></label>
    <div class="stack" data-custom-push hidden><label>Titel<input name="title" maxlength="80"></label><label>Bericht<textarea name="body" maxlength="240" rows="3"></textarea></label></div>
    <p class="hint" data-push-audience></p><button class="btn" ${state.ready?'':'disabled'}>Melding versturen</button><p role="status" data-send-status></p></form>
    <h3>Recente verzendingen</h3><div data-push-history></div>`;
   const form=host.querySelector('form'),message=form.querySelector('[role=status]'),button=form.querySelector('button'),hint=form.querySelector('[data-push-audience]');let revision=0,requestId=crypto.randomUUID();
-  const data=()=>({kind:form.elements.kind.value,tournament_id:form.elements.tournament.value||null,title:form.elements.title.value.trim(),body:form.elements.body.value.trim(),request_id:requestId});
-  const update=async()=>{const n=++revision,d=data();const custom=d.kind==='custom';form.querySelector('[data-custom-push]').hidden=!custom;form.elements.title.required=custom;form.elements.body.required=custom;
-   hint.textContent=d.kind==='reminder'?'Alleen deelnemers met ontbrekende open voorspellingen.':d.kind==='announcement'?'Alle gebruikers met pushmeldingen.':d.tournament_id?'Deelnemers van het gekozen spel.':'Alle gebruikers met pushmeldingen.';
+  const data=()=>({kind:form.elements.kind.value,tournament_id:form.elements.kind.value==='custom'?null:form.elements.tournament.value||null,title:form.elements.title.value.trim(),body:form.elements.body.value.trim(),request_id:requestId});
+  const update=async()=>{const n=++revision,d=data();const custom=d.kind==='custom';if(custom){form.elements.tournament.value='';d.tournament_id=null;}form.elements.tournament.closest('label').hidden=custom;form.querySelector('[data-custom-push]').hidden=!custom;form.elements.title.required=custom;form.elements.body.required=custom;
+   hint.textContent=d.kind==='reminder'?'Alleen deelnemers met ontbrekende open voorspellingen.':d.kind==='announcement'?'Alle spelers die pushmeldingen hebben aangezet.':d.tournament_id?'Deelnemers van het gekozen spel.':'Alle spelers die pushmeldingen hebben aangezet.';
    try{const r=await call(client,'preview',d);if(host.isConnected&&n===revision)hint.textContent+=` Bereik: ${r.users} gebruikers, ${r.devices} apparaten.`;}catch(e){if(n===revision)hint.textContent=e.message;}
   };
   form.elements.kind.onchange=()=>{requestId=crypto.randomUUID();update();};form.elements.tournament.onchange=()=>{requestId=crypto.randomUUID();update();};form.oninput=()=>{requestId=crypto.randomUUID();};

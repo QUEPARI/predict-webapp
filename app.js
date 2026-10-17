@@ -2,7 +2,7 @@ import {validAccent,accentPalette,applyAccent} from './branding.js?v=header-2026
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=score-spacing-20261017';
-import {loadOnlineProfile} from './online-profile.js?v=push-20261017';
+import {loadOnlineProfile} from './online-profile.js?v=push-times-20261017';
 
 // Centrally configured branding; no user data is stored in the public response.
 let brandAccent=null,appearanceRevision=0,appearanceController=null;
@@ -1610,7 +1610,7 @@ const renderBeforeOnlineProfile=render;
 render=function(){
   profileScreenController?.abort();renderBeforeOnlineProfile();
   if(!currentUser){currentProfile=null;pushBoundUser=null;return;}
-  if(pushBoundUser!==currentUser.id){pushBoundUser=currentUser.id;import('./push-notifications.js?v=push-20261017').then(({syncPushDevice})=>syncPushDevice(supabase)).catch(()=>{pushBoundUser=null;});}
+  if(pushBoundUser!==currentUser.id){pushBoundUser=currentUser.id;import('./push-notifications.js?v=push-times-20261017').then(({syncPushDevice})=>syncPushDevice(supabase)).catch(()=>{pushBoundUser=null;});}
   const badge=document.querySelector('.top .badge');if(badge)badge.textContent='ONLINE';
   const footer=document.querySelector('.footer');if(footer)footer.textContent='Predict · Je account, voorspellingen en poules uit Supabase';
   const userId=currentUser.id;
@@ -1620,7 +1620,7 @@ render=function(){
   logout.onclick=async()=>{
     const message=document.getElementById('account-logout-message');logout.disabled=true;message.textContent='Uitloggen…';
     try{
-      const {disconnectPushDevice}=await import('./push-notifications.js?v=push-20261017');await disconnectPushDevice(supabase);
+      const {disconnectPushDevice}=await import('./push-notifications.js?v=push-times-20261017');await disconnectPushDevice(supabase);
       const {error}=await supabase.auth.signOut();if(error)throw error;
       if(currentUser?.id!==userId)return;
       currentUser=null;currentProfile=null;currentRole='user';render();
@@ -1700,7 +1700,7 @@ function showAdminSection(id){
  document.querySelectorAll('[data-admin-panel]').forEach(panel=>panel.hidden=panel.dataset.adminPanel!==id);
  document.querySelectorAll('[data-admin-section]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.adminSection===(['schema','matches','rankings'].includes(id)?'tournaments':id))));
  if(['schema','matches','rankings'].includes(id))refreshAdminGameContext();if(id==='templates')loadAdminTemplates();
- if(id==='notifications'){const host=document.getElementById('admin-push');if(host&&!host.children.length)import('./push-notifications.js?v=push-20261017').then(({loadPushAdmin})=>{if(host.isConnected)loadPushAdmin(host,supabase);}).catch(()=>host.textContent='Meldingen laden mislukt.');}
+ if(id==='notifications'){const host=document.getElementById('admin-push');if(host&&!host.children.length)import('./push-notifications.js?v=push-times-20261017').then(({loadPushAdmin})=>{if(host.isConnected)loadPushAdmin(host,supabase);}).catch(()=>host.textContent='Meldingen laden mislukt.');}
 }
 document.addEventListener('predict-admin-schema-created',e=>{if(!e.detail?.id)return;adminGameId=e.detail.id;adminGameName=e.detail.name;adminGameKnockout=true;const ko=document.getElementById('admin-knockout');if(ko)ko.dataset.tournament=adminGameId;const host=document.getElementById('admin-tournament-publications');if(host)host.dataset.selectedTournament=adminGameId;refreshAdminGameContext();});
 

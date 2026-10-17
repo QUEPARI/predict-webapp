@@ -29,7 +29,7 @@ export async function loadOnlineProfile(target,ctx){
           ${available.map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select>
           <div id="account-predictions" class="stack" role="region" aria-label="Eigen voorspellingen"></div>`:
           '<p>Je doet nog niet mee aan een toernooi. Kies een toernooi via Toernooien of accepteer een poule-uitnodiging.</p>'}</div>`;
-    import('./push-notifications.js?v=push-20261017').then(({loadPushSettings})=>{const host=target.querySelector('[data-push-settings]');if(host&&active(target,ctx))loadPushSettings(host,ctx.supabase);}).catch(()=>{const host=target.querySelector('[data-push-settings]');if(host)host.textContent='Telefoonmeldingen laden mislukt.';});
+    import('./push-notifications.js?v=push-times-20261017').then(({loadPushSettings})=>{const host=target.querySelector('[data-push-settings]');if(host&&active(target,ctx))loadPushSettings(host,ctx.supabase);}).catch(()=>{const host=target.querySelector('[data-push-settings]');if(host)host.textContent='Telefoonmeldingen laden mislukt.';});
     const form=target.querySelector('[data-profile-form]'),name=form.querySelector('input'),theme=form.querySelector('select');
     let savedTheme=p.theme||'system',savedName=name.value;
     const dirty=()=>{form.dataset.dirty=String(name.value!==savedName||theme.value!==savedTheme);};

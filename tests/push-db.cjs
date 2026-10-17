@@ -71,5 +71,24 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261017171105_push_vault_credentials.sql'),'utf8'));
  await as(user);await assert.rejects(()=>db.query('select predict_push.dispatch()'),/permission denied/);await assert.rejects(()=>db.query('select public.push_worker_configuration()'),/permission denied/);
  await as('', 'service_role');assert.equal((await db.query('select public.push_worker_configuration() data')).rows[0].data.worker_token,'fake-not-a-secret');
+ await db.exec('reset role');
+ await db.exec(`create view cron.job as select 1::bigint jobid,name jobname from cron.jobs;
+ create function cron.unschedule(bigint) returns boolean language plpgsql as $$begin delete from cron.jobs where name='predict-hourly-reminders';return true;end$$;`);
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261017190105_dutch_push_reminder_times.sql'),'utf8'));
+ for(const [instant,expected] of [
+ ['2026-01-15T11:00:00Z','2026-01-15:12'],['2026-01-15T17:00:00Z','2026-01-15:18'],
+ ['2026-07-15T10:00:00Z','2026-07-15:12'],['2026-07-15T16:00:00Z','2026-07-15:18'],
+ ['2026-03-28T11:00:00Z','2026-03-28:12'],['2026-03-29T10:00:00Z','2026-03-29:12'],
+ ['2026-10-24T10:00:00Z','2026-10-24:12'],['2026-10-25T11:00:00Z','2026-10-25:12'],
+ ['2026-07-15T09:59:00Z',null],['2026-07-15T11:00:00Z',null],['2026-07-15T16:01:00Z',null],['2026-01-15T16:00:00Z',null]]){
+  assert.equal((await db.query('select predict_push.reminder_slot($1) slot',[instant])).rows[0].slot,expected,instant);
+ }
+ assert.equal((await db.query("select count(*) n from cron.jobs where name='predict-hourly-reminders'")).rows[0].n,0);
+ await db.exec('delete from predict_push.subscriptions');await db.query('delete from public.match_predictions where user_id=$1',[user]);await as(user);await api('subscribe',sub(20));await db.exec('reset role');
+ for(const time of ['2026-07-15T09:00:00Z','2026-07-15T10:00:00Z','2026-07-15T10:00:00Z','2026-07-15T16:00:00Z'])await db.query('select predict_push.scheduled_reminders($1)',[time]);
+ assert.equal((await db.query('select count(*) n from predict_push.deliveries')).rows[0].n,2);
+ await as('', 'service_role');const messages=(await db.query('select public.claim_push_deliveries() data')).rows[0].data;assert.equal(messages.length,2);assert(messages.every(x=>x.payload.title==='PREDICT. Voorspel nu!'&&x.payload.body==='Je hebt nog 1 wedstrijden te voorspellen'));
+ await as(user);await assert.rejects(()=>db.query('select predict_push.scheduled_reminders()'),/permission denied/);
+ console.log('PASS: 12:00/18:00 Amsterdam schedule, both DST transitions, no off-schedule reminders, per-slot dedupe and exact notification text');
  console.log('PASS: push authorization, private endpoints, eligibility, hourly and announcement dedupe, manual idempotency, leases/retries, stale reminders, shared-device reassignment and scheduler wiring');
 }finally{await db.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
