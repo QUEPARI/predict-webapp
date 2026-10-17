@@ -1,4 +1,4 @@
-import {dutchInput,dutchToUTC,dutchTime} from './knockout.js?v=daily-20261016';
+import {dutchInput,dutchToUTC,dutchTime} from './knockout.js?v=hub-20261017';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const labels={draft:'Concept',published:'Gepubliceerd',active:'Actief',completed:'Afgerond',archived:'Gepauzeerd / archief'};
 export async function loadTournamentManagement(target,ctx){

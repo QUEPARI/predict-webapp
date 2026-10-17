@@ -1,6 +1,6 @@
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=today-20261017';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=hub-20261017';
 import {loadOnlineProfile} from './online-profile.js?v=account-20261016';
 
 // Route native Auth callbacks to the isolated, non-persistent account flow.
@@ -41,7 +41,7 @@ function read(){
     localStorage.removeItem('predict-demo-v1');
     const value=JSON.parse(localStorage.getItem(STORE)||'{}');
     return {theme:['light','dark','system'].includes(value.theme)?value.theme:'system',
-      tab:['home','discover','pools','profile','admin'].includes(value.tab)?value.tab:'home',user:'Gebruiker',tournament:null};
+      tab:'home',user:'Gebruiker',tournament:null};
   } catch {return {theme:'system',tab:'home',user:'Gebruiker',tournament:null};}
 }
 let state=read();const save=()=>{try{localStorage.setItem(STORE,JSON.stringify({theme:state.theme,tab:state.tab}));}catch{/* Optional UI cache must not block account updates. */}};
@@ -65,8 +65,9 @@ function locked(m){return m.status!=='scheduled'||new Date(m.start)<=new Date()}
 function score(m,p){if(!m.official||!p)return 0;const a=m.official,b=p;const exact=Number(a.home)===Number(b.home)&&Number(a.away)===Number(b.away);const actualWin=Math.sign(a.home-a.away),predWin=Math.sign(b.home-b.away);if(m.format==='sets'){const [win,ex]=dartsPts[m.round]||[0,0];return exact?ex:actualWin===predWin?win:0}return exact?7:actualWin===predWin?3:0}
 function points(tid){return fixtures.filter(m=>m.tournament===tid).reduce((s,m)=>s+score(m,state.predictions[m.id]),0)}
 function missing(tid){return fixtures.filter(m=>m.tournament===tid&&!locked(m)&&!state.predictions[m.id]).length}
-function nav(){return `<div class="nav">${[['home','Home'],['discover','Toernooien'],['pools','Mijn poules'],['profile','Account']].map(([id,label])=>`<button data-tab="${id}" class="${state.tab===id?'active':''}">${label}</button>`).join('')}</div>`}
-function header(){return `<header class="top"><div class="logo"><div class="logo-mark">P</div><div><div class="brand">Predict</div><div class="tag">SPORTVOORSPELLINGEN</div></div></div></header>`}
+function nav(){return '<div class="nav" hidden></div>';}
+function header(){const initial=Array.from(currentProfile?.username||'G')[0].toLocaleUpperCase('nl-NL');return `<header class="top"><button type="button" class="logo logo-button" data-tab="home" aria-label="Home" title="Naar Mijn toernooien"><span class="logo-mark">P</span><span><span class="brand">Predict</span><span class="tag">SPORTVOORSPELLINGEN</span></span></button><div class="header-actions">${['admin','super_admin'].includes(currentRole)?'<button type="button" class="header-icon" data-tab="admin" aria-label="Beheer" title="Beheer">⚙</button>':''}<button type="button" class="account-avatar" data-tab="profile" aria-label="Account" title="Accountinstellingen">${esc(initial)}</button></div></header>`;}
+
 function tournamentCard(t){return `<div class="panel stack"><div class="row"><span class="sport">${t.sport==='darts'?'DARTS':'VOETBAL'}</span><span class="pill mutedpill">${esc(t.state)}</span></div><h2 style="margin:0">${esc(t.name)}</h2><div class="muted mini">${esc(t.description)}</div><div class="row"><span class="mini muted">${missing(t.id)} nog te voorspellen</span><span class="mini"><b>${points(t.id)} pt</b></span></div><button class="btn" data-open="${t.id}">Open toernooi →</button></div>`}
 function home(){return `<h1>Mijn toernooien</h1><p class="sub">Welkom, ${esc(state.user)}. Overzicht van jouw toernooien en voorspellingen.</p><div class="notice">Dit is een lokale demonstratie met fictieve wedstrijden. Er worden nog geen echte accounts, poules of uitslagen gesynchroniseerd.</div><div class="grid">${tournaments.filter(t=>state.joined.includes(t.id)).map(tournamentCard).join('')}</div>`}
 function discover(){return `<h1>Toernooien</h1><p class="sub">Kies een beschikbaar toernooi. Alleen systeembeheerders zullen later toernooien kunnen toevoegen.</p><div class="grid">${tournaments.map(tournamentCard).join('')}</div>`}
@@ -185,7 +186,7 @@ render = function () {
           if(r.error||!r.data?.access_token||!r.data?.refresh_token)throw Error();
           const session=await supabase.auth.setSession(r.data);if(session.error)throw Error();
         }
-        await loadCurrentUser();
+        state.tab='home';await loadCurrentUser();
       }catch{
         if(errorElement.isConnected)errorElement.textContent='Inloggen mislukt. Controleer je gegevens of probeer over vijftien minuten opnieuw.';
       }finally{if(button.isConnected)button.disabled=false;}
@@ -515,7 +516,7 @@ async function editAdminMatch(matchId) {
   const options = ['<option value="">Onbekend</option>', ...(rounds ?? []).map(r =>
     `<option value="${esc(r.round_id)}" ${r.round_id === match.round_id ? 'selected' : ''}>${esc(r.round_name)}</option>`
   )].join('');
-  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=daily-20261016');
+  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=hub-20261017');
   editor.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;gap:12px">
       <h2 id="admin-edit-title" style="margin:0">Wedstrijd bewerken</h2>
       <button type="button" class="ghost" id="admin-edit-close" aria-label="Sluiten">✕</button>
@@ -901,7 +902,7 @@ async function recordAdminMatchStart(matchId) {
     const enteredTime = dialog.querySelector('#start-actual-time').value;
     let verifiedStart = null;
     if (enteredTime) {
-      const {dutchToUTC}=await import('./knockout.js?v=daily-20261016');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
+      const {dutchToUTC}=await import('./knockout.js?v=hub-20261017');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
       if (!Number.isFinite(parsed.getTime()) || parsed.getTime() > Date.now()) {
         message.textContent = 'Vul een geldige werkelijke starttijd in die niet in de toekomst ligt.';
         return;
@@ -944,7 +945,7 @@ async function loadAdminTournamentPublications(force=false) {
   if(!force&&target.querySelector('[data-ko-dirty="true"]'))return;
   tournamentManagementController?.abort();tournamentManagementController=new AbortController();const managementSignal=tournamentManagementController.signal;
   const userId=currentUser.id;
-  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=daily-20261016');
+  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=hub-20261017');
     if(!target.isConnected||managementSignal.aborted)return;
     await loadTournamentManagement(target,{supabase,signal:managementSignal,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole),
       onSaved:()=>loadAdminMatches(),onEdit:(id,knockout)=>{showAdminSection(knockout?'schema':'matches');if(knockout)document.dispatchEvent(new CustomEvent('predict-knockout-select',{detail:id}));},
@@ -1372,8 +1373,10 @@ render = function () {
   }
 };
 
-async function loadPrivatePools() {
-  const target = document.getElementById('private-pools');
+async function loadPrivatePools(host,tournamentId) {
+  const target = host?.nodeType===1?host:document.getElementById('private-pools');
+  if(target&&tournamentId)target.dataset.tournament=tournamentId;
+  const scope=target?.dataset.tournament;
   if (!target || !currentUser) return;
   const userId = currentUser.id;
   const [memberships, poolResponse, tournamentsResponse] = await Promise.all([
@@ -1386,13 +1389,13 @@ async function loadPrivatePools() {
   if (failure) {
     target.textContent = 'Poules laden mislukt: ' + failure.message;
     const retry = document.createElement('button'); retry.className = 'btn secondary';
-    retry.textContent = 'Opnieuw proberen'; retry.onclick = loadPrivatePools; target.append(retry);
+    retry.textContent = 'Opnieuw proberen'; retry.onclick = ()=>loadPrivatePools(target); target.append(retry);
     return;
   }
   const ids = new Set((memberships.data || []).map(m => m.pool_id));
-  const mine = (poolResponse.data || []).filter(p => ids.has(p.id));
+  const mine = (poolResponse.data || []).filter(p => ids.has(p.id)&&(!scope||p.tournament_id===scope));
   const tournamentsById = new Map((tournamentsResponse.data || []).map(t => [t.id, t]));
-  const openTours = (tournamentsResponse.data || []).filter(t => ['published','active'].includes(t.status));
+  const openTours = (tournamentsResponse.data || []).filter(t => ['published','active'].includes(t.status)&&(!scope||t.id===scope));
   target.innerHTML = `<p id="pool-message" role="status"></p>
     <div class="grid">${mine.length ? mine.map(p => `<article class="panel stack">
       <h2>${esc(p.name)}</h2><div class="muted">${esc(tournamentsById.get(p.tournament_id)?.name || 'Toernooi')}</div>
@@ -1401,7 +1404,7 @@ async function loadPrivatePools() {
     </article>`).join('') : '<p>Je bent nog geen lid van een privépoule.</p>'}</div>
     <form id="private-create-form" class="panel stack"><h2>Poule aanmaken</h2>
       <label for="private-pool-name">Poulenaam</label><input id="private-pool-name" required minlength="2" maxlength="80">
-      <label for="private-pool-tournament">Toernooi</label><select id="private-pool-tournament" required>
+      <label for="private-pool-tournament" ${scope?'hidden':''}>Toernooi</label><select id="private-pool-tournament" required ${scope?'hidden':''}>
       ${openTours.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select>
       <p class="hint">Je wordt automatisch deelnemer van het toernooi en beheerder van de poule.</p>
       <button class="btn" ${openTours.length ? '' : 'disabled'}>Poule aanmaken</button>
@@ -1415,10 +1418,20 @@ async function loadPrivatePools() {
   async function submit(form, rpc, args) {
     const button = form.querySelector('button'); button.disabled = true; message.textContent = 'Bezig...';
     try {
-      const {error} = await supabase.rpc(rpc, args);
+      const {data,error} = await supabase.rpc(rpc, args);
       if (!target.isConnected || currentUser?.id !== userId) return;
       if (error) {message.textContent = error.message; return;}
-      await loadPrivatePools();
+      if(rpc==='accept_pool_invitation'&&scope&&data){
+        const accepted=await supabase.from('pools').select('id,tournament_id').eq('id',data).single();
+        if(!target.isConnected||currentUser?.id!==userId)return;
+        if(!accepted.error&&accepted.data?.tournament_id&&accepted.data.tournament_id!==scope){
+          const dirty=[...document.querySelectorAll('[data-online-predict] input')].some(i=>i.value!==i.defaultValue)||document.querySelector('[data-ko-dirty="true"]');
+          if(dirty&&!confirm('Uitnodiging geaccepteerd. Niet-opgeslagen wijzigingen laten vervallen en het andere toernooi openen?')){await loadPrivatePools(target);target.querySelector('#pool-message').textContent='Uitnodiging geaccepteerd. Je poule staat bij het andere toernooi op de startpagina.';return;}
+          onlineTournamentId=accepted.data.tournament_id;initialTournamentTab='pools';tournamentNotice='Uitnodiging geaccepteerd.';state.tab='home';render();return;
+        }
+      }
+      if(scope&&target.dataset.joined==='false'){onlineTournamentId=scope;initialTournamentTab='pools';tournamentNotice=rpc==='create_pool'?'Poule aangemaakt. Je neemt nu ook deel aan dit toernooi.':'Uitnodiging geaccepteerd.';state.tab='home';render();return;}
+      await loadPrivatePools(target);if(target.isConnected){const feedback=target.querySelector('#pool-message');if(feedback){feedback.textContent=rpc==='create_pool'?'Poule aangemaakt.':'Uitnodiging geaccepteerd.';feedback.className='success';}}
     } catch {if (target.isConnected) message.textContent = 'Verbinding mislukt. Probeer opnieuw.';}
     finally {if (button.isConnected) button.disabled = false;}
   }
@@ -1452,7 +1465,7 @@ async function loadPrivatePoolDetail(pool) {
   ]);
   if (!target.isConnected || currentUser?.id !== userId) return;
   if (members.error || rows.error || rounds.error) {
-    target.innerHTML='<button class="ghost" data-retry-back>← Mijn poules</button><p role="alert">Poule laden mislukt: '+esc((members.error || rows.error || rounds.error).message)+'</p>';target.querySelector('button').onclick=()=>loadPrivatePools();return;
+    target.innerHTML='<button class="ghost" data-retry-back>← Mijn poules</button><p role="alert">Poule laden mislukt: '+esc((members.error || rows.error || rounds.error).message)+'</p>';target.querySelector('button').onclick=()=>loadPrivatePools(overview);return;
   }
   const names = new Map((rows.data || []).map(r => [r.user_id,r.display_name]));
   target.innerHTML = `<button class="ghost" id="private-detail-back">← Mijn poules</button><h2>${esc(pool.name)}</h2><p id="private-detail-message" role="status"></p>
@@ -1471,7 +1484,7 @@ async function loadPrivatePoolDetail(pool) {
       <div id="private-invite-result" role="status"></div></form>
       <button class="btn secondary" id="private-revoke">Alle openstaande uitnodigingen intrekken</button>` :
       '<button class="btn secondary" id="private-leave">Poule verlaten</button>'}`;
-  target.querySelector('#private-detail-back').onclick=()=>loadPrivatePools();
+  target.querySelector('#private-detail-back').onclick=()=>loadPrivatePools(overview);
   const comparison=document.createElement('section');comparison.className='stack';target.append(comparison);
   const compare=member=>{import('./pool-comparison.js').then(({loadPoolComparison})=>{if(target.isConnected)loadPoolComparison(comparison,{supabase,isCurrent:()=>currentUser?.id===userId},pool,member,names.get(member)||'Poulegenoot');}).catch(()=>comparison.textContent='Vergelijken laden mislukt. Probeer opnieuw.');};
   const message = target.querySelector('#private-detail-message');
@@ -1500,7 +1513,7 @@ async function loadPrivatePoolDetail(pool) {
     try {
       const {error} = await supabase.rpc('manage_pool_member',{p_pool_id:pool.id,p_user_id:member,p_action:action});
       if (!target.isConnected) return;
-      if (error) message.textContent = error.message; else await loadPrivatePools();
+      if (error) message.textContent = error.message; else await loadPrivatePools(overview);
     } catch {if (target.isConnected) message.textContent = 'Verbinding mislukt. Probeer opnieuw.';}
     finally {if (button.isConnected) button.disabled = false;}
   }
@@ -1524,13 +1537,13 @@ async function loadPrivatePoolDetail(pool) {
     } catch {if (target.isConnected) result.textContent = 'Verbinding mislukt. Probeer opnieuw.';}
     finally {if (button.isConnected) button.disabled = false;}
   };
-  }catch(error){if(target.isConnected){target.innerHTML='<button class="ghost">← Mijn poules</button><p role="alert"></p>';target.querySelector('p').textContent='Poule laden mislukt: '+error.message;target.querySelector('button').onclick=()=>loadPrivatePools();}}
+  }catch(error){if(target.isConnected){target.innerHTML='<button class="ghost">← Mijn poules</button><p role="alert"></p>';target.querySelector('p').textContent='Poule laden mislukt: '+error.message;target.querySelector('button').onclick=()=>loadPrivatePools(overview);}}
 }
 
 // Replace the remaining tournament demo routes with authenticated online screens.
 // Obsolete local demo IDs must never select an online tournament or prediction.
 state.tournament = null;
-let onlineTournamentId = null;
+let onlineTournamentId = null;let initialTournamentTab='predictions',tournamentNotice='';
 let onlineScreenController = null;
 home = discover = function () {return '<section id="online-tournaments" class="stack" aria-label="Toernooien">Toernooien laden...</section>';};
 const renderBeforeOnlineTournaments = render;
@@ -1538,11 +1551,11 @@ render = function () {
   onlineScreenController?.abort();
   renderBeforeOnlineTournaments();
   if (!currentUser) {onlineTournamentId=null;return;}
-  document.querySelectorAll('.nav button').forEach(button=>{
+  document.querySelectorAll('.top [data-tab]').forEach(button=>{
     const navigate=button.onclick;
     button.onclick=event=>{
       const dirty=[...document.querySelectorAll('[data-online-predict] input')].some(i=>i.value!==i.defaultValue)||
-        document.querySelector('[data-profile-form][data-dirty="true"]')||document.querySelector('[data-ko-dirty="true"]');
+        document.querySelector('[data-profile-form][data-dirty="true"]')||document.querySelector('[data-ko-dirty="true"]')||[...document.querySelectorAll('#private-pools form input:not([readonly]):not([type=hidden])')].some(i=>i.value!==i.defaultValue);
       if(dirty&&!confirm('Niet-opgeslagen wijzigingen laten vervallen?'))return;
       onlineTournamentId=null;navigate(event);
     };
@@ -1557,9 +1570,9 @@ render = function () {
   const userId=currentUser.id;
   const ctx={supabase,userId,signal:onlineScreenController.signal,isCurrent:()=>currentUser?.id===userId,
     mode:state.tab,tournamentId:onlineTournamentId,
-    onOpen:id=>{onlineTournamentId=id;render();},
-    onBack:()=>{onlineTournamentId=null;render();}};
-  if (onlineTournamentId) loadTournamentDetail(target,ctx);
+    onOpen:id=>{onlineTournamentId=id;initialTournamentTab='predictions';render();},
+    onBack:()=>{onlineTournamentId=null;render();},onPools:(panel,joined)=>{panel.dataset.joined=String(joined);return loadPrivatePools(panel,onlineTournamentId);}};
+  if (onlineTournamentId) {loadTournamentDetail(target,ctx,0,tournamentNotice,{tab:initialTournamentTab,round:''});tournamentNotice='';}
   else loadTournamentCatalog(target,ctx);
 };
 
@@ -1627,7 +1640,7 @@ render=function(){
   const target=document.createElement('section');target.id='admin-knockout';target.className='panel stack';
   document.querySelector('#account-invitations')?.after(target);
   knockoutScreenController=new AbortController();const signal=knockoutScreenController.signal,userId=currentUser.id;
-  import('./knockout.js?v=daily-20261016').then(({loadKnockoutAdmin})=>{
+  import('./knockout.js?v=hub-20261017').then(({loadKnockoutAdmin})=>{
     if(!signal.aborted&&target.isConnected)loadKnockoutAdmin(target,{supabase,signal,isCurrent:()=>currentUser?.id===userId,onSaved:()=>{loadAdminMatches();loadAdminTournamentPublications();}});
   }).catch(()=>{if(!signal.aborted&&target.isConnected)target.textContent='Knock-outbeheer laden mislukt. Open Beheer opnieuw.';});
 };
@@ -1650,3 +1663,6 @@ render=function(){
  groups.forEach(([id,label,content])=>{if(!content)return;const panel=document.createElement('section');panel.dataset.adminPanel=id;panel.className='stack';panel.setAttribute('aria-label',label);const button=document.createElement('button');button.type='button';button.textContent=label;button.dataset.adminSection=id;button.onclick=()=>showAdminSection(id);nav.append(button);if(id==='matches'){const refresh=document.getElementById('admin-refresh');if(refresh)panel.append(refresh);}panel.append(content);shell.append(panel);});
  old.remove();showAdminSection(selectedAdminSection);
 };
+
+const renderBeforeHeaderNavigation=render;
+render=function(){renderBeforeHeaderNavigation();if(currentUser)document.querySelectorAll('.nav').forEach(el=>el.remove());};
