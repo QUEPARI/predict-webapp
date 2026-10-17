@@ -15,7 +15,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     await page.clock.install({time:new Date('2026-10-16T14:00:00Z')});
     await page.addInitScript(()=>{
       window.qaJoined=false;window.qaCalls=[];window.qaPredictions=[];window.qaFailSave=false;window.qaFailRead=false;
-      window.qaSupabase={auth:{getUser:async()=>({data:{user:{id:'user'}}}),signOut:async()=>({})},
+      window.qaSupabase={storage:{from(){return {getPublicUrl(){return {data:{publicUrl:'https://image-qa.invalid/cover.webp'}};}};}},auth:{getUser:async()=>({data:{user:{id:'user'}}}),signOut:async()=>({})},
         from(table){
           const filters={};let one=false,from=0,to=999;
           const q={select(){return q;},eq(k,v){filters[k]=v;return q;},neq(){return q;},in(k,v){filters[k]=v;return q;},
@@ -48,11 +48,12 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
           return {data:[]};
         }};
     });
-    await page.route('https://cdn.jsdelivr.net/**',route=>route.fulfill({contentType:'text/javascript',body:'export const createClient=()=>window.qaSupabase;'}));
+    await page.route('https://image-qa.invalid/**',route=>route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150"><rect width="200" height="150" fill="#273ab0"/><text x="25" y="85" fill="white" font-size="35">DARTS</text></svg>'}));
+    await page.route('https://cdn.jsdelivr.net/**' ,route=>route.fulfill({contentType:'text/javascript',body:'export const createClient=()=>window.qaSupabase;'}));
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
     await page.getByText('Je doet nog niet mee aan een toernooi.',{exact:false}).waitFor();
     assert.equal(await page.locator('[data-my-tournaments] [data-online-open]').count(),0);assert.equal(await page.locator('[data-open-tournaments] [data-online-open]').count(),1);await page.getByRole('button',{name:'Home',exact:true}).click();
-    await page.getByText('49 wedstrijden open om te voorspellen',{exact:true}).waitFor();await page.getByRole('button',{name:'Bekijk toernooi'}).click();
+    await page.getByText('49 wedstrijden open om te voorspellen',{exact:true}).waitFor();for(const width of [320,390,1280]){await page.setViewportSize({width,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));}await page.setViewportSize({width:390,height:844});await page.evaluate(()=>document.body.classList.add('dark'));await page.locator('.tournament-art img').evaluate(img=>img.decode());await page.screenshot({path:path.join(__dirname,'../test-results/tournament-cards-dark-mobile.png')});await page.getByRole('button',{name:'Bekijk toernooi'}).click();
     await page.getByRole('button',{name:'Deelnemen aan dit toernooi'}).waitFor();
     assert.equal(await page.locator('[data-online-predict]').count(),0,'Nonparticipant cannot submit');
     assert.equal(await page.locator('#online-tournaments img').count(),0,'Names escaped');
