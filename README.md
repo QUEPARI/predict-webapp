@@ -9,6 +9,12 @@
 - Schema-kaarten volgen hun inhoud, met het winnaarsvinkje bij de naam en scores rechts onder elkaar.
 - Zie [startpagina, header en toernooipoules](docs/tournament-hub-milestone.md).
 
+## Accentkleur voor de hele app
+- Via **Beheer → Instellingen** kunnen beheerders de accentkleur kiezen met een kleurkiezer of kleurcode. Voorbeelden tonen de lichte en donkere weergave. De standaardkleur is met één knop te herstellen.
+- De keuze wordt centraal opgeslagen en bij het openen van de app opgehaald, ook op het inlogscherm. Kleurtinten en tekstcontrast worden automatisch aangepast voor leesbaarheid. Statuskleuren voor bijvoorbeeld winnaars/fouten behouden hun betekenis.
+- Alleen beheerders kunnen wijzigen; kleurwijzigingen worden gelogd. De openbare uitleesfunctie toont uitsluitend de kleur.
+- Zie [accentkleur en beveiligingscontrole](docs/app-accent-milestone.md). Migratie `20261017081215` is toegepast.
+
 ## Profiel en voorkeuren
 De mijlpaal voor [gebruikersnaam en wachtwoord zonder e-mail](docs/manual-accounts-milestone.md) is gepubliceerd via PR #4 (`aa45d6f`) en door de gebruiker getest. Deelnemers activeren hun account met een eenmalige code van een beheerder. Wachtwoordherstel gebruikt ook een beheerderscode. SMTP en een eigen domein zijn niet nodig.
 

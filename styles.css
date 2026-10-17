@@ -43,3 +43,7 @@
 @media(max-width:740px){.header-actions{gap:6px}.top{gap:8px}.logo-button .brand{font-size:21px}.logo-button .tag{font-size:8px}.header-icon,.account-avatar{width:42px;height:42px}.admin-shell{margin-top:0}}
 
 .compact-public .ko-node{height:auto;min-height:0}.account-avatar,.header-icon{min-width:44px;min-height:44px}
+
+.accent-inputs{display:flex;align-items:center;gap:10px}.accent-inputs input[type=color]{width:62px;height:42px;padding:4px;flex-shrink:0}.accent-inputs input[type=text],#app-accent-hex{max-width:180px}.accent-previews{display:grid;grid-template-columns:1fr 1fr;gap:10px}.accent-previews>div{border:1px solid var(--border);border-radius:9px;padding:12px;display:grid;gap:8px}.accent-sample{border-radius:8px;padding:9px;text-align:center;font-weight:700}.accent-previews [style]{min-width:0}
+
+#app-appearance .toolbar .btn{background:var(--accent);color:var(--accent-contrast);border-color:var(--accent)}

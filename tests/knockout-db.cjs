@@ -48,6 +48,8 @@ const {PGlite}=require('../.local-test/node_modules/@electric-sql/pglite');
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261016202950_compact_predictions.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261016210334_tournament_counts.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261016215435_compact_daily_matches.sql'),'utf8'));
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261017081215_app_accent_settings.sql'),'utf8'));
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/app_accent_settings.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/tournament_counts.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/manual_knockout.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/knockout_templates.sql'),'utf8'));

@@ -1,7 +1,37 @@
+import {validAccent,accentPalette,applyAccent} from './branding.js?v=accent-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=hub-20261017';
 import {loadOnlineProfile} from './online-profile.js?v=account-20261016';
+
+// Centrally configured branding; no user data is stored in the public response.
+let brandAccent=null,appearanceRevision=0,appearanceController=null;
+function applyBrandAccent(){applyAccent(brandAccent);}
+async function readAppAppearance(){
+ const revision=appearanceRevision,r=await supabase.rpc('get_app_appearance');if(r.error)throw Error(r.error.message);
+ const color=r.data?.accent??null;if(color!==null&&!validAccent(color))throw Error('Ongeldige kleurinstelling ontvangen.');
+ if(revision===appearanceRevision){brandAccent=color;applyBrandAccent();}return revision===appearanceRevision?color:brandAccent;
+}
+function loadAppearanceSettings(target){
+ appearanceController?.abort();appearanceController=new AbortController();
+ const userId=currentUser.id;
+ target.innerHTML='<h2>Uiterlijk van Predict</h2><p>De accentkleur geldt voor alle gebruikers, ook op het inlogscherm. Licht en donker worden automatisch aangepast voor leesbare tekst.</p><form class="stack" data-appearance-form><label for="app-accent">Accentkleur</label><div class="accent-inputs"><input id="app-accent" type="color" value="#126f6b"><input id="app-accent-hex" aria-label="Kleurcode" pattern="#[0-9a-fA-F]{6}" maxlength="7" value="#126f6b" required spellcheck="false"></div><div class="accent-previews" aria-label="Kleurvoorbeeld"></div><p data-appearance-message role="status"></p><div class="toolbar"><button class="btn" type="submit">Kleur opslaan</button><button class="ghost" type="button" data-accent-reset>Standaardkleur herstellen</button><button class="ghost" type="button" data-accent-read>Opnieuw ophalen</button></div></form>';
+ const form=target.querySelector('form'),picker=form.querySelector('#app-accent'),hex=form.querySelector('#app-accent-hex'),message=form.querySelector('[data-appearance-message]');
+ const active=()=>target.isConnected&&currentUser?.id===userId&&['admin','super_admin'].includes(currentRole);
+ const preview=()=>{if(!validAccent(hex.value))return;target.querySelector('.accent-previews').innerHTML=[false,true].map(dark=>{const p=form.dataset.useDefault==='true'?{accent:dark?'#58c6b0':'#126f6b',text:dark?'#10241e':'#ffffff'}:accentPalette(hex.value,dark);return `<div style="background:${dark?'#182233':'#ffffff'};color:${dark?'#f0f4f9':'#172335'}"><span>${dark?'Donker':'Licht'}</span><span class="accent-sample" style="background:${p.accent};color:${p.text}">Voorbeeld</span></div>`;}).join('');};
+ form.oninput=event=>{form.dataset.useDefault='false';form.dataset.koDirty='true';message.textContent='';if(event.target===picker)hex.value=picker.value;else if(validAccent(hex.value))picker.value=hex.value;preview();};preview();
+ const load=async()=>{message.textContent='Kleur laden…';try{const color=await readAppAppearance();if(!active())return;if(form.dataset.koDirty!=='true'){form.dataset.useDefault=String(color===null);picker.value=hex.value=color||'#126f6b';preview();}message.textContent='';}catch(error){if(active()){message.textContent='Ophalen mislukt: '+error.message;message.className='error';}}};
+ const save=async color=>{if(!active())return;if(color!==null&&!validAccent(color)){message.textContent='Vul een geldige kleurcode in, bijvoorbeeld #2459B8.';message.className='error';hex.focus();return;}
+   const controls=[...form.querySelectorAll('input,button')];controls.forEach(x=>x.disabled=true);message.className='';message.textContent='Opslaan…';
+   try{const r=await supabase.rpc('set_app_appearance',{p_accent:color});if(!active())return;if(r.error)throw Error(r.error.message);const saved=r.data?.accent??null;if(saved!==null&&!validAccent(saved))throw Error('Ongeldige kleurinstelling ontvangen.');appearanceRevision++;brandAccent=saved;applyBrandAccent();picker.value=hex.value=saved||'#126f6b';form.dataset.koDirty='false';form.dataset.useDefault=String(saved===null);preview();message.textContent=saved?'Accentkleur opgeslagen.':'Standaardkleur hersteld.';message.className='success';}
+   catch(error){if(active()){message.textContent='Opslaan mislukt: '+error.message;message.className='error';}}
+   finally{if(active())controls.forEach(x=>x.disabled=false);}
+ };
+ form.onsubmit=event=>{event.preventDefault();save(hex.value);};form.querySelector('[data-accent-reset]').onclick=()=>save(null);
+ form.querySelector('[data-accent-read]').onclick=()=>{if(form.dataset.koDirty!=='true'||confirm('Niet-opgeslagen kleurwijzigingen laten vervallen?')){form.dataset.koDirty='false';load();}};
+ window.addEventListener('beforeunload',event=>{if(active()&&form.dataset.koDirty==='true'){event.preventDefault();event.returnValue='';}},{signal:appearanceController.signal});
+ load();
+}
 
 // Route native Auth callbacks to the isolated, non-persistent account flow.
 const authCallback = new URLSearchParams(location.hash.slice(1));
@@ -48,7 +78,7 @@ let state=read();const save=()=>{try{localStorage.setItem(STORE,JSON.stringify({
 const themeMedia=window.matchMedia('(prefers-color-scheme: dark)');
 function isDarkTheme(){return state.theme==='dark'||(state.theme==='system'&&themeMedia.matches);}
 function applyTheme(){
-  document.body.classList.toggle('dark',isDarkTheme());
+  document.body.classList.toggle('dark',isDarkTheme());applyBrandAccent();
   const button=document.querySelector('[data-action="theme"]');
   if(button)button.textContent=isDarkTheme()?'☀ Licht':'◐ Donker';
 }
@@ -1659,10 +1689,13 @@ render=function(){
  const shell=document.createElement('section');shell.className='admin-shell stack';shell.innerHTML='<h1>Beheer</h1><nav class="admin-subnav" aria-label="Beheeronderdelen"></nav>';
  document.querySelector('.nav')?.after(shell);
  const nav=shell.querySelector('nav');
- const groups=[['tournaments','Toernooien',publication],['schema','Schema’s',document.getElementById('admin-knockout')],['matches','Wedstrijden',document.getElementById('admin-matches')?.closest('.panel')],['accounts','Accounts',document.getElementById('account-invitations')],['rankings','Klassementen',document.getElementById('admin-leaderboards')],['qa','Testomgeving',document.getElementById('qa-prediction-panel')]];
+ const appearance=document.createElement('section');appearance.id='app-appearance';appearance.className='panel stack';loadAppearanceSettings(appearance);
+ const groups=[['settings','Instellingen',appearance],['tournaments','Toernooien',publication],['schema','Schema’s',document.getElementById('admin-knockout')],['matches','Wedstrijden',document.getElementById('admin-matches')?.closest('.panel')],['accounts','Accounts',document.getElementById('account-invitations')],['rankings','Klassementen',document.getElementById('admin-leaderboards')],['qa','Testomgeving',document.getElementById('qa-prediction-panel')]];
  groups.forEach(([id,label,content])=>{if(!content)return;const panel=document.createElement('section');panel.dataset.adminPanel=id;panel.className='stack';panel.setAttribute('aria-label',label);const button=document.createElement('button');button.type='button';button.textContent=label;button.dataset.adminSection=id;button.onclick=()=>showAdminSection(id);nav.append(button);if(id==='matches'){const refresh=document.getElementById('admin-refresh');if(refresh)panel.append(refresh);}panel.append(content);shell.append(panel);});
  old.remove();showAdminSection(selectedAdminSection);
 };
 
 const renderBeforeHeaderNavigation=render;
 render=function(){renderBeforeHeaderNavigation();if(currentUser)document.querySelectorAll('.nav').forEach(el=>el.remove());};
+
+readAppAppearance().catch(()=>{});
