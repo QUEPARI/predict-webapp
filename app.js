@@ -1,7 +1,7 @@
-import {validAccent,accentPalette,applyAccent} from './branding.js?v=accent-20261017';
+import {validAccent,accentPalette,applyAccent} from './branding.js?v=cards-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=hub-20261017';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=cards-20261017';
 import {loadOnlineProfile} from './online-profile.js?v=account-20261016';
 
 // Centrally configured branding; no user data is stored in the public response.
@@ -18,7 +18,7 @@ function loadAppearanceSettings(target){
  target.innerHTML='<h2>Uiterlijk van Predict</h2><p>De accentkleur geldt voor alle gebruikers, ook op het inlogscherm. Licht en donker worden automatisch aangepast voor leesbare tekst.</p><form class="stack" data-appearance-form><label for="app-accent">Accentkleur</label><div class="accent-inputs"><input id="app-accent" type="color" value="#126f6b"><input id="app-accent-hex" aria-label="Kleurcode" pattern="#[0-9a-fA-F]{6}" maxlength="7" value="#126f6b" required spellcheck="false"></div><div class="accent-previews" aria-label="Kleurvoorbeeld"></div><p data-appearance-message role="status"></p><div class="toolbar"><button class="btn" type="submit">Kleur opslaan</button><button class="ghost" type="button" data-accent-reset>Standaardkleur herstellen</button><button class="ghost" type="button" data-accent-read>Opnieuw ophalen</button></div></form>';
  const form=target.querySelector('form'),picker=form.querySelector('#app-accent'),hex=form.querySelector('#app-accent-hex'),message=form.querySelector('[data-appearance-message]');
  const active=()=>target.isConnected&&currentUser?.id===userId&&['admin','super_admin'].includes(currentRole);
- const preview=()=>{if(!validAccent(hex.value))return;target.querySelector('.accent-previews').innerHTML=[false,true].map(dark=>{const p=form.dataset.useDefault==='true'?{accent:dark?'#58c6b0':'#126f6b',text:dark?'#10241e':'#ffffff'}:accentPalette(hex.value,dark);return `<div style="background:${dark?'#182233':'#ffffff'};color:${dark?'#f0f4f9':'#172335'}"><span>${dark?'Donker':'Licht'}</span><span class="accent-sample" style="background:${p.accent};color:${p.text}">Voorbeeld</span></div>`;}).join('');};
+ const preview=()=>{if(!validAccent(hex.value))return;target.querySelector('.accent-previews').innerHTML=[false,true].map(dark=>{const p=form.dataset.useDefault==='true'?{accent:dark?'#58c6b0':'#126f6b',text:dark?'#10241e':'#ffffff'}:accentPalette(hex.value,dark);return `<div style="background:${dark?'#1e1e1e':'#ffffff'};color:${dark?'#f0f4f9':'#172335'}"><span>${dark?'Donker':'Licht'}</span><span class="accent-sample" style="background:${p.accent};color:${p.text}">Voorbeeld</span></div>`;}).join('');};
  form.oninput=event=>{form.dataset.useDefault='false';form.dataset.koDirty='true';message.textContent='';if(event.target===picker)hex.value=picker.value;else if(validAccent(hex.value))picker.value=hex.value;preview();};preview();
  const load=async()=>{message.textContent='Kleur laden…';try{const color=await readAppAppearance();if(!active())return;if(form.dataset.koDirty!=='true'){form.dataset.useDefault=String(color===null);picker.value=hex.value=color||'#126f6b';preview();}message.textContent='';}catch(error){if(active()){message.textContent='Ophalen mislukt: '+error.message;message.className='error';}}};
  const save=async color=>{if(!active())return;if(color!==null&&!validAccent(color)){message.textContent='Vul een geldige kleurcode in, bijvoorbeeld #2459B8.';message.className='error';hex.focus();return;}
@@ -975,7 +975,7 @@ async function loadAdminTournamentPublications(force=false) {
   if(!force&&target.querySelector('[data-ko-dirty="true"]'))return;
   tournamentManagementController?.abort();tournamentManagementController=new AbortController();const managementSignal=tournamentManagementController.signal;
   const userId=currentUser.id;
-  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=hub-20261017');
+  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=cards-20261017');
     if(!target.isConnected||managementSignal.aborted)return;
     await loadTournamentManagement(target,{supabase,signal:managementSignal,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole),
       onSaved:()=>loadAdminMatches(),onEdit:(id,knockout)=>{showAdminSection(knockout?'schema':'matches');if(knockout)document.dispatchEvent(new CustomEvent('predict-knockout-select',{detail:id}));},

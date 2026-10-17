@@ -2,6 +2,11 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Toernooikaarten en afbeeldingen
+- Compacte kaarten met toernooiafbeelding, naam en voorspelstatus op de startpagina. Donkere modus gebruikt een neutrale zwarte/anthraciete basis.
+- Beheer → Toernooien: kies een toernooi en upload/verwijder de openbare afbeelding. JPG, PNG en WebP worden verkleind naar WebP; alleen beheerders mogen bestanden wijzigen.
+- Zie [verificatie](docs/tournament-images-milestone.md).
+
 ## Nieuwe startpagina en navigatie
 - Na inloggen verschijnt Mijn toernooien, met daaronder Open toernooien waaraan je nog kunt deelnemen. Toernooien worden niet dubbel getoond; na deelname staan ze onder Mijn toernooien.
 - Het Predict-logo brengt je naar deze startpagina. Rechts staan een ronde Account-knop met je gebruikersinitiaal en, alleen voor beheerders, een tandwiel voor Beheer. Het gewone hoofdmenu is verwijderd.
