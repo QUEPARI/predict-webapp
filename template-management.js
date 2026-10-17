@@ -1,4 +1,4 @@
-import {roundTable,readRoundTable,unitSelect,roundNames} from './round-settings.js?v=recovery-20261017';
+import {roundTable,readRoundTable,unitSelect,roundNames} from './round-settings.js?v=refinements-20261017';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export async function loadTemplateManagement(target,ctx){
  const alive=()=>target.isConnected&&!ctx.signal.aborted&&ctx.isCurrent();let catalog,selected=null,busy=false;

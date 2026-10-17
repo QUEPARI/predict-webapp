@@ -2,6 +2,13 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Naamcorrecties, klassementpagina’s en compact beheer
+- Deelnemersnamen kunnen ook na voorspellingen of gestarte wedstrijden worden gecorrigeerd. Schemaplekken, scores, deadlines en wedstrijdvoorspellingen blijven identiek; winnaarskeuzes volgen de naamcorrectie op dezelfde schemaplek. Namen blijven uniek en bestaande actieve deelnemers kunnen niet worden leeggemaakt.
+- Toernooi- en pouleklassementen tonen maximaal 10 spelers per pagina, ook in beheer. Namen openen een vergelijking. Het nieuwe toernooi-RPC controleert deelname en toont uitsluitend wedstrijden waarvan de deadline verstreken is of die werkelijk gestart zijn; een handmatig gesloten toekomstige wedstrijd blijft verborgen.
+- Uitslaginvoer is compact, zonder dubbele namen of grote witruimten. Afbeelding opslaan gebruikt de gewone primaire knop; verwijderen is rood.
+- Het spelbeheermenu blijft onder het algemene beheermenu staan bij scrollen. Dubbele toernooinaam, status, Schema vernieuwen en de uitlegtekst verdwijnen uit het schemascherm. Punten worden uitsluitend onder Schema ingesteld (na publicatie vergrendeld).
+- Migratie `20261017125312_roster_corrections_and_tournament_comparison.sql`; rollbacktest `supabase/tests/roster_and_tournament_comparison.sql`.
+
 ## Herstelacties en compacte beheerformulieren
 - **Schema → Wedstrijden** biedt Uitstel ongedaan maken (ook na de deadline) en Uitslag ongedaan maken. Voorspellen blijft gesloten totdat de beheerder bewust heropent met een toekomstige begintijd.
 - Uitslagherstel trekt de doorgeplaatste winnaar terug en herberekent punten, zonder voorspellingen te verwijderen. Bij voorspellingen of start in de vervolgwedstrijd wordt de hele herstelactie geblokkeerd. Auditlogging blijft behouden.

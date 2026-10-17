@@ -1,7 +1,7 @@
 import {validAccent,accentPalette,applyAccent} from './branding.js?v=header-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=recovery-20261017';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=refinements-20261017';
 import {loadOnlineProfile} from './online-profile.js?v=account-20261016';
 
 // Centrally configured branding; no user data is stored in the public response.
@@ -548,7 +548,7 @@ async function editAdminMatch(matchId) {
   const options = ['<option value="">Onbekend</option>', ...(rounds ?? []).map(r =>
     `<option value="${esc(r.round_id)}" ${r.round_id === match.round_id ? 'selected' : ''}>${esc(r.round_name)}</option>`
   )].join('');
-  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=recovery-20261017');
+  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=refinements-20261017');
   editor.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;gap:12px">
       <h2 id="admin-edit-title" style="margin:0">Wedstrijd bewerken</h2>
       <button type="button" class="ghost" id="admin-edit-close" aria-label="Sluiten">✕</button>
@@ -934,7 +934,7 @@ async function recordAdminMatchStart(matchId) {
     const enteredTime = dialog.querySelector('#start-actual-time').value;
     let verifiedStart = null;
     if (enteredTime) {
-      const {dutchToUTC}=await import('./knockout.js?v=recovery-20261017');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
+      const {dutchToUTC}=await import('./knockout.js?v=refinements-20261017');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
       if (!Number.isFinite(parsed.getTime()) || parsed.getTime() > Date.now()) {
         message.textContent = 'Vul een geldige werkelijke starttijd in die niet in de toekomst ligt.';
         return;
@@ -977,7 +977,7 @@ async function loadAdminTournamentPublications(force=false) {
   if(!force&&target.querySelector('[data-ko-dirty="true"]'))return;
   tournamentManagementController?.abort();tournamentManagementController=new AbortController();const managementSignal=tournamentManagementController.signal;
   const userId=currentUser.id;
-  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=recovery-20261017');
+  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=refinements-20261017');
     if(!target.isConnected||managementSignal.aborted)return;
     await loadTournamentManagement(target,{supabase,signal:managementSignal,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole),
       onCreate:()=>{const general=document.getElementById('admin-tournament-publications');if(general?.querySelector('[data-ko-dirty="true"]')&&!confirm('Niet-opgeslagen toernooiwijzigingen laten vervallen?'))return;if(general)general.querySelectorAll('[data-ko-dirty]').forEach(el=>el.dataset.koDirty='false');adminGameId='';adminGameName='Nieuw toernooi';const ko=document.querySelector('#admin-knockout');if(ko)ko.dataset.tournament='';const create=document.querySelector('#ko-create');if(create)create.hidden=false;const open=()=>{if(managementSignal.aborted||currentUser?.id!==userId)return;const details=document.querySelector('#ko-create details');if(!details)return;document.removeEventListener('predict-knockout-ready',open);details.open=true;details.scrollIntoView({block:'start'});details.querySelector('input[name=name]')?.focus({preventScroll:true});};document.addEventListener('predict-knockout-ready',open,{signal:managementSignal});showAdminSection('schema');open();},
@@ -1321,15 +1321,9 @@ async function loadAdminLeaderboards() {
       return;
     }
     const rows = data || [];
-    results.innerHTML = rows.length
-      ? `<table><thead><tr><th>#</th><th>Deelnemer</th><th class="num">Punten</th>
-          <th class="num">Winnaars</th><th class="num">Exact</th></tr></thead>
-          <tbody>${rows.map(r => `<tr><td>${r.rank_position}</td>
-            <td>${esc(r.display_name)}</td>
-            <td class="num"><strong>${r.earned_points}</strong></td>
-            <td class="num">${r.correct_winners}</td>
-            <td class="num">${r.exact_scores}</td></tr>`).join('')}</tbody></table>`
-      : '<p class="hint">Nog geen deelnemers in dit klassement.</p>';
+    const {renderLeaderboard,loadTournamentComparison,loadPoolComparison}=await import('./pool-comparison.js?v=refinements-20261017');
+    if(!panel.isConnected||request!==version)return;
+    renderLeaderboard(results,rows,(host,member,name)=>pool.value?loadPoolComparison(host,{supabase,isCurrent:()=>panel.isConnected},{id:pool.value},member,name):loadTournamentComparison(host,{supabase,isCurrent:()=>panel.isConnected},tour.value,member,name),{detailed:true,userId:currentUser.id});
   }
 
   tour.onchange = refreshOptions;
@@ -1519,7 +1513,7 @@ async function loadPrivatePoolDetail(pool) {
       '<button class="btn secondary" id="private-leave">Poule verlaten</button>'}`;
   target.querySelector('#private-detail-back').onclick=()=>loadPrivatePools(overview);
   const comparison=document.createElement('section');comparison.className='stack';target.append(comparison);
-  const compare=member=>{import('./pool-comparison.js').then(({loadPoolComparison})=>{if(target.isConnected)loadPoolComparison(comparison,{supabase,isCurrent:()=>currentUser?.id===userId},pool,member,names.get(member)||'Poulegenoot');}).catch(()=>comparison.textContent='Vergelijken laden mislukt. Probeer opnieuw.');};
+  const compare=member=>{import('./pool-comparison.js?v=refinements-20261017').then(({loadPoolComparison})=>{if(target.isConnected)loadPoolComparison(comparison,{supabase,isCurrent:()=>currentUser?.id===userId},pool,member,names.get(member)||'Poulegenoot');}).catch(()=>comparison.textContent='Vergelijken laden mislukt. Probeer opnieuw.');};
   const message = target.querySelector('#private-detail-message');
   const ranking = target.querySelector('#private-pool-ranking');
   function showRanking(data) {
@@ -1673,7 +1667,7 @@ render=function(){
   const target=document.createElement('section');target.id='admin-knockout';target.className='panel stack';
   document.querySelector('#account-invitations')?.after(target);
   knockoutScreenController=new AbortController();const signal=knockoutScreenController.signal,userId=currentUser.id;
-  import('./knockout.js?v=recovery-20261017').then(({loadKnockoutAdmin})=>{
+  import('./knockout.js?v=refinements-20261017').then(({loadKnockoutAdmin})=>{
     if(!signal.aborted&&target.isConnected)loadKnockoutAdmin(target,{supabase,signal,isCurrent:()=>currentUser?.id===userId,onSaved:()=>{loadAdminMatches();loadAdminTournamentPublications();}});
   }).catch(()=>{if(!signal.aborted&&target.isConnected)target.textContent='Knock-outbeheer laden mislukt. Open Beheer opnieuw.';});
 };
@@ -1681,6 +1675,7 @@ render=function(){
 let tournamentManagementController=null;
 let templateManagementController=null;
 let selectedAdminSection='tournaments';
+let adminNavObserver=null;
 function openAdminGameSection(id,name,knockout,section){
  if(section==='schema'&&document.querySelector('#admin-knockout [data-ko-dirty="true"]')&&!confirm('Niet-opgeslagen schemawijzigingen laten vervallen?'))return;
  adminGameId=id;adminGameName=name;adminGameKnockout=knockout;
@@ -1696,7 +1691,7 @@ function refreshAdminGameContext(){
  header.querySelector('[data-context-matches]')?.addEventListener('click',()=>openAdminGameSection(adminGameId,adminGameName,adminGameKnockout,'matches'));
  }
 }
-async function loadAdminTemplates(){const target=document.getElementById('admin-templates');if(!target||target.children.length)return;target.textContent='Sjablonen laden…';try{const {loadTemplateManagement}=await import('./template-management.js?v=recovery-20261017');if(!target.isConnected)return;await loadTemplateManagement(target,{supabase,signal:templateManagementController.signal,isCurrent:()=>['admin','super_admin'].includes(currentRole),onSaved:()=>document.dispatchEvent(new CustomEvent('predict-knockout-templates-changed'))});}catch(error){if(target.isConnected)target.textContent='Sjablonen laden mislukt: '+error.message;}}
+async function loadAdminTemplates(){const target=document.getElementById('admin-templates');if(!target||target.children.length)return;target.textContent='Sjablonen laden…';try{const {loadTemplateManagement}=await import('./template-management.js?v=refinements-20261017');if(!target.isConnected)return;await loadTemplateManagement(target,{supabase,signal:templateManagementController.signal,isCurrent:()=>['admin','super_admin'].includes(currentRole),onSaved:()=>document.dispatchEvent(new CustomEvent('predict-knockout-templates-changed'))});}catch(error){if(target.isConnected)target.textContent='Sjablonen laden mislukt: '+error.message;}}
 function showAdminSection(id){
  selectedAdminSection=id;
  document.querySelectorAll('[data-admin-panel]').forEach(panel=>panel.hidden=panel.dataset.adminPanel!==id);
@@ -1707,7 +1702,7 @@ document.addEventListener('predict-admin-schema-created',e=>{if(!e.detail?.id)re
 
 const renderBeforeAdminNavigation=render;
 render=function(){
- templateManagementController?.abort();templateManagementController=new AbortController();tournamentManagementController?.abort();renderBeforeAdminNavigation();if(!currentUser||!['admin','super_admin'].includes(currentRole)||state.tab!=='admin')return;
+ adminNavObserver?.disconnect();templateManagementController?.abort();templateManagementController=new AbortController();tournamentManagementController?.abort();renderBeforeAdminNavigation();if(!currentUser||!['admin','super_admin'].includes(currentRole)||state.tab!=='admin')return;
  const publication=document.getElementById('admin-tournament-publications'),old=publication?.closest('section');if(!old)return;
  const shell=document.createElement('section');shell.className='admin-shell stack';shell.innerHTML='<h1>Beheer</h1><nav class="admin-subnav" aria-label="Beheeronderdelen"></nav>';
  document.querySelector('.nav')?.after(shell);
@@ -1716,7 +1711,7 @@ render=function(){
  const templates=document.createElement('section');templates.id='admin-templates';templates.className='panel stack';
  const groups=[['settings','Instellingen',appearance],['tournaments','Spellen',publication],['templates','Sjablonen',templates],['schema','Schema’s',document.getElementById('admin-knockout')],['matches','Wedstrijden',document.getElementById('admin-matches')?.closest('.panel')],['accounts','Accounts',document.getElementById('account-invitations')],['rankings','Klassementen',document.getElementById('admin-leaderboards')],['qa','Testomgeving',document.getElementById('qa-prediction-panel')]];
  groups.forEach(([id,label,content])=>{if(!content)return;const panel=document.createElement('section');panel.dataset.adminPanel=id;panel.className='stack';panel.setAttribute('aria-label',label);const button=document.createElement('button');button.type='button';button.textContent=label;button.dataset.adminSection=id;button.onclick=()=>{if(id==='tournaments'){delete publication.dataset.selectedTournament;loadAdminTournamentPublications(true);}showAdminSection(id);};if(!['schema','matches','rankings'].includes(id))nav.append(button);if(id==='matches'){const refresh=document.getElementById('admin-refresh');if(refresh)panel.append(refresh);}panel.append(content);shell.append(panel);});
- old.remove();showAdminSection(selectedAdminSection);
+ old.remove();const updateAdminOffset=()=>shell.style.setProperty('--admin-game-top',(nav.getBoundingClientRect().height+16)+'px');adminNavObserver=new ResizeObserver(updateAdminOffset);adminNavObserver.observe(nav);updateAdminOffset();showAdminSection(selectedAdminSection);
 };
 
 const renderBeforeHeaderNavigation=render;

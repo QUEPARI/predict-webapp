@@ -142,3 +142,22 @@
 .result-entry>button{justify-self:start}
 .game-context h2,[data-game-context] h2{font-size:19px;margin:0}
 #admin-tournament-publications:has([data-detail]:not([hidden])){padding-top:16px}
+.result-entry{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 0}
+.result-entry>strong{flex:1;min-width:160px;font-size:13px}
+.result-entry:has(form)>strong{display:none}
+.result-entry [data-inline-result]:has(form){width:100%}
+.result-entry .result-entry-form{display:flex;align-items:end;flex-wrap:wrap;gap:8px 12px}
+.result-entry-form .two{display:flex;gap:10px;flex-wrap:wrap}
+.result-entry-form label{display:grid;gap:4px;font-size:12px;max-width:200px}
+.result-entry-form input{width:64px;padding:5px 8px}
+.result-entry-form p{margin:0;font-size:11px}
+.result-entry-form [role=status]:empty{display:none}
+.result-entry-form [role=status]:not(:empty){flex-basis:100%;order:5}
+.result-entry-form .btn{padding:7px 12px;font-size:12px}
+.results-needed{padding:10px 12px}
+.results-needed>.stack{gap:0}
+.remove-image{justify-self:start;font-size:12px;padding:8px 12px}
+.scoped-schema>h2,.scoped-schema>p:not(#ko-message){display:none}
+#ko-message:empty{display:none}
+.admin-shell .game-context,.admin-shell [data-game-context]{position:sticky;top:var(--admin-game-top,76px);z-index:4;align-self:start;background:var(--bg);padding:7px 0}
+.ranking-pagination{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;font-size:12px}
