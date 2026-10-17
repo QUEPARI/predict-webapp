@@ -1,5 +1,5 @@
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const score=(h,a)=>h==null||a==null?'—':esc(h)+'–'+esc(a);
+const score=(h,a)=>h==null||a==null?'—':esc(h)+' - '+esc(a);
 const scoreTone=(m,h,a)=>h==null||a==null?'unpredicted':m.status!=='finished'||m.home_score==null||m.away_score==null?'pending':h===m.home_score&&a===m.away_score?'exact':Math.sign(h-a)===Math.sign(m.home_score-m.away_score)?'winner':'wrong';
 export async function loadPoolComparison(host,ctx,pool,member,name,kind='pool'){
  const target=document.createElement('section');host.replaceChildren(target);

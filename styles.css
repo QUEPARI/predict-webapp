@@ -207,7 +207,7 @@
 .compact-match .prediction-inline [role=status]:not(:empty){grid-column:1/-1;grid-row:2}
 .closed-score-summary{display:flex;position:relative;justify-content:center;min-height:31px}
 .prediction-chip{padding:4px 14px;min-width:60px;text-align:center}
-.match-points{position:absolute;left:66.666667%;transform:translateX(-50%);font-size:11px}
+.match-points{position:absolute;left:75%;transform:translateX(-50%);font-size:11px}
 @media(max-width:380px){.compact-match .prediction-inline>.btn{grid-column:1/-1;grid-row:2;justify-self:end}.compact-match .prediction-inline [role=status]:not(:empty){grid-row:3}.compact-match .prediction-inline input{width:50px}}
 
 /* Opaque, contiguous management navigation, including the page gutters. */
