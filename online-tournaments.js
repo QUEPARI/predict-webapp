@@ -98,7 +98,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
         const p=myPredictions.get(m.id),earned=myPoints.get(m.id);
         const allowed=joined && open(m,t);
         return `<article class="panel compact-match" data-online-match="${esc(m.id)}">
-          <div class="match-heading"><small class="muted">${esc(roundNames.get(m.round_id)||'Ronde onbekend')}${m.status!=='scheduled'?' · '+esc(labels[m.status]||m.status):''}</small><div class="match-meta"><span class="pill ${allowed?'is-open':'is-closed'}" data-open-state>${allowed?'Open':'Gesloten'}</span><small>${esc(date(m.scheduled_start))}</small></div></div>
+          <div class="match-heading"><small class="muted">${esc(roundNames.get(m.round_id)||'Ronde onbekend')}${m.score_unit!=='goals'&&Number.isInteger(m.first_to)?' – First to '+m.first_to:''}${m.status!=='scheduled'?' · '+esc(labels[m.status]||m.status):''}</small><div class="match-meta"><span class="pill ${allowed?'is-open':'is-closed'}" data-open-state>${allowed?'Open':'Gesloten'}</span><small>${esc(date(m.scheduled_start))}</small></div></div>
           ${joined ? `<form class="prediction-inline" data-online-predict="${esc(m.id)}"><div class="two">
             <div class="field"><label for="online-home-${esc(m.id)}">${esc(m.home_name)}</label><input id="online-home-${esc(m.id)}" aria-label="Score ${esc(m.home_name)}" name="home" inputmode="numeric" type="number" min="0" max="99" step="1" required value="${esc(p?.home_score ?? '')}" ${allowed?'':'disabled'}></div>
             <div class="field"><label for="online-away-${esc(m.id)}">${esc(m.away_name)}</label><input id="online-away-${esc(m.id)}" aria-label="Score ${esc(m.away_name)}" name="away" inputmode="numeric" type="number" min="0" max="99" step="1" required value="${esc(p?.away_score ?? '')}" ${allowed?'':'disabled'}></div>
@@ -187,7 +187,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
         const home=Number(form.elements.home.value),away=Number(form.elements.away.value);
         if (![home,away].every(n=>Number.isInteger(n)&&n>=0&&n<=99) ||
           (m.score_unit!=='goals' && !((home===m.first_to && away<m.first_to)||(away===m.first_to && home<m.first_to)))) {
-          message.textContent='Vul een geldige eindstand voor dit wedstrijdformaat in.';return;
+          message.textContent=m.score_unit==='goals'?'Vul een geldige eindstand voor dit wedstrijdformaat in.':`Score ongeldig: maximale aantal punten voor de winnaar is ${m.first_to}`;return;
         }
         button.disabled=true;button.textContent='Opslaan…';message.textContent='';
         const fields=[...form.querySelectorAll('input')];fields.forEach(i=>i.disabled=true);
