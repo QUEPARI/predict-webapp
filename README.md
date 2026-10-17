@@ -2,6 +2,14 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Vooraankondigingen en sjabloonbeheer
+- Concepten kunnen met een van- en tot-datum als **Vooraankondiging** op Beschikbare spellen verschijnen. Deelname, poules en voorspellingen openen pas na publicatie. Spelers zien het datumbereik zonder tijden; wedstrijden behouden hun tijden.
+- **Beheer → Sjablonen** toont eigen formats en de European Tour-standaard. Eigen sjablonen kunnen worden aangemaakt en gewijzigd; de standaard kan als eigen kopie worden bewaard. Bestaande toernooien wijzigen niet mee.
+- Spelvorm staat één keer per toernooi/sjabloon. First-to en punten staan per ronde in een compacte tabel. Eventuele bestaande gemengde toernooiformats worden behouden zolang je geen nieuwe centrale spelvorm kiest.
+- Schema en Wedstrijden zijn alleen bereikbaar via het geselecteerde toernooi in Beheer → Toernooien. De wedstrijdacties zijn inklapbaar.
+- Het logo is een Home-knop, Mijn spellen/Beschikbare spellen hebben dezelfde kopgrootte en spelersnamen staan gecentreerd boven scorevelden.
+- Zie [verificatie en migratie](docs/previews-and-templates-milestone.md).
+
 ## Concept alvast aanmaken
 - **Beheer → Toernooien → Nieuw toernooi** opent direct het aanmaakformulier.
 - Startdatum, first-to en punten mogen leeg blijven bij het aanmaken van een knock-outconcept. Lege punten blijven onbekend en worden niet als nul opgeslagen.

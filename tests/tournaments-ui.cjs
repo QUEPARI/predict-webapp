@@ -2,7 +2,7 @@
 const {chromium}=require('playwright');
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
 (async()=>{
-  const files={'/':'index.html','/tournament-images.js':'tournament-images.js','/branding.js':'branding.js','/app.js':'app.js','/pool-comparison.js':'pool-comparison.js','/bracket.js':'bracket.js','/knockout.js':'knockout.js','/tournament-management.js':'tournament-management.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'};
+  const files={'/':'index.html','/tournament-images.js':'tournament-images.js','/round-settings.js':'round-settings.js','/template-management.js':'template-management.js','/branding.js':'branding.js','/app.js':'app.js','/pool-comparison.js':'pool-comparison.js','/bracket.js':'bracket.js','/knockout.js':'knockout.js','/tournament-management.js':'tournament-management.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'};
   const server=http.createServer((req,res)=>{req.url=req.url.split('?')[0];
     const file=files[req.url];if(!file){res.writeHead(404).end();return;}
     res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');
@@ -16,7 +16,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     await page.addInitScript(()=>{
       window.qaJoined=false;window.qaCalls=[];window.qaPredictions=[];window.qaFailSave=false;window.qaFailRead=false;
       window.qaSupabase={storage:{from(){return {getPublicUrl(){return {data:{publicUrl:'https://image-qa.invalid/cover.webp'}};}};}},auth:{getUser:async()=>({data:{user:{id:'user'}}}),signOut:async()=>({})},
-        from(table){
+        from(table){window.qaTables=window.qaTables||[];window.qaTables.push(table);
           const filters={};let one=false,from=0,to=999;
           const q={select(){return q;},eq(k,v){filters[k]=v;return q;},neq(){return q;},in(k,v){filters[k]=v;return q;},
             order(){return q;},single(){one=true;return q;},range(a,b){from=a;to=b;return q;},then(resolve,reject){
@@ -25,8 +25,8 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
                 scheduled_start:i===53?'2026-10-18T14:00:00Z':i>=54?'2026-10-15T14:00:00Z':i===51?'2026-10-17T14:00:00Z':i===52?'2026-10-17T00:30:00Z':'2026-10-16T14:01:00Z',actual_start:null,status:[1,55].includes(i)?'postponed':[2,51,54].includes(i)?'finished':'scheduled',
                 home_score:[2,51,54].includes(i)?6:null,away_score:[2,51,54].includes(i)?3:null,score_unit:i===3?'goals':'legs',first_to:i===3?null:6,
                 start_time_confirmed:true,needs_review:false,predictions_enabled:true}));
-              const t={id:'tour',name:'QA <img src=x onerror=alert(1)>',status:'published',starts_at:'2026-10-16T13:00:00Z'};
-              let data={profiles:{username:'QA'},user_roles:{role:'user'},tournaments:one?t:[t],
+              const t={id:'tour',name:'QA <img src=x onerror=alert(1)>',status:'published',starts_at:'2026-10-16T13:00:00Z',ends_at:'2026-10-18T19:00:00Z'};const preview={id:'preview',name:'QA binnenkort',status:'announced',starts_at:'2026-10-20T13:00:00Z',ends_at:'2026-10-22T19:00:00Z'};
+              let data={profiles:{username:'QA'},user_roles:{role:'user'},tournaments:one?(filters.id==='preview'?preview:t):(window.qaAnnouncement?[t,preview]:[t]),
                 tournament_entries:window.qaJoined?[{tournament_id:'tour'}]:[],matches:ms.slice(from,to+1),
                 tournament_rounds:[{id:'round',name:'Ronde 1',round_order:1},{id:'round-2',name:'Ronde 2',round_order:2}],
                 tournament_scoring:[{scoring_mode:'replacement'}],round_scoring:[{round_id:'round',winner_points:1,exact_score_points:3}],
@@ -60,7 +60,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     assert.equal(await page.locator('#online-tournaments img').count(),0,'Names escaped');
     await page.getByRole('button',{name:'Deelnemen aan dit toernooi'}).click();
     await page.getByText('Je neemt nu deel aan dit toernooi.').waitFor();
-    await page.getByText('Punten uit afgeronde wedstrijden: 1.',{exact:false}).waitFor();assert.equal(await page.locator('.tournament-title p').count(),0);assert(!(await page.locator('.participation-line').textContent()).includes('Je doet mee'));assert(await page.locator('.layout>.footer').evaluate(e=>e.getBoundingClientRect().top>=e.previousElementSibling.getBoundingClientRect().bottom),'Footer does not overlap long tournament content');
+    await page.getByText('Punten uit afgeronde wedstrijden: 1.',{exact:false}).waitFor();assert.equal(await page.locator('.tournament-title p').count(),0);assert.equal(await page.locator('.prediction-inline label').first().evaluate(e=>getComputedStyle(e).textAlign),'center');assert(!(await page.locator('.participation-line').textContent()).includes('Je doet mee'));assert(await page.locator('.layout>.footer').evaluate(e=>e.getBoundingClientRect().top>=e.previousElementSibling.getBoundingClientRect().bottom),'Footer does not overlap long tournament content');
     await page.getByRole('button',{name:'Spelregels & puntentelling',exact:true}).click();await page.getByRole('heading',{name:'Spelregels & puntentelling'}).waitFor();assert((await page.locator('[data-detail-panel=rules]').textContent()).includes('first-to 6'));assert.equal(await page.locator('.match-rules').count(),0);await page.getByRole('button',{name:'Voorspellingen',exact:true}).click();const card=page.locator('[data-online-match="match-0"]');
     assert(await page.locator('.top').evaluate(e=>getComputedStyle(e).position==='static'&&e.getBoundingClientRect().top<document.querySelector('#online-tournaments').getBoundingClientRect().top),'Mobile menu above content');await card.locator('[name="home"]').fill('6');await card.locator('[name="away"]').fill('6');
     await card.getByRole('button').click();
@@ -78,7 +78,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     assert(await page.evaluate(()=>window.qaCalls.some(c=>c.name==='submit_match_prediction'&&c.args.p_match_id==='match-3'&&c.args.p_home_score===2&&c.args.p_away_score===2)),'Football draw allowed');
     assert.equal(await page.locator('[data-online-match="match-1"] button').isDisabled(),true,'Postponed closed');
     assert.equal(await page.locator('[data-online-match="match-2"] button').isDisabled(),true,'Finished closed');
-    await page.getByRole('button',{name:'Home',exact:true}).click();assert.equal(await page.locator('[data-my-tournaments] .muted').count(),0);assert(!(await page.locator('[data-my-tournaments]').textContent()).includes('Je doet mee'));assert.equal(await page.locator('[data-open-tournaments] [data-online-open]').count(),0);assert.equal(await page.locator('[data-my-tournaments] [data-online-open]').count(),1);await page.getByRole('button',{name:'Wedstrijden en voorspellingen'}).click();await card.getByRole('button',{name:'Opgeslagen',exact:true}).waitFor();assert(await card.getByRole('button').isDisabled());
+    await page.getByRole('button',{name:'Home',exact:true}).click();assert.equal(await page.locator('[data-my-tournaments] .game-dates').count(),1);assert(!(await page.locator('[data-my-tournaments]').textContent()).includes('Je doet mee'));assert.equal(await page.locator('[data-open-tournaments] [data-online-open]').count(),0);assert.equal(await page.locator('[data-my-tournaments] [data-online-open]').count(),1);await page.getByRole('button',{name:'Wedstrijden en voorspellingen'}).click();await card.getByRole('button',{name:'Opgeslagen',exact:true}).waitFor();assert(await card.getByRole('button').isDisabled());
     fs.mkdirSync(path.join(__dirname,'..','test-results'),{recursive:true});for(const width of [320,390,1280]){await page.setViewportSize({width,height:900});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(__dirname,'..','test-results','saved-predictions-'+width+'.png')});}await page.setViewportSize({width:390,height:844});
     await card.locator('[name=away]').fill('3');assert.equal(await card.getByRole('button').textContent(),'Opslaan');assert(await card.getByRole('button').isEnabled());
     await page.evaluate(()=>window.qaFailSave=true);
@@ -113,6 +113,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     assert.equal(await page.evaluate(()=>Object.values(localStorage).some(v=>v.includes('match-0'))),false,'No online predictions cached locally');
     await page.getByRole('button',{name:'Wedstrijden en voorspellingen'}).click();await page.locator('[data-online-match="match-0"]').waitFor();await page.clock.fastForward(14*60*60*1000);
     assert.equal(await page.locator('[data-online-match="match-0"]').isVisible(),false,'Previous local day disappears at midnight');assert.equal(await page.locator('[data-online-match="match-51"]').isVisible(),true,'Closed match for new local day appears');assert.equal(await page.locator('[data-online-match="match-53"]').isVisible(),true,'Future open match stays visible');assert.equal(await page.locator('[data-pagination]').isVisible(),false);
+    await page.evaluate(()=>window.qaAnnouncement=true);await page.getByRole('button',{name:'Home',exact:true}).click();await page.locator('[data-online-open=preview]').waitFor();const dates=await page.locator('[data-my-tournaments] .game-dates').textContent();assert(!dates.includes(':')&&dates.includes('2026'));assert.equal(await page.locator('#online-tournaments>h1').evaluate(e=>getComputedStyle(e).fontSize),await page.locator('.available-title').evaluate(e=>getComputedStyle(e).fontSize));assert.equal(await page.locator('[data-online-open=preview] [data-tour-count]').count(),0);await page.evaluate(()=>qaTables=[]);await page.locator('[data-online-open=preview]').click();await page.getByRole('heading',{name:'Vooraankondiging',exact:true}).waitFor();assert.equal(await page.locator('#online-join,[data-online-predict]').count(),0);assert(!await page.evaluate(()=>qaTables.includes('matches')));await page.getByRole('button',{name:'Naar Home',exact:true}).click();await page.getByRole('heading',{name:'Mijn spellen',exact:true}).waitFor();await page.screenshot({path:path.join(__dirname,'../test-results/announcement-cards-mobile.png'),fullPage:true});
     assert.deepEqual(errors,[]);
     console.log('PASS: real routes, join without pool, own prediction create/reload, validation, drafts, server rejection, deadline timer, pagination, mobile width and retry');
   } finally {if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}

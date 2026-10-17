@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 
 (async () => {
   const server = http.createServer((req,res) => {req.url=req.url.split('?')[0];
-    const file = {'/':'index.html','/tournament-images.js':'tournament-images.js','/branding.js':'branding.js','/app.js':'app.js','/pool-comparison.js':'pool-comparison.js','/knockout.js':'knockout.js','/bracket.js':'bracket.js','/tournament-management.js':'tournament-management.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'}[req.url];
+    const file = {'/':'index.html','/tournament-images.js':'tournament-images.js','/round-settings.js':'round-settings.js','/template-management.js':'template-management.js','/branding.js':'branding.js','/app.js':'app.js','/pool-comparison.js':'pool-comparison.js','/knockout.js':'knockout.js','/bracket.js':'bracket.js','/tournament-management.js':'tournament-management.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'}[req.url];
     if (!file) {res.writeHead(404).end(); return;}
     res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');
     res.end(fs.readFileSync(path.join(__dirname,'..',file)));

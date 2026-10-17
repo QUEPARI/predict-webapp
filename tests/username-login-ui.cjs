@@ -1,6 +1,6 @@
 const {chromium}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 (async()=>{
-  const files=['index.html','tournament-images.js','branding.js','app.js','online-profile.js','online-tournaments.js','styles.css','manifest.webmanifest'];
+  const files=['index.html','tournament-images.js','round-settings.js','template-management.js','branding.js','app.js','online-profile.js','online-tournaments.js','styles.css','manifest.webmanifest'];
   const server=http.createServer((req,res)=>{req.url=req.url.split('?')[0];const f=req.url==='/'?'index.html':req.url.slice(1);if(!files.includes(f)){res.writeHead(404).end();return;}res.setHeader('Content-Type',f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(path.join(__dirname,'..',f)));});
   await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
   try{

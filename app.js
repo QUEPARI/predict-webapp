@@ -1,7 +1,7 @@
 import {validAccent,accentPalette,applyAccent} from './branding.js?v=header-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=drafts-20261017';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=previews-20261017';
 import {loadOnlineProfile} from './online-profile.js?v=account-20261016';
 
 // Centrally configured branding; no user data is stored in the public response.
@@ -96,7 +96,7 @@ function score(m,p){if(!m.official||!p)return 0;const a=m.official,b=p;const exa
 function points(tid){return fixtures.filter(m=>m.tournament===tid).reduce((s,m)=>s+score(m,state.predictions[m.id]),0)}
 function missing(tid){return fixtures.filter(m=>m.tournament===tid&&!locked(m)&&!state.predictions[m.id]).length}
 function nav(){return '<div class="nav" hidden></div>';}
-function header(){const initial=Array.from(currentProfile?.username||'G')[0].toLocaleUpperCase('nl-NL');return `<header class="top centered-header"><button type="button" class="header-icon header-home" data-tab="home" aria-label="Home" title="Naar Mijn spellen"><span class="header-disc"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10H15v-6H9v6H3z"/></svg></span></button><div class="centered-brand"><span class="brand">PREDICT.</span><span class="tag">SPORTVOORSPELLINGEN</span></div><div class="header-actions">${['admin','super_admin'].includes(currentRole)?'<button type="button" class="header-icon" data-tab="admin" aria-label="Beheer" title="Beheer"><span class="header-disc">⚙</span></button>':''}<button type="button" class="account-avatar" data-tab="profile" aria-label="Account" title="Accountinstellingen"><span class="header-disc account-disc">${esc(initial)}</span></button></div></header>`;}
+function header(){const initial=Array.from(currentProfile?.username||'G')[0].toLocaleUpperCase('nl-NL');return `<header class="top centered-header"><button type="button" class="header-icon header-home" data-tab="home" aria-label="Home" title="Naar Mijn spellen"><span class="header-disc"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10H15v-6H9v6H3z"/></svg></span></button><button type="button" class="centered-brand wordmark-home" data-tab="home" aria-label="Naar Home"><span class="brand">PREDICT.</span><span class="tag">SPORTVOORSPELLINGEN</span></button><div class="header-actions">${['admin','super_admin'].includes(currentRole)?'<button type="button" class="header-icon" data-tab="admin" aria-label="Beheer" title="Beheer"><span class="header-disc">⚙</span></button>':''}<button type="button" class="account-avatar" data-tab="profile" aria-label="Account" title="Accountinstellingen"><span class="header-disc account-disc">${esc(initial)}</span></button></div></header>`;}
 
 function tournamentCard(t){return `<div class="panel stack"><div class="row"><span class="sport">${t.sport==='darts'?'DARTS':'VOETBAL'}</span><span class="pill mutedpill">${esc(t.state)}</span></div><h2 style="margin:0">${esc(t.name)}</h2><div class="muted mini">${esc(t.description)}</div><div class="row"><span class="mini muted">${missing(t.id)} nog te voorspellen</span><span class="mini"><b>${points(t.id)} pt</b></span></div><button class="btn" data-open="${t.id}">Open toernooi →</button></div>`}
 function home(){return `<h1>Mijn toernooien</h1><p class="sub">Welkom, ${esc(state.user)}. Overzicht van jouw toernooien en voorspellingen.</p><div class="notice">Dit is een lokale demonstratie met fictieve wedstrijden. Er worden nog geen echte accounts, poules of uitslagen gesynchroniseerd.</div><div class="grid">${tournaments.filter(t=>state.joined.includes(t.id)).map(tournamentCard).join('')}</div>`}
@@ -409,6 +409,7 @@ function canRecordAdminResult(match) {
     match.round_id && validFormat);
 }
 
+let adminGameId='',adminGameName='',adminGameKnockout=true;
 let adminMatchesCache = [];
 let adminShowAllMatches=false;
 
@@ -430,9 +431,10 @@ async function loadAdminMatches() {
     target.textContent = 'Geen wedstrijden gevonden.';
     return;
   }
-  const reviewCount = adminMatchesCache.filter(m => m.needs_review).length;
+  const scopedMatches=adminMatchesCache.filter(m=>!target.dataset.tournament||m.tournament_id===target.dataset.tournament);
+  const reviewCount = scopedMatches.filter(m => m.needs_review).length;
   const isOpen=m=>m.predictions_enabled&&m.match_status==='scheduled'&&!m.actual_start&&!m.needs_review&&m.start_time_confirmed&&Date.parse(m.scheduled_start)>Date.now();
-  const visible=adminMatchesCache.filter(m=>adminShowAllMatches||isOpen(m)||(m.home_score==null&&m.away_score==null&&['scheduled','live'].includes(m.match_status)&&(Date.parse(m.actual_start)<=Date.now()||Date.parse(m.scheduled_start)<=Date.now())));
+  const visible=scopedMatches.filter(m=>adminShowAllMatches||isOpen(m)||(m.home_score==null&&m.away_score==null&&['scheduled','live'].includes(m.match_status)&&(Date.parse(m.actual_start)<=Date.now()||Date.parse(m.scheduled_start)<=Date.now())));
   const rows = visible.map(m => {
     const start = m.scheduled_start ? fmt(m.scheduled_start) : 'Onbekend';
     const lockedForEdit = m.match_status !== 'scheduled' ||
@@ -448,7 +450,7 @@ async function loadAdminMatches() {
       <td>${m.needs_review ? 'Controle nodig' : 'Gecontroleerd'}</td>
       <td>${isOpen(m)?'Voorspellen open':m.home_score!=null?'Afgerond':canRecordAdminResult(m)?'Uitslag nodig':'Voorspellen gesloten'}</td><td class="result-column">${m.home_score!=null?esc(m.home_score)+'–'+esc(m.away_score):'—'}</td>
       <td>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <details class="match-action-menu"><summary>Acties</summary><div class="stack">
           <button class="btn secondary" data-edit-match="${esc(m.match_id)}"
             ${lockedForEdit ? 'disabled title="Wedstrijd niet wijzigbaar via deze procedure"' : 'title="Ronde en starttijd bewerken"'}>Bewerken</button>
           <button class="btn secondary" data-approve-match="${esc(m.match_id)}"
@@ -466,17 +468,18 @@ async function loadAdminMatches() {
             ${!canRecordAdminResult(m)
               ? 'disabled title="Uitslag vereist een geregistreerde werkelijke start of verstreken geplande starttijd, plus geldige ronde en formaat"'
               : 'title="Handmatige eindstand met auditregistratie invoeren"'}>Uitslag invoeren</button>
-        </div>
+        </div></details>
       </td>
     </tr>`;
   }).join('');
-  target.innerHTML = `<p class="muted mini">${resultResponse.error?'Uitslagen laden mislukt: '+esc(resultResponse.error.message)+'. ':''}Nog af te handelen · ${visible.length} van ${adminMatchesCache.length} wedstrijden. ${reviewCount} vereisen controle.</p><label class="choice"><input type="checkbox" id="admin-show-all" ${adminShowAllMatches?'checked':''}>Toon alle wedstrijden</label>${!visible.length?'<p>Geen wedstrijden om af te handelen.</p>':''}
+  target.innerHTML = `<p class="muted mini">${resultResponse.error?'Uitslagen laden mislukt: '+esc(resultResponse.error.message)+'. ':''}Nog af te handelen · ${visible.length} van ${scopedMatches.length} wedstrijden. ${reviewCount} vereisen controle.</p><label class="choice"><input type="checkbox" id="admin-show-all" ${adminShowAllMatches?'checked':''}>Toon alle wedstrijden</label>${!visible.length?'<p>Geen wedstrijden om af te handelen.</p>':''}
   <table><thead><tr><th>Toernooi</th><th>Speler 1</th><th>Speler 2</th><th>Ronde</th><th>Starttijd</th><th>Starttijdstatus</th><th>Controle</th><th>Voorspellen</th><th class="result-column">Uitslag</th><th>Actie</th></tr></thead>
   <tbody>${rows}</tbody></table>`;
   target.querySelector('table').classList.add('admin-match-table');
   const columnLabels=['Toernooi','Speler 1','Speler 2','Ronde','Starttijd','Starttijdstatus','Controle','Voorspellen','Uitslag','Actie'];
   target.querySelectorAll('tbody tr').forEach(row=>[...row.cells].forEach((cell,i)=>cell.dataset.label=columnLabels[i]));
   target.querySelector('#admin-show-all').onchange=e=>{adminShowAllMatches=e.target.checked;loadAdminMatches();};
+  target.querySelectorAll('.match-action-menu button').forEach(b=>b.addEventListener('click',()=>b.closest('details').open=false));
   target.querySelectorAll('[data-edit-match]').forEach(button => {
     button.onclick = () => editAdminMatch(button.dataset.editMatch);
   });
@@ -545,7 +548,7 @@ async function editAdminMatch(matchId) {
   const options = ['<option value="">Onbekend</option>', ...(rounds ?? []).map(r =>
     `<option value="${esc(r.round_id)}" ${r.round_id === match.round_id ? 'selected' : ''}>${esc(r.round_name)}</option>`
   )].join('');
-  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=drafts-20261017');
+  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=previews-20261017');
   editor.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;gap:12px">
       <h2 id="admin-edit-title" style="margin:0">Wedstrijd bewerken</h2>
       <button type="button" class="ghost" id="admin-edit-close" aria-label="Sluiten">✕</button>
@@ -931,7 +934,7 @@ async function recordAdminMatchStart(matchId) {
     const enteredTime = dialog.querySelector('#start-actual-time').value;
     let verifiedStart = null;
     if (enteredTime) {
-      const {dutchToUTC}=await import('./knockout.js?v=drafts-20261017');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
+      const {dutchToUTC}=await import('./knockout.js?v=previews-20261017');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
       if (!Number.isFinite(parsed.getTime()) || parsed.getTime() > Date.now()) {
         message.textContent = 'Vul een geldige werkelijke starttijd in die niet in de toekomst ligt.';
         return;
@@ -974,11 +977,11 @@ async function loadAdminTournamentPublications(force=false) {
   if(!force&&target.querySelector('[data-ko-dirty="true"]'))return;
   tournamentManagementController?.abort();tournamentManagementController=new AbortController();const managementSignal=tournamentManagementController.signal;
   const userId=currentUser.id;
-  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=drafts-20261017');
+  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=previews-20261017');
     if(!target.isConnected||managementSignal.aborted)return;
     await loadTournamentManagement(target,{supabase,signal:managementSignal,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole),
-      onCreate:()=>{const open=()=>{if(managementSignal.aborted||currentUser?.id!==userId)return;const details=document.querySelector('#ko-create details');if(!details)return;document.removeEventListener('predict-knockout-ready',open);details.open=true;details.scrollIntoView({block:'start'});details.querySelector('input[name=name]')?.focus({preventScroll:true});};document.addEventListener('predict-knockout-ready',open,{signal:managementSignal});showAdminSection('schema');open();},
-      onSaved:()=>loadAdminMatches(),onEdit:(id,knockout)=>{showAdminSection(knockout?'schema':'matches');if(knockout)document.dispatchEvent(new CustomEvent('predict-knockout-select',{detail:id}));},
+      onCreate:()=>{const general=document.getElementById('admin-tournament-publications');if(general?.querySelector('[data-ko-dirty="true"]')&&!confirm('Niet-opgeslagen toernooiwijzigingen laten vervallen?'))return;if(general)general.querySelectorAll('[data-ko-dirty]').forEach(el=>el.dataset.koDirty='false');adminGameId='';adminGameName='Nieuw toernooi';const ko=document.querySelector('#admin-knockout');if(ko)ko.dataset.tournament='';const create=document.querySelector('#ko-create');if(create)create.hidden=false;const open=()=>{if(managementSignal.aborted||currentUser?.id!==userId)return;const details=document.querySelector('#ko-create details');if(!details)return;document.removeEventListener('predict-knockout-ready',open);details.open=true;details.scrollIntoView({block:'start'});details.querySelector('input[name=name]')?.focus({preventScroll:true});};document.addEventListener('predict-knockout-ready',open,{signal:managementSignal});showAdminSection('schema');open();},
+      onSaved:()=>loadAdminMatches(),onEdit:(id,knockout,section,name)=>openAdminGameSection(id,name,knockout,section),
       onPublish:async t=>{if(!t.knockout){showPublishTournamentDialog(t);return;}
         if(!confirm('Publiceren vergrendelt de puntentelling en opent complete toekomstige wedstrijden. Doorgaan?'))return;
         const r=await supabase.rpc('edit_knockout',{p_tournament:t.id,p_action:'publish',p_match:null,p_values:{}});
@@ -1670,28 +1673,48 @@ render=function(){
   const target=document.createElement('section');target.id='admin-knockout';target.className='panel stack';
   document.querySelector('#account-invitations')?.after(target);
   knockoutScreenController=new AbortController();const signal=knockoutScreenController.signal,userId=currentUser.id;
-  import('./knockout.js?v=drafts-20261017').then(({loadKnockoutAdmin})=>{
+  import('./knockout.js?v=previews-20261017').then(({loadKnockoutAdmin})=>{
     if(!signal.aborted&&target.isConnected)loadKnockoutAdmin(target,{supabase,signal,isCurrent:()=>currentUser?.id===userId,onSaved:()=>{loadAdminMatches();loadAdminTournamentPublications();}});
   }).catch(()=>{if(!signal.aborted&&target.isConnected)target.textContent='Knock-outbeheer laden mislukt. Open Beheer opnieuw.';});
 };
 
 let tournamentManagementController=null;
+let templateManagementController=null;
 let selectedAdminSection='tournaments';
+function openAdminGameSection(id,name,knockout,section){
+ if(section==='schema'&&document.querySelector('#admin-knockout [data-ko-dirty="true"]')&&!confirm('Niet-opgeslagen schemawijzigingen laten vervallen?'))return;
+ adminGameId=id;adminGameName=name;adminGameKnockout=knockout;
+ const ko=document.getElementById('admin-knockout'),matches=document.getElementById('admin-matches');if(ko)ko.dataset.tournament=id;if(matches)matches.dataset.tournament=id;
+ showAdminSection(section);if(section==='schema')document.dispatchEvent(new CustomEvent('predict-knockout-select',{detail:{id,confirmed:true}}));else loadAdminMatches();
+}
+function refreshAdminGameContext(){
+ for(const section of ['schema','matches']){const panel=document.querySelector(`[data-admin-panel="${section}"]`);if(!panel)continue;let header=panel.querySelector('[data-game-context]');if(!header){header=document.createElement('div');header.className='stack';header.dataset.gameContext='';panel.prepend(header);}
+ header.innerHTML=`<button type="button" class="ghost" data-context-general>← Toernooibeheer</button><h2>${esc(adminGameName||'Nieuw toernooi')}</h2>${adminGameId?`<nav class="detail-tabs" aria-label="Toernooibeheer"><button type="button" data-context-general>Algemeen</button>${adminGameKnockout?`<button type="button" data-context-schema aria-pressed="${section==='schema'}">Schema</button>`:''}<button type="button" data-context-matches aria-pressed="${section==='matches'}">Wedstrijden</button></nav>`:''}`;
+ header.querySelectorAll('[data-context-general]').forEach(b=>b.onclick=()=>{const host=document.getElementById('admin-tournament-publications');if(host&&adminGameId)host.dataset.selectedTournament=adminGameId;showAdminSection('tournaments');if(!host?.querySelector('[data-ko-dirty="true"]'))loadAdminTournamentPublications(true);});
+ header.querySelector('[data-context-schema]')?.addEventListener('click',()=>openAdminGameSection(adminGameId,adminGameName,true,'schema'));
+ header.querySelector('[data-context-matches]')?.addEventListener('click',()=>openAdminGameSection(adminGameId,adminGameName,adminGameKnockout,'matches'));
+ }
+}
+async function loadAdminTemplates(){const target=document.getElementById('admin-templates');if(!target||target.children.length)return;target.textContent='Sjablonen laden…';try{const {loadTemplateManagement}=await import('./template-management.js?v=previews-20261017');if(!target.isConnected)return;await loadTemplateManagement(target,{supabase,signal:templateManagementController.signal,isCurrent:()=>['admin','super_admin'].includes(currentRole),onSaved:()=>document.dispatchEvent(new CustomEvent('predict-knockout-templates-changed'))});}catch(error){if(target.isConnected)target.textContent='Sjablonen laden mislukt: '+error.message;}}
 function showAdminSection(id){
  selectedAdminSection=id;
  document.querySelectorAll('[data-admin-panel]').forEach(panel=>panel.hidden=panel.dataset.adminPanel!==id);
- document.querySelectorAll('[data-admin-section]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.adminSection===id)));
+ document.querySelectorAll('[data-admin-section]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.adminSection===(['schema','matches'].includes(id)?'tournaments':id))));
+ if(['schema','matches'].includes(id))refreshAdminGameContext();if(id==='templates')loadAdminTemplates();
 }
+document.addEventListener('predict-admin-schema-created',e=>{if(!e.detail?.id)return;adminGameId=e.detail.id;adminGameName=e.detail.name;adminGameKnockout=true;const ko=document.getElementById('admin-knockout');if(ko)ko.dataset.tournament=adminGameId;const host=document.getElementById('admin-tournament-publications');if(host)host.dataset.selectedTournament=adminGameId;refreshAdminGameContext();});
+
 const renderBeforeAdminNavigation=render;
 render=function(){
- tournamentManagementController?.abort();renderBeforeAdminNavigation();if(!currentUser||!['admin','super_admin'].includes(currentRole)||state.tab!=='admin')return;
+ templateManagementController?.abort();templateManagementController=new AbortController();tournamentManagementController?.abort();renderBeforeAdminNavigation();if(!currentUser||!['admin','super_admin'].includes(currentRole)||state.tab!=='admin')return;
  const publication=document.getElementById('admin-tournament-publications'),old=publication?.closest('section');if(!old)return;
  const shell=document.createElement('section');shell.className='admin-shell stack';shell.innerHTML='<h1>Beheer</h1><nav class="admin-subnav" aria-label="Beheeronderdelen"></nav>';
  document.querySelector('.nav')?.after(shell);
  const nav=shell.querySelector('nav');
  const appearance=document.createElement('section');appearance.id='app-appearance';appearance.className='panel stack';loadAppearanceSettings(appearance);
- const groups=[['settings','Instellingen',appearance],['tournaments','Toernooien',publication],['schema','Schema’s',document.getElementById('admin-knockout')],['matches','Wedstrijden',document.getElementById('admin-matches')?.closest('.panel')],['accounts','Accounts',document.getElementById('account-invitations')],['rankings','Klassementen',document.getElementById('admin-leaderboards')],['qa','Testomgeving',document.getElementById('qa-prediction-panel')]];
- groups.forEach(([id,label,content])=>{if(!content)return;const panel=document.createElement('section');panel.dataset.adminPanel=id;panel.className='stack';panel.setAttribute('aria-label',label);const button=document.createElement('button');button.type='button';button.textContent=label;button.dataset.adminSection=id;button.onclick=()=>showAdminSection(id);nav.append(button);if(id==='matches'){const refresh=document.getElementById('admin-refresh');if(refresh)panel.append(refresh);}panel.append(content);shell.append(panel);});
+ const templates=document.createElement('section');templates.id='admin-templates';templates.className='panel stack';
+ const groups=[['settings','Instellingen',appearance],['tournaments','Toernooien',publication],['templates','Sjablonen',templates],['schema','Schema’s',document.getElementById('admin-knockout')],['matches','Wedstrijden',document.getElementById('admin-matches')?.closest('.panel')],['accounts','Accounts',document.getElementById('account-invitations')],['rankings','Klassementen',document.getElementById('admin-leaderboards')],['qa','Testomgeving',document.getElementById('qa-prediction-panel')]];
+ groups.forEach(([id,label,content])=>{if(!content)return;const panel=document.createElement('section');panel.dataset.adminPanel=id;panel.className='stack';panel.setAttribute('aria-label',label);const button=document.createElement('button');button.type='button';button.textContent=label;button.dataset.adminSection=id;button.onclick=()=>{if(id==='tournaments'){delete publication.dataset.selectedTournament;loadAdminTournamentPublications(true);}showAdminSection(id);};if(!['schema','matches'].includes(id))nav.append(button);if(id==='matches'){const refresh=document.getElementById('admin-refresh');if(refresh)panel.append(refresh);}panel.append(content);shell.append(panel);});
  old.remove();showAdminSection(selectedAdminSection);
 };
 
