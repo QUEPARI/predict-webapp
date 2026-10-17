@@ -1,7 +1,7 @@
 // Browser integration with a fictitious centrally persisted color. No hosted writes.
 const {chromium}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 (async()=>{
- const allowed=['index.html','tournament-images.js','round-settings.js','template-management.js','branding.js','app.js','online-profile.js','online-tournaments.js','knockout.js','bracket.js','tournament-management.js','styles.css','manifest.webmanifest'];
+ const allowed=['index.html','tournament-images.js','round-settings.js','template-management.js','branding.js','app.js','push-notifications.js','online-profile.js','online-tournaments.js','knockout.js','bracket.js','tournament-management.js','styles.css','manifest.webmanifest'];
  const server=http.createServer((req,res)=>{const f=new URL(req.url,'http://local').pathname.slice(1)||'index.html';if(!allowed.includes(f)){res.writeHead(404).end();return;}res.setHeader('Content-Type',f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(path.join(__dirname,'..',f)));});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser,accent=null,holdRead=false,releaseRead,readHeld;
  try{
