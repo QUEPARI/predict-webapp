@@ -24,11 +24,12 @@ export async function loadOnlineProfile(target,ctx){
           ${[['system','Systeeminstelling'],['light','Licht'],['dark','Donker']].map(([v,label])=>`<option value="${v}" ${p.theme===v?'selected':''}>${label}</option>`).join('')}</select></div>
         <p class="hint">Naam en thema worden bij je account opgeslagen. Systeeminstelling volgt de voorkeur van je apparaat.</p>
         <p role="status" id="account-profile-message"></p><button class="btn">Account opslaan</button>
-      </form><div class="panel stack"><h2>Mijn voorspellingen</h2>
+      </form><section class="panel stack" data-push-settings aria-label="Telefoonmeldingen"></section><div class="panel stack"><h2>Mijn voorspellingen</h2>
         ${available.length?`<label for="account-prediction-tour">Toernooi</label><select id="account-prediction-tour">
           ${available.map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select>
           <div id="account-predictions" class="stack" role="region" aria-label="Eigen voorspellingen"></div>`:
           '<p>Je doet nog niet mee aan een toernooi. Kies een toernooi via Toernooien of accepteer een poule-uitnodiging.</p>'}</div>`;
+    import('./push-notifications.js?v=push-20261017').then(({loadPushSettings})=>{const host=target.querySelector('[data-push-settings]');if(host&&active(target,ctx))loadPushSettings(host,ctx.supabase);}).catch(()=>{const host=target.querySelector('[data-push-settings]');if(host)host.textContent='Telefoonmeldingen laden mislukt.';});
     const form=target.querySelector('[data-profile-form]'),name=form.querySelector('input'),theme=form.querySelector('select');
     let savedTheme=p.theme||'system',savedName=name.value;
     const dirty=()=>{form.dataset.dirty=String(name.value!==savedName||theme.value!==savedTheme);};
