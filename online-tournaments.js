@@ -3,6 +3,7 @@ const labels = {published:'Gepubliceerd',active:'Actief',completed:'Afgerond',ar
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const date = value => value && Number.isFinite(Date.parse(value))
   ? new Intl.DateTimeFormat('nl-NL',{dateStyle:'medium',timeStyle:'short'}).format(new Date(value)) : 'Nog niet bevestigd';
+const localDay=value=>{const d=new Date(value);return Number.isFinite(d.getTime())?`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`:'';};
 const current = (target,ctx) => target.isConnected && !ctx.signal.aborted && ctx.isCurrent();
 const open = (m,t) => ['published','active'].includes(t.status) && m.predictions_enabled === true &&
   m.needs_review === false && m.start_time_confirmed === true && m.round_id != null &&
@@ -70,7 +71,8 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
     const allMatches=(matches.data||[]).filter(m=>!byes.has(m.id));
     const selected=allMatches.filter(m=>!view.round||m.round_id===view.round);
     const resultMatches=selected.filter(m=>m.home_score!=null);
-    let activeMatches=view.tab==='results'?resultMatches:selected;
+    const visiblePredictions=()=>selected.filter(m=>localDay(m.scheduled_start)===localDay(new Date())||open(m,t));
+    let activeMatches=view.tab==='results'?resultMatches:visiblePredictions();
     page=Math.max(0,Math.min(page,Math.ceil(activeMatches.length/size)-1));
     const list=selected;
     const predictionMatches=selected;
@@ -103,7 +105,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
             </div><p role="status" data-prediction-message></p><button class="btn" aria-live="polite" ${allowed?(p?'disabled':''):'hidden disabled'}>${p?'Opgeslagen':'Opslaan'}</button></form>` : `<div class="teams">${esc(m.home_name)} – ${esc(m.away_name)}</div>`}
           <table class="score-summary" data-score-summary ${allowed?'hidden':''}><thead><tr><th>Jouw voorspelling</th><th class="result-column">Uitslag</th><th>Punten</th></tr></thead><tbody><tr><td>${p?p.home_score+'–'+p.away_score:'—'}</td><td class="result-column">${m.home_score!=null?m.home_score+'–'+m.away_score:'—'}</td><td>${earned?.earned_points??'—'}</td></tr></tbody></table>
         </article>`;
-      }).join('') || '<p>Er zijn nog geen wedstrijden beschikbaar op deze pagina.</p>'}</div>
+      }).join('') || ''}</div><p data-empty-predictions>Geen wedstrijden vandaag of open om te voorspellen in deze ronde.</p>
       <div class="row"><button class="btn secondary" id="online-previous" ${page===0?'disabled':''}>Vorige</button>
         <span>Pagina ${page+1}</span><button class="btn secondary" id="online-next" ${(page+1)*size >= activeMatches.length?'disabled':''}>Volgende</button></div></section><section data-detail-panel="results"><h2>Uitslagen per ronde</h2><div class="table-wrap"><table><thead><tr><th>Ronde / wedstrijd</th><th>Jouw voorspelling</th><th class="result-column">Uitslag</th><th>Punten</th></tr></thead><tbody>${shownResults.map(m=>{const p=myPredictions.get(m.id);return `<tr><td>${esc(roundNames.get(m.round_id)||'—')}<br>${esc(m.home_name)} – ${esc(m.away_name)}</td><td>${p?p.home_score+'–'+p.away_score:'—'}</td><td class="result-column">${m.home_score}–${m.away_score}</td><td>${myPoints.get(m.id)?.earned_points??'—'}</td></tr>`;}).join('')||'<tr><td colspan="4">Nog geen uitslagen in deze ronde.</td></tr>'}</tbody></table></div></section><section data-detail-panel="schema"></section><section data-detail-panel="champion"></section><section data-detail-panel="ranking"><h2>Klassement</h2><div data-ranking></div></section>`;
     const champion=target.querySelector('[data-detail-panel="champion"]');champion.className='panel stack';
@@ -113,16 +115,20 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
     const schema=target.querySelector('[data-detail-panel="schema"]');schema.className='panel stack';
     import('./knockout.js?v=daily-20261016').then(({loadKnockoutSchema})=>{if(current(target,ctx))loadKnockoutSchema(schema,ctx,t.id,bracket).then(data=>{if(current(target,ctx)&&data)renderRules(data);});});
     const pager=target.querySelector('#online-next').closest('.row');pager.dataset.pagination='';target.append(pager);
-    function updatePage(){
+    function updatePage(tab=view.tab){
+      activeMatches=tab==='results'?resultMatches:visiblePredictions();
       page=Math.max(0,Math.min(page,Math.ceil(activeMatches.length/size)-1));
-      target.querySelectorAll('[data-online-match]').forEach((card,i)=>card.hidden=i<page*size||i>=(page+1)*size);
+      const visibleIds=new Set(activeMatches.slice(page*size,(page+1)*size).map(m=>m.id));
+      target.querySelectorAll('[data-online-match]').forEach(card=>card.hidden=!visibleIds.has(card.dataset.onlineMatch));
+      target.querySelector('[data-empty-predictions]').hidden=visiblePredictions().length>0;
+      pager.hidden=!['predictions','results'].includes(tab)||activeMatches.length<=size;
       target.querySelectorAll('[data-detail-panel=results] tbody tr').forEach((row,i)=>row.hidden=i<page*size||i>=(page+1)*size);
       target.querySelector('#online-previous').disabled=page===0;target.querySelector('#online-next').disabled=(page+1)*size>=activeMatches.length;
       pager.querySelector('span').textContent='Pagina '+(page+1);
     }
     let rankingLoaded=false;
     async function showTab(tab){
-      if(view.tab!==tab&&['predictions','results'].includes(tab))page=0;activeMatches=tab==='results'?resultMatches:selected;updatePage();
+      if(view.tab!==tab&&['predictions','results'].includes(tab))page=0;updatePage(tab);
       view.tab=tab;target.querySelectorAll('[data-detail-panel]').forEach(p=>p.hidden=p.dataset.detailPanel!==tab);target.querySelectorAll('[data-detail-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.detailTab===tab)));target.querySelector('[data-round-controls]').hidden=!['predictions','results'].includes(tab);target.querySelector('[data-list-title]').textContent=tab==='results'?'Uitslagen':'Wedstrijden';pager.hidden=!['predictions','results'].includes(tab)||activeMatches.length<=size;
       if(tab==='ranking'&&!rankingLoaded){const panel=target.querySelector('[data-ranking]');panel.textContent='Klassement laden…';const r=await ctx.supabase.rpc('get_tournament_leaderboard',{p_tournament_id:t.id,p_pool_id:null,p_round_id:null});if(!current(panel,ctx))return;if(r.error){panel.textContent=r.error.message;return;}rankingLoaded=true;panel.innerHTML='<div class="table-wrap"><table><thead><tr><th>#</th><th>Naam</th><th>Punten</th></tr></thead><tbody>'+(r.data||[]).map(x=>`<tr><td>${x.rank_position}</td><td>${esc(x.display_name)}</td><td>${x.earned_points}</td></tr>`).join('')+'</tbody></table></div>';}
     }
@@ -133,6 +139,9 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
       if(current(target,ctx)&&hasDraft()){event.preventDefault();event.returnValue='';}
     },{signal:ctx.signal});
     showTab(view.tab);
+    let dayTimer;
+    const watchDay=()=>{const midnight=new Date();midnight.setHours(24,0,0,0);dayTimer=setTimeout(()=>{if(current(target,ctx)){updatePage();watchDay();}},Math.max(100,midnight.getTime()-Date.now()+50));};
+    watchDay();ctx.signal.addEventListener('abort',()=>clearTimeout(dayTimer),{once:true});
     target.querySelector('#online-round').onchange=e=>{if(discard()){view.round=e.target.value;loadTournamentDetail(host,ctx,0,'',view);}else e.target.value=view.round;};
     target.querySelector('#online-previous').onclick=()=>{page--;updatePage();};
     target.querySelector('#online-next').onclick=()=>{page++;updatePage();};
@@ -158,7 +167,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
 
       const disable=()=>{
         form.querySelectorAll('input,button').forEach(e=>e.disabled=true);
-        const state=form.closest('article').querySelector('[data-open-state]');state.textContent='Gesloten';state.className='pill is-closed';form.querySelector('button').hidden=true;const summary=form.closest('article').querySelector('[data-score-summary]');if(summary)summary.hidden=false;
+        const state=form.closest('article').querySelector('[data-open-state]');state.textContent='Gesloten';state.className='pill is-closed';form.querySelector('button').hidden=true;const summary=form.closest('article').querySelector('[data-score-summary]');if(summary)summary.hidden=false;updatePage();
       };
       if (open(m,t)) {
         // Keep fields from appearing editable after the deadline, including long-open tabs.

@@ -34,3 +34,7 @@
 @media(max-width:740px){.admin-match-table td:nth-child(1){order:1}.admin-match-table td:nth-child(4){order:2}.admin-match-table td:nth-child(2){order:3}.admin-match-table td:nth-child(3){order:4}.admin-match-table td:nth-child(5){order:5}.admin-match-table td:nth-child(8){order:6}.admin-match-table td:nth-child(6){order:7}.admin-match-table td:nth-child(7){order:8}.admin-match-table td:nth-child(9){order:9}.admin-match-table td:last-child{order:10}}
 
 @media(max-width:740px){.compact-match .prediction-inline{grid-template-columns:minmax(0,1fr) 96px}}
+
+/* Use the same compact controls for the main and management menus. */
+.nav button,.admin-subnav button{font-size:13px;line-height:1.2;padding:8px 10px}.admin-subnav{gap:5px;padding:6px}.admin-subnav button{flex:0 0 auto}
+@media(max-width:740px){.nav{flex-wrap:wrap;overflow:visible;gap:5px}.nav button,.admin-subnav button{flex:0 0 auto;min-width:0;padding:7px 9px;font-size:12px;line-height:1.2}.admin-subnav{gap:5px}}

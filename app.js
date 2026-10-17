@@ -1,6 +1,6 @@
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=saved-20261017';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=today-20261017';
 import {loadOnlineProfile} from './online-profile.js?v=account-20261016';
 
 // Route native Auth callbacks to the isolated, non-persistent account flow.
@@ -41,7 +41,7 @@ function read(){
     localStorage.removeItem('predict-demo-v1');
     const value=JSON.parse(localStorage.getItem(STORE)||'{}');
     return {theme:['light','dark','system'].includes(value.theme)?value.theme:'system',
-      tab:['home','discover','pools','profile','leaderboards','admin'].includes(value.tab)?value.tab:'home',user:'Gebruiker',tournament:null};
+      tab:['home','discover','pools','profile','admin'].includes(value.tab)?value.tab:'home',user:'Gebruiker',tournament:null};
   } catch {return {theme:'system',tab:'home',user:'Gebruiker',tournament:null};}
 }
 let state=read();const save=()=>{try{localStorage.setItem(STORE,JSON.stringify({theme:state.theme,tab:state.tab}));}catch{/* Optional UI cache must not block account updates. */}};
@@ -1305,24 +1305,6 @@ async function loadAdminLeaderboards() {
   await refreshOptions();
 }
 
-
-const renderBeforePublicLeaderboard = render;
-render = function () {
-  renderBeforePublicLeaderboard();
-  if (!currentUser || state.tournament || !document.querySelector('.nav')) return;
-  const nav = document.querySelector('.nav');
-  const button = document.createElement('button');
-  button.textContent = 'Klassementen';
-  button.classList.toggle('active',state.tab==='leaderboards');
-  button.onclick = () => {state.tab='leaderboards';state.tournament=null;save();render();};
-  nav.append(button);
-  if (state.tab!=='leaderboards') return;
-  while(nav.nextSibling) nav.nextSibling.remove();
-  const section=document.createElement('section');
-  section.innerHTML='<h1>Klassementen</h1><p class="sub">Actuele punten uit Supabase.</p><div class="panel stack" id="public-leaderboard">Laden...</div>';
-  document.querySelector('.layout').append(section);
-  loadPublicLeaderboard();
-};
 
 async function loadPublicLeaderboard() {
   const target=document.getElementById('public-leaderboard');
