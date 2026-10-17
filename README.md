@@ -2,6 +2,11 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Rustige wedstrijdkaarten
+- Open kaarten zijn blauw. Spelers staan links/rechts met de uitslag centraal; jouw voorspelling en punten staan er compact onder. Gesloten kaarten behouden de uitkomstkleur.
+- De teksten Exact goed en Vergelijk poule zijn uit de kaart verwijderd. De hele gesloten kaart opent de bestaande pop-up, ook via toetsenbord (Enter/spatie). Het uitkomstlabel staat in de pop-up.
+- Uitslagen tonen achter de ronde de wedstrijddatum in de tijdzone van de speler.
+
 ## Gesloten wedstrijden en poulepop-up
 - Gesloten wedstrijdkaarten openen een pop-up met voorspellingen en punten van de eigen poule. Een eigen beheerde poule staat bovenaan; anders wordt de eerste eigen deelname gekozen. Wisselen kan via de dropdown. Alleen eigen poules van hetzelfde toernooi zijn beschikbaar.
 - De database controleert het actuele lidmaatschap van de kijker en de geselecteerde poule. Een handmatig gesloten toekomstige wedstrijd onthult niets; vergelijking opent pas na de deadline of werkelijke start. Leden staan met maximaal 10 per pagina in de pop-up.

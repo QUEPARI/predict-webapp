@@ -11,10 +11,10 @@ export async function loadPoolComparison(host,ctx,pool,member,name,kind='pool'){
 }
 export const loadTournamentComparison=(host,ctx,id,member,name)=>loadPoolComparison(host,ctx,{id},member,name,'tournament');
 
-export async function showMatchPoolComparison(ctx,tournament,match){
+export async function showMatchPoolComparison(ctx,tournament,match,outcome=''){
  document.getElementById('match-pool-dialog')?.close();
  const dialog=document.createElement('dialog');dialog.id='match-pool-dialog';dialog.className='match-pool-dialog';dialog.setAttribute('aria-labelledby','match-pool-title');
- dialog.innerHTML=`<div class="row"><h2 id="match-pool-title">Wedstrijddetails</h2><button type="button" class="ghost mini" data-close-match aria-label="Sluiten">✕</button></div><h3>${esc(match.home_name)} – ${esc(match.away_name)}</h3><p class="match-popup-score">Uitslag: ${score(match.home_score,match.away_score)}</p><div data-popup-content role="status">Poules laden…</div>`;
+ dialog.innerHTML=`<div class="row"><h2 id="match-pool-title">Wedstrijddetails</h2><button type="button" class="ghost mini" data-close-match aria-label="Sluiten">✕</button></div><h3>${esc(match.home_name)} – ${esc(match.away_name)}</h3><p class="match-popup-score">Uitslag: ${score(match.home_score,match.away_score)}</p>${outcome?`<p class="match-popup-outcome">${esc(outcome)}</p>`:''}<div data-popup-content role="status">Poules laden…</div>`;
  document.body.append(dialog);dialog.querySelector('[data-close-match]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
  ctx.signal?.addEventListener('abort',()=>{dialog.close();dialog.remove();},{once:true});
  const alive=()=>dialog.isConnected&&!ctx.signal?.aborted&&ctx.isCurrent();const host=dialog.querySelector('[data-popup-content]');
