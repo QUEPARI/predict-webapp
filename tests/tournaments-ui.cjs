@@ -64,7 +64,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     await page.getByRole('button',{name:'Spelregels & puntentelling',exact:true}).click();await page.getByRole('heading',{name:'Spelregels & puntentelling'}).waitFor();assert((await page.locator('[data-detail-panel=rules]').textContent()).includes('first-to 6'));assert.equal(await page.locator('.match-rules').count(),0);await page.getByRole('button',{name:'Voorspellingen',exact:true}).click();const card=page.locator('[data-online-match="match-0"]');
     assert(await page.locator('.top').evaluate(e=>getComputedStyle(e).position==='static'&&e.getBoundingClientRect().top<document.querySelector('#online-tournaments').getBoundingClientRect().top),'Mobile menu above content');await card.locator('[name="home"]').fill('6');await card.locator('[name="away"]').fill('6');
     await card.getByRole('button').click();
-    await card.getByText('Vul een geldige eindstand voor dit wedstrijdformaat in.').waitFor();
+    await card.getByText('Score ongeldig: maximale aantal punten voor de winnaar is 6',{exact:true}).waitFor();assert((await card.locator('.match-heading').textContent()).includes('Ronde 1 – First to 6'));
     assert.equal(await page.evaluate(()=>window.qaCalls.filter(c=>c.name==='submit_match_prediction').length),0);
     await page.locator('[data-online-match="match-3"] [name="home"]').fill('2');
     await card.locator('[name="away"]').fill('4');await card.getByRole('button').click();
