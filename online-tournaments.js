@@ -13,6 +13,14 @@ const open = (m,t) => ['published','active'].includes(t.status) && m.predictions
   Date.parse(m.scheduled_start) > Date.now() &&
   (m.score_unit === 'goals' ? m.first_to == null : ['sets','legs'].includes(m.score_unit) && Number.isInteger(m.first_to) && m.first_to >= 1 && m.first_to <= 99);
 
+export function predictionOutcome(m,p){
+ if(m.status!=='finished'||m.home_score==null||m.away_score==null)return {state:'pending',label:m.status==='cancelled'?'Geannuleerd':m.status==='postponed'?'Uitgesteld':'Wacht op uitslag'};
+ if(!p)return {state:'unpredicted',label:'Niet voorspeld'};
+ if(p.home_score===m.home_score&&p.away_score===m.away_score)return {state:'exact',label:'Exact goed'};
+ if(Math.sign(p.home_score-p.away_score)===Math.sign(m.home_score-m.away_score))return {state:'winner',label:'Winnaar goed'};
+ return {state:'wrong',label:'Onjuist'};
+}
+
 export async function loadTournamentCatalog(target,ctx) {
   try {
     const [tours,entries] = await Promise.all([
@@ -96,14 +104,15 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
       <nav class="detail-tabs" aria-label="Toernooionderdelen">${[['predictions','Voorspellingen'],['results','Uitslagen'],['schema','Schema'],['champion','Toernooiwinnaar'],['ranking','Klassement'],['pools','Poules'],['rules','Spelregels & puntentelling']].map(([id,label])=>`<button type="button" data-detail-tab="${id}">${label}</button>`).join('')}</nav><div data-round-controls class="match-controls"><h2 data-list-title>Wedstrijden</h2><select id="online-round" aria-label="Ronde"><option value="">Alle rondes</option>${(rounds.data||[]).map(r=>`<option value="${esc(r.id)}" ${view.round===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select></div><section data-detail-panel="predictions">
       <div class="grid online-matches">${predictionMatches.map(m=>{
         const p=myPredictions.get(m.id),earned=myPoints.get(m.id);
-        const allowed=joined && open(m,t);
-        return `<article class="panel compact-match" data-online-match="${esc(m.id)}">
+        const allowed=joined && open(m,t),closed=!open(m,t),outcome=predictionOutcome(m,p);
+        return `<article class="panel compact-match ${closed?'prediction-'+outcome.state+' match-comparable':''}" data-online-match="${esc(m.id)}">
           <div class="match-heading"><small class="muted">${esc(roundNames.get(m.round_id)||'Ronde onbekend')}${m.score_unit!=='goals'&&Number.isInteger(m.first_to)?' – First to '+m.first_to:''}${m.status!=='scheduled'?' · '+esc(labels[m.status]||m.status):''}</small><div class="match-meta"><span class="pill ${allowed?'is-open':'is-closed'}" data-open-state>${allowed?'Open':'Gesloten'}</span><small>${esc(date(m.scheduled_start))}</small></div></div>
           ${joined ? `<form class="prediction-inline" data-online-predict="${esc(m.id)}"><div class="two">
             <div class="field"><label for="online-home-${esc(m.id)}">${esc(m.home_name)}</label><input id="online-home-${esc(m.id)}" aria-label="Score ${esc(m.home_name)}" name="home" inputmode="numeric" type="number" min="0" max="99" step="1" required value="${esc(p?.home_score ?? '')}" ${allowed?'':'disabled'}></div>
             <div class="field"><label for="online-away-${esc(m.id)}">${esc(m.away_name)}</label><input id="online-away-${esc(m.id)}" aria-label="Score ${esc(m.away_name)}" name="away" inputmode="numeric" type="number" min="0" max="99" step="1" required value="${esc(p?.away_score ?? '')}" ${allowed?'':'disabled'}></div>
             </div><p role="status" data-prediction-message></p><button class="btn" aria-live="polite" ${allowed?(p?'disabled':''):'hidden disabled'}>${p?'Opgeslagen':'Opslaan'}</button></form>` : `<div class="teams">${esc(m.home_name)} – ${esc(m.away_name)}</div>`}
           <table class="score-summary" data-score-summary ${allowed?'hidden':''}><thead><tr><th>Jouw voorspelling</th><th class="result-column">Uitslag</th><th>Punten</th></tr></thead><tbody><tr><td>${p?p.home_score+'–'+p.away_score:'—'}</td><td class="result-column">${m.home_score!=null?m.home_score+'–'+m.away_score:'—'}</td><td>${earned?.earned_points??'—'}</td></tr></tbody></table>
+          <div class="closed-match-footer" ${closed?'':'hidden'}><small data-prediction-outcome>${esc(outcome.label)}</small><button type="button" class="name-link" data-compare-match="${esc(m.id)}">Vergelijk poule</button></div>
         </article>`;
       }).join('') || ''}</div><p data-empty-predictions>Geen wedstrijden vandaag of open om te voorspellen in deze ronde.</p>
       <div class="row"><button class="btn secondary" id="online-previous" ${page===0?'disabled':''}>Vorige</button>
@@ -156,6 +165,8 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
         await loadTournamentDetail(host,ctx,page,'Je neemt nu deel aan dit toernooi.',view);
       } catch(error) {if(current(target,ctx)){target.querySelector('#online-notice').textContent=error.message;join.disabled=false;}}
     };
+    async function compareMatch(m){try{const {showMatchPoolComparison}=await import('./pool-comparison.js?v=match-popup-20261017');if(current(target,ctx))showMatchPoolComparison(ctx,t.id,m);}catch(error){if(current(target,ctx))target.querySelector('#online-notice').textContent='Vergelijken laden mislukt. Probeer opnieuw.';}}
+    target.querySelectorAll('[data-online-match]').forEach(card=>{const m=list.find(m=>m.id===card.dataset.onlineMatch);card.querySelector('[data-compare-match]').onclick=()=>compareMatch(m);card.addEventListener('click',e=>{if(!open(m,t)&&!e.target.closest('button,input,select,a'))compareMatch(m);});});
     target.querySelectorAll('[data-online-predict]').forEach(form=>{
       const m=list.find(m=>m.id===form.dataset.onlinePredict);
       const message=form.querySelector('[data-prediction-message]');
@@ -168,7 +179,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
 
       const disable=()=>{
         form.querySelectorAll('input,button').forEach(e=>e.disabled=true);
-        const state=form.closest('article').querySelector('[data-open-state]');state.textContent='Gesloten';state.className='pill is-closed';form.querySelector('button').hidden=true;const summary=form.closest('article').querySelector('[data-score-summary]');if(summary)summary.hidden=false;updatePage();
+        const card=form.closest('article'),outcome=predictionOutcome(m,myPredictions.get(m.id));card.classList.add('match-comparable','prediction-'+outcome.state);card.querySelector('.closed-match-footer').hidden=false;card.querySelector('[data-prediction-outcome]').textContent=outcome.label;const state=card.querySelector('[data-open-state]');state.textContent='Gesloten';state.className='pill is-closed';form.querySelector('button').hidden=true;const summary=form.closest('article').querySelector('[data-score-summary]');if(summary)summary.hidden=false;updatePage();
       };
       if (open(m,t)) {
         // Keep fields from appearing editable after the deadline, including long-open tabs.
@@ -209,7 +220,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
 async function loadTournamentRankings(host,ctx,tournamentId){
  const panel=document.createElement('section');panel.className='stack';host.replaceChildren(panel);
  const valid=()=>current(panel,ctx);
- const {renderLeaderboard,loadTournamentComparison,loadPoolComparison}=await import('./pool-comparison.js?v=refinements-20261017');
+ const {renderLeaderboard,loadTournamentComparison,loadPoolComparison}=await import('./pool-comparison.js?v=match-popup-20261017');
  panel.innerHTML='<h3>Toernooiklassement</h3><div data-global-ranking role="status">Klassement laden…</div><h3>Mijn pouleklassementen</h3><div data-pool-rankings class="stack" role="region" aria-label="Mijn pouleklassementen">Poules laden…</div>';
  const global=panel.querySelector('[data-global-ranking]'),poolsHost=panel.querySelector('[data-pool-rankings]');
  const report=(host,error,retry)=>{host.innerHTML='<p role="alert"></p><button type="button" class="ghost">Opnieuw proberen</button>';host.querySelector('p').textContent=error.message||'Ophalen mislukt.';host.querySelector('button').onclick=retry;};

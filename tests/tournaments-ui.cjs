@@ -2,6 +2,7 @@
 const {chromium}=require('playwright');
 const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
 (async()=>{
+ const {predictionOutcome}=await import('../online-tournaments.js');const result={status:'finished',home_score:6,away_score:3};assert.equal(predictionOutcome(result,{home_score:6,away_score:3}).state,'exact');assert.equal(predictionOutcome(result,{home_score:6,away_score:1}).state,'winner');assert.equal(predictionOutcome(result,{home_score:3,away_score:6}).state,'wrong');assert.equal(predictionOutcome(result,null).state,'unpredicted');assert.equal(predictionOutcome({status:'live'},null).state,'pending');assert.equal(predictionOutcome({status:'finished',home_score:1,away_score:1},{home_score:2,away_score:2}).state,'winner');
   const files={'/':'index.html','/tournament-images.js':'tournament-images.js','/round-settings.js':'round-settings.js','/template-management.js':'template-management.js','/branding.js':'branding.js','/app.js':'app.js','/pool-comparison.js':'pool-comparison.js','/bracket.js':'bracket.js','/knockout.js':'knockout.js','/tournament-management.js':'tournament-management.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'};
   const server=http.createServer((req,res)=>{req.url=req.url.split('?')[0];
     const file=files[req.url];if(!file){res.writeHead(404).end();return;}
@@ -14,7 +15,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     const page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'America/New_York'});const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.clock.install({time:new Date('2026-10-16T14:00:00Z')});
     await page.addInitScript(()=>{
-      window.qaJoined=false;window.qaCalls=[];window.qaPredictions=[];window.qaFailSave=false;window.qaFailRead=false;
+      window.qaJoined=false;window.qaCalls=[];window.qaPredictions=[{match_id:'match-2',home_score:6,away_score:3}];window.qaFailSave=false;window.qaFailRead=false;
       window.qaSupabase={storage:{from(){return {getPublicUrl(){return {data:{publicUrl:'https://image-qa.invalid/cover.webp'}};}};}},auth:{getUser:async()=>({data:{user:{id:'user'}}}),signOut:async()=>({})},
         from(table){window.qaTables=window.qaTables||[];window.qaTables.push(table);
           const filters={};let one=false,from=0,to=999;
@@ -30,7 +31,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
                 tournament_entries:window.qaJoined?[{tournament_id:'tour'},...(window.qaAnnouncement?[{tournament_id:'later'},{tournament_id:'old'}]:[])]:[],matches:ms.slice(from,to+1),
                 tournament_rounds:[{id:'round',name:'Ronde 1',round_order:1},{id:'round-2',name:'Ronde 2',round_order:2}],
                 tournament_scoring:[{scoring_mode:'replacement'}],round_scoring:[{round_id:'round',winner_points:1,exact_score_points:3}],
-                match_predictions:window.qaPredictions.filter(p=>filters.match_id?.includes(p.match_id)),pool_members:[],pools:[]}[table] || [];
+                match_predictions:window.qaPredictions.filter(p=>filters.match_id?.includes(p.match_id)),pool_members:window.qaPopup?[{pool_id:'own'},{pool_id:'joined'}]:[],pools:window.qaPopup&&!window.qaNoPools?[{id:'joined',name:'A vrienden',tournament_id:'tour',owner_id:'other'},{id:'own',name:'Z eigen poule',tournament_id:'tour',owner_id:'user'},{id:'stranger',name:'Buitenstaanders',tournament_id:'tour',owner_id:'other'}]:[]}[table] || [];
               return Promise.resolve({data,count:table==='matches'?56:undefined}).then(resolve,reject);
             }};return q;
         },
@@ -38,7 +39,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
           window.qaCalls.push({name,args});
           if(name==='get_tournament_prediction_counts')return {data:{server_now:'2026-10-16T14:00:00Z',next_deadline:'2026-10-16T14:01:00Z',tournaments:[{id:'tour',open_count:49,remaining_count:48}]}};
           if(name==='join_tournament'){window.qaJoined=true;return {data:'tour'};}
-          if(name==='get_my_match_points')return {data:[{match_id:'match-2',earned_points:1}]};
+          if(name==='get_match_pool_comparison'){if(window.qaPopupFail)return {error:{message:'QA vergelijken mislukt'}};return {data:{visible:args.p_match!=='match-1',members:Array.from({length:12},(_,i)=>({user_id:i===0?'user':'member-'+i,display_name:i===0?'QA <img src=x>':'Lid '+i,predicted_home:6,predicted_away:3,points:15}))}};}if(name==='get_my_match_points')return {data:[{match_id:'match-2',earned_points:1}]};
           if(name==='submit_match_prediction'){
             if(window.qaFailSave)return {error:{message:'De individuele voorspeldeadline is verstreken.'}};
             window.qaPredictions=window.qaPredictions.filter(p=>p.match_id!==args.p_match_id);
@@ -76,8 +77,13 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     await football.locator('[name="away"]').fill('2');await football.getByRole('button').click();
     await football.getByRole('button',{name:'Opgeslagen',exact:true}).waitFor();
     assert(await page.evaluate(()=>window.qaCalls.some(c=>c.name==='submit_match_prediction'&&c.args.p_match_id==='match-3'&&c.args.p_home_score===2&&c.args.p_away_score===2)),'Football draw allowed');
-    assert.equal(await page.locator('[data-online-match="match-1"] button').isDisabled(),true,'Postponed closed');
-    assert.equal(await page.locator('[data-online-match="match-2"] button').isDisabled(),true,'Finished closed');
+    assert.equal(await page.locator('[data-online-match="match-1"] form button').isDisabled(),true,'Postponed closed');
+    assert.equal(await page.locator('[data-online-match="match-2"] form button').isDisabled(),true,'Finished closed');
+    assert(await page.locator('[data-online-match="match-2"]').evaluate(e=>e.classList.contains('prediction-exact')));assert(await page.locator('[data-online-match="match-1"]').evaluate(e=>e.classList.contains('prediction-pending')));
+    await page.evaluate(()=>window.qaPopup=true);await page.locator('[data-online-match="match-2"] .match-heading').click();const popup=page.locator('#match-pool-dialog');await popup.locator('tbody tr').first().waitFor();assert.equal(await popup.locator('[data-match-pool]').inputValue(),'own');assert.equal(await popup.locator('option').count(),2);assert.equal(await popup.locator('tbody tr').count(),10);assert.equal(await popup.locator('img').count(),0);assert((await popup.locator('.my-pool-prediction').textContent()).includes('(jij)'));await popup.locator('[data-popup-next]').click();assert.equal(await popup.locator('tbody tr').count(),2);assert(await popup.locator('[data-popup-next]').isDisabled());await popup.locator('[data-match-pool]').selectOption('joined');await popup.locator('tbody tr').first().waitFor();assert(await page.evaluate(()=>qaCalls.some(c=>c.name==='get_match_pool_comparison'&&c.args.p_pool==='joined')));for(const width of [320,390,1280]){await page.setViewportSize({width,height:844});assert(await popup.locator('table').evaluate(e=>e.getBoundingClientRect().right<=e.closest('dialog').getBoundingClientRect().right));}await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(__dirname,'../test-results/match-popup-mobile.png')});await page.evaluate(()=>document.body.classList.add('dark'));await page.screenshot({path:path.join(__dirname,'../test-results/match-popup-dark-mobile.png')});await page.evaluate(()=>document.body.classList.remove('dark'));await popup.getByRole('button',{name:'Sluiten',exact:true}).click();
+    await page.locator('[data-online-match="match-1"] [data-compare-match]').click();await popup.getByText('Voorspellingen zijn zichtbaar zodra de deadline verstreken is of de wedstrijd werkelijk gestart is.',{exact:true}).waitFor();await popup.press('Escape');assert.equal(await popup.count(),0);
+    await page.evaluate(()=>window.qaPopupFail=true);await page.locator('[data-online-match="match-2"] [data-compare-match]').click();await popup.getByText('QA vergelijken mislukt',{exact:true}).waitFor();await page.evaluate(()=>window.qaPopupFail=false);await popup.getByRole('button',{name:'Opnieuw proberen',exact:true}).click();await popup.locator('tbody tr').first().waitFor();await popup.getByRole('button',{name:'Sluiten',exact:true}).click();
+    await page.evaluate(()=>window.qaNoPools=true);await page.locator('[data-online-match="match-2"] [data-compare-match]').click();await popup.getByText('Je doet voor dit spel nog niet mee aan een poule.',{exact:true}).waitFor();await popup.getByRole('button',{name:'Sluiten',exact:true}).click();await page.evaluate(()=>{window.qaPopup=false;window.qaNoPools=false;});
     await page.getByRole('button',{name:'Home',exact:true}).click();assert.equal(await page.locator('[data-my-tournaments] .game-dates').count(),1);assert(!(await page.locator('[data-my-tournaments]').textContent()).includes('Je doet mee'));assert.equal(await page.locator('[data-open-tournaments] [data-online-open]').count(),0);assert.equal(await page.locator('[data-my-tournaments] [data-online-open]').count(),1);await page.getByRole('button',{name:'Wedstrijden en voorspellingen'}).click();await card.getByRole('button',{name:'Opgeslagen',exact:true}).waitFor();assert(await card.getByRole('button').isDisabled());
     fs.mkdirSync(path.join(__dirname,'..','test-results'),{recursive:true});for(const width of [320,390,1280]){await page.setViewportSize({width,height:900});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(__dirname,'..','test-results','saved-predictions-'+width+'.png')});}await page.setViewportSize({width:390,height:844});
     await card.locator('[name=away]').fill('3');assert.equal(await card.getByRole('button').textContent(),'Opslaan');assert(await card.getByRole('button').isEnabled());
