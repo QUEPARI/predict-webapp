@@ -1,7 +1,7 @@
 import {validAccent,accentPalette,applyAccent} from './branding.js?v=header-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=first-to-20261017';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=recovery-20261017';
 import {loadOnlineProfile} from './online-profile.js?v=account-20261016';
 
 // Centrally configured branding; no user data is stored in the public response.
@@ -548,7 +548,7 @@ async function editAdminMatch(matchId) {
   const options = ['<option value="">Onbekend</option>', ...(rounds ?? []).map(r =>
     `<option value="${esc(r.round_id)}" ${r.round_id === match.round_id ? 'selected' : ''}>${esc(r.round_name)}</option>`
   )].join('');
-  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=management-20261017');
+  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=recovery-20261017');
   editor.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;gap:12px">
       <h2 id="admin-edit-title" style="margin:0">Wedstrijd bewerken</h2>
       <button type="button" class="ghost" id="admin-edit-close" aria-label="Sluiten">✕</button>
@@ -934,7 +934,7 @@ async function recordAdminMatchStart(matchId) {
     const enteredTime = dialog.querySelector('#start-actual-time').value;
     let verifiedStart = null;
     if (enteredTime) {
-      const {dutchToUTC}=await import('./knockout.js?v=management-20261017');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
+      const {dutchToUTC}=await import('./knockout.js?v=recovery-20261017');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
       if (!Number.isFinite(parsed.getTime()) || parsed.getTime() > Date.now()) {
         message.textContent = 'Vul een geldige werkelijke starttijd in die niet in de toekomst ligt.';
         return;
@@ -977,7 +977,7 @@ async function loadAdminTournamentPublications(force=false) {
   if(!force&&target.querySelector('[data-ko-dirty="true"]'))return;
   tournamentManagementController?.abort();tournamentManagementController=new AbortController();const managementSignal=tournamentManagementController.signal;
   const userId=currentUser.id;
-  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=management-20261017');
+  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=recovery-20261017');
     if(!target.isConnected||managementSignal.aborted)return;
     await loadTournamentManagement(target,{supabase,signal:managementSignal,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole),
       onCreate:()=>{const general=document.getElementById('admin-tournament-publications');if(general?.querySelector('[data-ko-dirty="true"]')&&!confirm('Niet-opgeslagen toernooiwijzigingen laten vervallen?'))return;if(general)general.querySelectorAll('[data-ko-dirty]').forEach(el=>el.dataset.koDirty='false');adminGameId='';adminGameName='Nieuw toernooi';const ko=document.querySelector('#admin-knockout');if(ko)ko.dataset.tournament='';const create=document.querySelector('#ko-create');if(create)create.hidden=false;const open=()=>{if(managementSignal.aborted||currentUser?.id!==userId)return;const details=document.querySelector('#ko-create details');if(!details)return;document.removeEventListener('predict-knockout-ready',open);details.open=true;details.scrollIntoView({block:'start'});details.querySelector('input[name=name]')?.focus({preventScroll:true});};document.addEventListener('predict-knockout-ready',open,{signal:managementSignal});showAdminSection('schema');open();},
@@ -1673,7 +1673,7 @@ render=function(){
   const target=document.createElement('section');target.id='admin-knockout';target.className='panel stack';
   document.querySelector('#account-invitations')?.after(target);
   knockoutScreenController=new AbortController();const signal=knockoutScreenController.signal,userId=currentUser.id;
-  import('./knockout.js?v=management-20261017').then(({loadKnockoutAdmin})=>{
+  import('./knockout.js?v=recovery-20261017').then(({loadKnockoutAdmin})=>{
     if(!signal.aborted&&target.isConnected)loadKnockoutAdmin(target,{supabase,signal,isCurrent:()=>currentUser?.id===userId,onSaved:()=>{loadAdminMatches();loadAdminTournamentPublications();}});
   }).catch(()=>{if(!signal.aborted&&target.isConnected)target.textContent='Knock-outbeheer laden mislukt. Open Beheer opnieuw.';});
 };
@@ -1696,7 +1696,7 @@ function refreshAdminGameContext(){
  header.querySelector('[data-context-matches]')?.addEventListener('click',()=>openAdminGameSection(adminGameId,adminGameName,adminGameKnockout,'matches'));
  }
 }
-async function loadAdminTemplates(){const target=document.getElementById('admin-templates');if(!target||target.children.length)return;target.textContent='Sjablonen laden…';try{const {loadTemplateManagement}=await import('./template-management.js?v=management-20261017');if(!target.isConnected)return;await loadTemplateManagement(target,{supabase,signal:templateManagementController.signal,isCurrent:()=>['admin','super_admin'].includes(currentRole),onSaved:()=>document.dispatchEvent(new CustomEvent('predict-knockout-templates-changed'))});}catch(error){if(target.isConnected)target.textContent='Sjablonen laden mislukt: '+error.message;}}
+async function loadAdminTemplates(){const target=document.getElementById('admin-templates');if(!target||target.children.length)return;target.textContent='Sjablonen laden…';try{const {loadTemplateManagement}=await import('./template-management.js?v=recovery-20261017');if(!target.isConnected)return;await loadTemplateManagement(target,{supabase,signal:templateManagementController.signal,isCurrent:()=>['admin','super_admin'].includes(currentRole),onSaved:()=>document.dispatchEvent(new CustomEvent('predict-knockout-templates-changed'))});}catch(error){if(target.isConnected)target.textContent='Sjablonen laden mislukt: '+error.message;}}
 function showAdminSection(id){
  selectedAdminSection=id;
  document.querySelectorAll('[data-admin-panel]').forEach(panel=>panel.hidden=panel.dataset.adminPanel!==id);

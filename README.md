@@ -2,6 +2,15 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Herstelacties en compacte beheerformulieren
+- **Schema → Wedstrijden** biedt Uitstel ongedaan maken (ook na de deadline) en Uitslag ongedaan maken. Voorspellen blijft gesloten totdat de beheerder bewust heropent met een toekomstige begintijd.
+- Uitslagherstel trekt de doorgeplaatste winnaar terug en herberekent punten, zonder voorspellingen te verwijderen. Bij voorspellingen of start in de vervolgwedstrijd wordt de hele herstelactie geblokkeerd. Auditlogging blijft behouden.
+- Wijzigingsredenen worden automatisch op de server vastgelegd; beheerders hoeven nergens meer een reden in te vullen.
+- Statusfilter start op Nog af te handelen; het nieuwe rondefilter op Alle rondes. Het schema biedt compacte neutrale tijd/statusacties zonder score- of first-to-invoer. Uitslagen kunnen per wedstrijd rechtstreeks bij Uitslagen nodig worden ingevuld.
+- Spelnaam en tabs staan in alle beheerschermen boven de inhoudsbox. Uitklapbalken gebruiken de accentachtergrond en de drie headercirkels hebben dezelfde rand, achtergrond en afmetingen.
+- Alleen eigen sjablonen zijn beschikbaar. De ingebouwde European Tour-optie is verwijderd; eigen sjablonen en bestaande spellen blijven behouden. Bewerken, Verwijderen en Kopie maken zijn even groot.
+- Migratie `20261017121505_match_recovery_and_admin_forms.sql`; rollbacktests in `supabase/tests/match_recovery.sql`.
+
 ## Compact spelbeheer en archivering
 - Beheer → **Spellen** sorteert op begindatum, net als Mijn spellen. Gearchiveerde spellen blijven in het uitklapbare beheerarchief beschikbaar.
 - Spellen worden automatisch 7 dagen (168 uur) na hun eindtijd gearchiveerd. De database controleert dit iedere 5 minuten; ontbrekende einddatums en concepten worden overgeslagen. Uitslagen, voorspellingen en poules blijven bewaard.
@@ -12,7 +21,7 @@
 
 ## Vooraankondigingen en sjabloonbeheer
 - Concepten kunnen met een van- en tot-datum als **Vooraankondiging** op Beschikbare spellen verschijnen. Deelname, poules en voorspellingen openen pas na publicatie. Spelers zien het datumbereik zonder tijden; wedstrijden behouden hun tijden.
-- **Beheer → Sjablonen** toont eigen formats en de European Tour-standaard. Eigen sjablonen kunnen worden aangemaakt en gewijzigd; de standaard kan als eigen kopie worden bewaard. Bestaande toernooien wijzigen niet mee.
+- **Beheer → Sjablonen** toont eigen formats. Eigen sjablonen kunnen worden aangemaakt en gewijzigd. Bestaande toernooien wijzigen niet mee.
 - Spelvorm staat één keer per toernooi/sjabloon. First-to en punten staan per ronde in een compacte tabel. Eventuele bestaande gemengde toernooiformats worden behouden zolang je geen nieuwe centrale spelvorm kiest.
 - Schema en Wedstrijden zijn alleen bereikbaar via het geselecteerde toernooi in Beheer → Toernooien. De wedstrijdacties zijn inklapbaar.
 - Het logo is een Home-knop, Mijn spellen/Beschikbare spellen hebben dezelfde kopgrootte en spelersnamen staan gecentreerd boven scorevelden.
