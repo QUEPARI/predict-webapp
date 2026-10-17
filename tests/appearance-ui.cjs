@@ -1,7 +1,7 @@
 // Browser integration with a fictitious centrally persisted color. No hosted writes.
 const {chromium}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 (async()=>{
- const allowed=['index.html','branding.js','app.js','online-profile.js','online-tournaments.js','knockout.js','bracket.js','tournament-management.js','styles.css','manifest.webmanifest'];
+ const allowed=['index.html','tournament-images.js','branding.js','app.js','online-profile.js','online-tournaments.js','knockout.js','bracket.js','tournament-management.js','styles.css','manifest.webmanifest'];
  const server=http.createServer((req,res)=>{const f=new URL(req.url,'http://local').pathname.slice(1)||'index.html';if(!allowed.includes(f)){res.writeHead(404).end();return;}res.setHeader('Content-Type',f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(path.join(__dirname,'..',f)));});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser,accent=null,holdRead=false,releaseRead,readHeld;
  try{
@@ -35,7 +35,7 @@ const {chromium}=require('playwright'),http=require('node:http'),fs=require('nod
   await save('#7733cc');await page.getByRole('button',{name:'Account',exact:true}).click();await page.getByLabel('Thema',{exact:true}).selectOption('dark');await page.getByRole('button',{name:'Account opslaan'}).click();await page.getByText('Account opgeslagen in Predict.').waitFor();assert(await page.locator('body').evaluate(e=>e.classList.contains('dark')));assert.notEqual(await page.locator('.logo-mark').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(88, 198, 176)');
   await settings();assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));fs.mkdirSync(path.join(__dirname,'../test-results'),{recursive:true});await page.screenshot({path:path.join(__dirname,'../test-results/appearance-dark-mobile.png')});
   await page.getByRole('button',{name:'Account',exact:true}).click();await page.getByRole('button',{name:'Uitloggen',exact:true}).click();await page.getByLabel('Gebruikersnaam',{exact:true}).waitFor();await page.reload();await page.waitForFunction(()=>document.body.style.getPropertyValue('--accent')!=='');assert.equal(accent,'#7733cc');
-  await page.evaluate(()=>{localStorage.removeItem('qa-out');localStorage.setItem('qa-role','user');});await page.reload();await page.getByRole('heading',{name:'Mijn toernooien'}).waitFor();assert.equal(await page.getByRole('button',{name:'Beheer',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Instellingen',exact:true}).count(),0);assert.deepEqual(errors,[]);
+  await page.evaluate(()=>{localStorage.removeItem('qa-out');localStorage.setItem('qa-role','user');});await page.reload();await page.getByRole('heading',{name:'Mijn spellen'}).waitFor();assert.equal(await page.getByRole('button',{name:'Beheer',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Instellingen',exact:true}).count(),0);assert.deepEqual(errors,[]);
   console.log('PASS: central accent save/reload, failed save retains input, light/dark contrast, reset, login branding and admin-only controls.');
  }finally{await browser?.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

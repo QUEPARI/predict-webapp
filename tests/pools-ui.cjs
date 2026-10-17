@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 
 (async () => {
   const server = http.createServer((req,res) => {req.url=req.url.split('?')[0];
-    const file = {'/':'index.html','/branding.js':'branding.js','/app.js':'app.js','/pool-comparison.js':'pool-comparison.js','/knockout.js':'knockout.js','/bracket.js':'bracket.js','/tournament-management.js':'tournament-management.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'}[req.url];
+    const file = {'/':'index.html','/tournament-images.js':'tournament-images.js','/branding.js':'branding.js','/app.js':'app.js','/pool-comparison.js':'pool-comparison.js','/knockout.js':'knockout.js','/bracket.js':'bracket.js','/tournament-management.js':'tournament-management.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'}[req.url];
     if (!file) {res.writeHead(404).end(); return;}
     res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');
     res.end(fs.readFileSync(path.join(__dirname,'..',file)));
@@ -36,13 +36,13 @@ const assert = require('node:assert/strict');
               let data={profiles:{username:'QA eigenaar'},user_roles:{role:'user'},tournaments:[{id:tid,name:'QA toernooi',status:'published'},{id:otherTid,name:'QA ander toernooi',status:'published'}],
                 tournament_entries:[{tournament_id:tid},{tournament_id:otherTid}],pools:[pool,{id:otherPid,name:'Andere poule',owner_id:uid,tournament_id:otherTid}],pool_members:filters.pool_id?[{user_id:uid},{user_id:member}]:[{pool_id:pid},{pool_id:otherPid}],
                 tournament_rounds:[{id:'round-1',name:'Ronde 1'}]}[table] || [];
-              if(window.qaFresh&&['tournament_entries','pools','pool_members'].includes(table))data=[];if(table==='tournaments'&&one)data=data.find(t=>t.id===filters.id)||data[0];if(table==='pools'&&one)data=data.find(p=>p.id===filters.id)||data[0];return Promise.resolve({data}).then(resolve,reject);
+              if(window.qaRankingExtra&&table==='pools')data.push({id:'rank-extra',name:'Collega’s',tournament_id:tid,owner_id:uid});if(window.qaRankingExtra&&table==='pool_members'&&!filters.pool_id)data.push({pool_id:'rank-extra'});if(window.qaFresh&&['tournament_entries','pools','pool_members'].includes(table))data=[];if(table==='tournaments'&&one)data=data.find(t=>t.id===filters.id)||data[0];if(table==='pools'&&one)data=data.find(p=>p.id===filters.id)||data[0];return Promise.resolve({data}).then(resolve,reject);
             }}; return chain;
         },
         async rpc(name,args){
           window.qaCalls.push({name,args});
           if (window.qaFail) return {error:{message:'Geen toegang tot deze poule'}};
-          if(name==='create_pool')window.qaFresh=false;
+          if(name==='get_tournament_leaderboard'&&args.p_pool_id==='rank-extra'&&window.qaPoolRankFail)return {error:{message:'QA klassement tijdelijk niet beschikbaar'}};if(name==='create_pool')window.qaFresh=false;
           if(name==='accept_pool_invitation'&&window.qaAcceptOther)return {data:otherPid};if(name==='get_my_match_points')return {data:[]};if(name==='get_knockout_schema')return {data:null};if(name==='get_champion_prediction')return {data:{enabled:false}};
           if(name==='get_pool_prediction_comparison')return {data:[{id:'m',round_id:'round-1',round_name:'Ronde 1',home_name:'QA A',away_name:'QA B',my_home:6,my_away:4,their_home:6,their_away:3,home_score:6,away_score:4,my_points:3,their_points:1}]};
           return {data:name==='get_tournament_leaderboard'?rows:name==='invite_pool_member'?'a'.repeat(64):pid};
@@ -52,6 +52,7 @@ const assert = require('node:assert/strict');
     await page.route('https://cdn.jsdelivr.net/**',route => route.fulfill({contentType:'text/javascript',body:'export const createClient=()=>window.qaSupabase;'}));
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
     await page.getByRole('button',{name:'Home',exact:true}).click();await page.getByRole('button',{name:'Wedstrijden en voorspellingen'}).first().click();await page.getByRole('button',{name:'Poules',exact:true}).click();
+    await page.evaluate(()=>window.qaRankingExtra=true);await page.getByRole('button',{name:'Klassement',exact:true}).click();await page.locator('.pool-ranking').first().waitFor();assert.equal(await page.locator('.pool-ranking').count(),2);assert.equal(await page.locator('[data-pool-rankings]').getByText('Andere poule',{exact:true}).count(),0);assert.equal(await page.locator('[data-pool-rankings] img').count(),0);assert(!await page.evaluate(()=>qaCalls.some(c=>c.name==='get_tournament_leaderboard'&&c.args.p_pool_id)),'Pool standings load only on expansion');await page.locator('.pool-ranking summary').first().click();await page.locator('.pool-ranking').first().locator('table').waitFor();await page.locator('.pool-ranking').first().getByRole('button',{name:'Lid',exact:true}).click();await page.locator('h3:visible').filter({hasText:'Jij en Lid'}).waitFor();await page.evaluate(()=>window.qaPoolRankFail=true);await page.locator('.pool-ranking summary').nth(1).click();await page.getByText('QA klassement tijdelijk niet beschikbaar',{exact:true}).waitFor();await page.evaluate(()=>window.qaPoolRankFail=false);await page.locator('.pool-ranking').nth(1).getByRole('button',{name:'Opnieuw proberen'}).click();await page.locator('.pool-ranking').nth(1).locator('table').waitFor();await page.screenshot({path:path.join(__dirname,'../test-results/tournament-pool-rankings-mobile.png'),fullPage:true});await page.evaluate(()=>window.qaRankingExtra=false);await page.getByRole('button',{name:'Poules',exact:true}).click();
     await page.getByRole('button',{name:'Leden en klassement'}).waitFor();
     assert.equal(await page.locator('#private-pools [data-pool-detail]').count(),1);assert.equal(await page.locator('#private-pool-tournament').inputValue(),'22222222-2222-4222-8222-222222222222');assert.equal(await page.locator('#private-pool-tournament').isVisible(),false);assert.equal(await page.getByText('Andere poule',{exact:true}).count(),0);
     assert.equal(await page.locator('#private-pools img').count(),0,'Names must be escaped');
@@ -64,7 +65,7 @@ const assert = require('node:assert/strict');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,'Mobile page must not overflow horizontally');
     fs.mkdirSync(path.join(__dirname,'..','test-results'),{recursive:true});
     await page.screenshot({path:path.join(__dirname,'..','test-results','private-pools-mobile.png'),fullPage:true});
-    await page.locator('[data-compare-member="44444444-4444-4444-8444-444444444444"]').first().click();await page.getByText('Jij en Lid',{exact:true}).waitFor();assert.equal(await page.locator('.comparison-table tbody tr').count(),1);assert((await page.locator('.comparison-table').textContent()).includes('6–4'));assert((await page.locator('.comparison-table').textContent()).includes('6–3'));
+    await page.locator('[data-compare-member="44444444-4444-4444-8444-444444444444"]').first().click();await page.locator('h3:visible').filter({hasText:'Jij en Lid'}).waitFor();assert.equal(await page.locator('.comparison-table:visible tbody tr').count(),1);assert((await page.locator('.comparison-table:visible').textContent()).includes('6–4'));assert((await page.locator('.comparison-table:visible').textContent()).includes('6–3'));
     await page.getByLabel('Klassement per ronde').selectOption('round-1');
     await page.waitForFunction(()=>window.qaCalls.some(c=>c.name==='get_tournament_leaderboard'&&c.args.p_round_id==='round-1'));
     await page.getByRole('button',{name:'← Mijn poules',exact:true}).click();
