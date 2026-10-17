@@ -1,7 +1,7 @@
 import {validAccent,accentPalette,applyAccent} from './branding.js?v=header-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=score-palette-20261017';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=score-spacing-20261017';
 import {loadOnlineProfile} from './online-profile.js?v=account-20261016';
 
 // Centrally configured branding; no user data is stored in the public response.
@@ -1321,7 +1321,7 @@ async function loadAdminLeaderboards() {
       return;
     }
     const rows = data || [];
-    const {renderLeaderboard,loadTournamentComparison,loadPoolComparison}=await import('./pool-comparison.js?v=score-palette-20261017');
+    const {renderLeaderboard,loadTournamentComparison,loadPoolComparison}=await import('./pool-comparison.js?v=score-spacing-20261017');
     if(!panel.isConnected||request!==version)return;
     renderLeaderboard(results,rows,(host,member,name)=>pool.value?loadPoolComparison(host,{supabase,isCurrent:()=>panel.isConnected},{id:pool.value},member,name):loadTournamentComparison(host,{supabase,isCurrent:()=>panel.isConnected},tour.value,member,name),{detailed:true,userId:currentUser.id});
   }
@@ -1513,7 +1513,7 @@ async function loadPrivatePoolDetail(pool) {
       '<button class="btn secondary" id="private-leave">Poule verlaten</button>'}`;
   target.querySelector('#private-detail-back').onclick=()=>loadPrivatePools(overview);
   const comparison=document.createElement('section');comparison.className='stack';target.append(comparison);
-  const compare=member=>{import('./pool-comparison.js?v=score-palette-20261017').then(({loadPoolComparison})=>{if(target.isConnected)loadPoolComparison(comparison,{supabase,isCurrent:()=>currentUser?.id===userId},pool,member,names.get(member)||'Poulegenoot');}).catch(()=>comparison.textContent='Vergelijken laden mislukt. Probeer opnieuw.');};
+  const compare=member=>{import('./pool-comparison.js?v=score-spacing-20261017').then(({loadPoolComparison})=>{if(target.isConnected)loadPoolComparison(comparison,{supabase,isCurrent:()=>currentUser?.id===userId},pool,member,names.get(member)||'Poulegenoot');}).catch(()=>comparison.textContent='Vergelijken laden mislukt. Probeer opnieuw.');};
   const message = target.querySelector('#private-detail-message');
   const ranking = target.querySelector('#private-pool-ranking');
   function showRanking(data) {
