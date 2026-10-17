@@ -2,6 +2,14 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Compact spelbeheer en archivering
+- Beheer → **Spellen** sorteert op begindatum, net als Mijn spellen. Gearchiveerde spellen blijven in het uitklapbare beheerarchief beschikbaar.
+- Spellen worden automatisch 7 dagen (168 uur) na hun eindtijd gearchiveerd. De database controleert dit iedere 5 minuten; ontbrekende einddatums en concepten worden overgeslagen. Uitslagen, voorspellingen en poules blijven bewaard.
+- Elk spel heeft dezelfde tabs **Algemeen, Schema, Wedstrijden, Klassement**. Het algemene beheermenu bevat geen Klassementen meer.
+- Benodigde uitslagen staan direct bij het openen van een spel. Instellingen en schemaonderdelen zijn duidelijk inklapbaar; het extra volledige beheerschema is verwijderd.
+- Eigen sjablonen kunnen na bevestiging worden verwijderd zonder bestaande spellen te wijzigen.
+- Migratie: `20261017113827_compact_game_management.sql`; verificatie: `supabase/tests/compact_game_management.sql` en lokale browsertests.
+
 ## Vooraankondigingen en sjabloonbeheer
 - Concepten kunnen met een van- en tot-datum als **Vooraankondiging** op Beschikbare spellen verschijnen. Deelname, poules en voorspellingen openen pas na publicatie. Spelers zien het datumbereik zonder tijden; wedstrijden behouden hun tijden.
 - **Beheer → Sjablonen** toont eigen formats en de European Tour-standaard. Eigen sjablonen kunnen worden aangemaakt en gewijzigd; de standaard kan als eigen kopie worden bewaard. Bestaande toernooien wijzigen niet mee.

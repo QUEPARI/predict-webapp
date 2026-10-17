@@ -1,4 +1,4 @@
-import {roundTable,readRoundTable,unitSelect,roundNames} from './round-settings.js?v=previews-20261017';
+import {roundTable,readRoundTable,unitSelect,roundNames} from './round-settings.js?v=management-20261017';
 import {layoutBracket} from './bracket.js?v=hub-20261017';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const tournamentLabel=s=>({draft:'Concept',announced:'Vooraankondiging',published:'Gepubliceerd',active:'Actief',completed:'Afgerond',archived:'Gepauzeerd / archief'}[s]||s);
@@ -87,10 +87,10 @@ export async function loadKnockoutAdmin(target,ctx){
     finally{busy=false;controls.forEach(([x,disabled])=>{if(x.isConnected)x.disabled=disabled;});}
   }
   function renderEditor(){
-    const host=$('ko-editor');
+    const host=$('ko-editor'),openedFolds=[...host.querySelectorAll('.admin-fold[open]')].map(el=>el.id);
     host.innerHTML=`<h3>${esc(data.name)}</h3><p>Status: ${esc(tournamentLabel(data.status))}</p>${['draft','announced'].includes(data.status)?'<button class="btn" id="ko-publish">Publiceren en complete wedstrijden openen</button>':''}<button class="ghost" id="ko-refresh">Schema vernieuwen</button><p>Bij verstreken begintijd sluit voorspellen automatisch. “Uitslag nodig” is geen bevestiging dat de wedstrijd werkelijk begonnen is. Een open toekomstige wedstrijd blijft bij een tijdcorrectie open. Gesloten of verlopen wedstrijden heropen je bewust. Alle acties worden automatisch gelogd.</p><div class="row"><label>Toon<select id="ko-filter"><option value="pending">Nog af te handelen</option><option value="all">Alle wedstrijden</option><option>Uitslag nodig</option><option>Nog aanvullen</option><option>Afgerond</option></select></label></div><div id="ko-cards" class="stack"></div><div id="ko-full"></div>`;
     if(['draft','announced'].includes(data.status)){
-      const settings=document.createElement('details');settings.id='ko-settings';
+      const settings=document.createElement('details');settings.id='ko-settings';settings.className='admin-fold';
       const values=data.rounds.map(r=>{const m=data.matches.find(m=>m.round===r.order)||{};return {...r,unit:r.unit||m.unit||'legs',first_to:r.first_to===undefined?m.first_to:r.first_to};}),units=[...new Set(values.map(r=>r.unit))];
       settings.innerHTML=`<summary>Ronde-instellingen en punten</summary><p class="hint">Tussentijds opslaan kan met lege velden. Vul ze vóór publiceren in.</p><form class="stack"><div class="two"><label>Van (Nederland)<input name="start" type="datetime-local" value="${esc(dutchInput(data.start))}"></label><label>Tot (Nederland)<input name="end" type="datetime-local" value="${esc(dutchInput(data.end))}"></label></div><label>Puntenmethode<select name="mode"><option value="replacement">Exacte score vervangt winnaarspunten</option><option value="additive">Exacte score telt bovenop winnaarspunten</option></select></label>${unitSelect(units[0],units.length>1)}${roundTable(values,{goals:units[0]==='goals'})}<button class="btn">Conceptinstellingen opslaan</button><p role="status" data-round-settings-message></p></form>`;
       const form=settings.querySelector('form');form.elements.mode.value=data.scoring_mode||'replacement';form.oninput=()=>form.dataset.koDirty='true';
@@ -98,7 +98,7 @@ export async function loadKnockoutAdmin(target,ctx){
       host.querySelector('#ko-filter').closest('.row').before(settings);
       if(data.publication_issues?.length){const issues=document.createElement('div');issues.className='notice';issues.setAttribute('role','status');issues.innerHTML='<strong>Nog invullen vóór publiceren</strong><ul>'+data.publication_issues.map(issue=>'<li>'+esc(issue)+'</li>').join('')+'</ul>';settings.before(issues);}
     }
-    drawSchema($('ko-full'),data,true);
+    $('ko-full').remove();
     if(data.status!=='completed'){
       const rosterForm=document.createElement('form');rosterForm.className='stack';rosterForm.id='ko-roster';
       const seen=new Set();
@@ -110,12 +110,12 @@ export async function loadKnockoutAdmin(target,ctx){
       rosterForm.innerHTML=`<h3>Namen invullen in het schema</h3><p>Vul spelers of teams op hun officiële lotingsplek in. Een winnaarverwijzing wordt automatisch ingevuld na de uitslag. Lege plekken mag je tussentijds opslaan. Namen wijzigen kan zolang er geen voorspellingen, gestarte wedstrijden of ingestelde winnaarsvraag zijn.</p><div class="ko-bracket">${data.rounds.map(r=>`<section class="stack ko-round"><h4>${esc(r.name)}</h4>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel ko-node" data-node="${esc(m.id)}">${entrant(m.home_slot,m.home,won(m,'home'))}${entrant(m.away_slot,m.away,won(m,'away'))}</article>`).join('')}</section>`).join('')}</div><button type="submit" class="btn">Deelnemersnamen opslaan</button><p data-roster-message role="status"></p>`;
       // Preserve edit access if a historical bracket contains an unusual slot arrangement.
       if(seen.size!==data.roster.length){for(let slot=1;slot<=data.roster.length;slot++){if(!seen.has(slot))rosterForm.insertAdjacentHTML('beforeend',entrant(slot,''));}}
-      host.querySelector('h3').after(rosterForm);layoutBracket(rosterForm.querySelector('.ko-bracket'),data);rosterForm.oninput=()=>rosterForm.dataset.koDirty='true';
+      const rosterSection=document.createElement('details');rosterSection.className='admin-fold';rosterSection.id='ko-roster-section';rosterSection.innerHTML='<summary>Namen invullen in het schema</summary>';rosterForm.querySelector('h3').remove();rosterSection.append(rosterForm);host.querySelector('h3').after(rosterSection);layoutBracket(rosterForm.querySelector('.ko-bracket'),data);rosterForm.oninput=()=>rosterForm.dataset.koDirty='true';
       rosterForm.onsubmit=e=>{e.preventDefault();if([...target.querySelectorAll('[data-ko-dirty="true"]')].some(x=>x!==rosterForm)&&!confirm('Andere niet-opgeslagen wijzigingen laten vervallen?'))return;
         const names=[...data.roster];rosterForm.querySelectorAll('[data-slot]').forEach(input=>names[Number(input.dataset.slot)-1]=input.value.trim());mutate('roster',null,{names});};
     }
     const now=Date.parse(data.server_now||new Date().toISOString()),receivedAt=Date.now();
-    const cards=$('ko-cards');
+    const cards=$('ko-cards'),matchSection=document.createElement('details');matchSection.className='admin-fold';matchSection.id='ko-matches-section';matchSection.innerHTML='<summary>Wedstrijden</summary>';const filter=$('ko-filter').closest('.row');filter.before(matchSection);matchSection.append(filter,cards);
     const groups=new Map(),ordered=[...data.matches].sort((a,b)=>a.round-b.round||(a.start?Date.parse(a.start):Infinity)-(b.start?Date.parse(b.start):Infinity)||a.number-b.number);
     for(const m of ordered){
       if(!groups.has(m.round)){const group=document.createElement('section');group.className='manage-round stack';group.dataset.manageRound=m.round;group.innerHTML='<h4>'+esc(data.rounds.find(r=>r.order===m.round)?.name||'Ronde '+m.round)+'</h4>';groups.set(m.round,group);cards.append(group);}
@@ -147,6 +147,7 @@ export async function loadKnockoutAdmin(target,ctx){
       };
     }
     $('ko-filter').onchange=()=>{cards.querySelectorAll('article').forEach(card=>{const m=data.matches.find(m=>m.id===card.dataset.koMatch),value=$('ko-filter').value,state=knockoutStatus(m,Date.now()+(now-receivedAt));card.hidden=!!m.bye||(value==='pending'?!predictionState(m,data.status,Date.now()+(now-receivedAt)).open&&!['Uitslag nodig','Nog aanvullen'].includes(state):value!=='all'&&state!==value);});groups.forEach(group=>group.hidden=![...group.querySelectorAll('article')].some(c=>!c.hidden));};
+    openedFolds.forEach(id=>{const el=$(id);if(el)el.open=true;});
     $('ko-filter').onchange();
     clearInterval(tickTimer);const clockOffset=now-Date.now();
     tickTimer=setInterval(()=>{
