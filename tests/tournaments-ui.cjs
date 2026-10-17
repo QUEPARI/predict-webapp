@@ -21,9 +21,9 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
           const q={select(){return q;},eq(k,v){filters[k]=v;return q;},neq(){return q;},in(k,v){filters[k]=v;return q;},
             order(){return q;},single(){one=true;return q;},range(a,b){from=a;to=b;return q;},then(resolve,reject){
               if(window.qaFailRead&&table==='matches')return Promise.resolve({error:{message:'Testverbinding verbroken'}}).then(resolve,reject);
-              const ms=Array.from({length:53},(_,i)=>({id:'match-'+i,round_id:i>=51?'round-2':'round',home_name:'Speler '+i,away_name:'Tegenstander '+i,
-                scheduled_start:i===51?'2026-10-17T14:00:00Z':i===52?'2026-10-17T00:30:00Z':'2026-10-16T14:01:00Z',actual_start:null,status:i===1?'postponed':[2,51].includes(i)?'finished':'scheduled',
-                home_score:[2,51].includes(i)?6:null,away_score:[2,51].includes(i)?3:null,score_unit:i===3?'goals':'legs',first_to:i===3?null:6,
+              const ms=Array.from({length:56},(_,i)=>({id:'match-'+i,round_id:i>=51?'round-2':'round',home_name:'Speler '+i,away_name:'Tegenstander '+i,
+                scheduled_start:i===53?'2026-10-18T14:00:00Z':i>=54?'2026-10-15T14:00:00Z':i===51?'2026-10-17T14:00:00Z':i===52?'2026-10-17T00:30:00Z':'2026-10-16T14:01:00Z',actual_start:null,status:[1,55].includes(i)?'postponed':[2,51,54].includes(i)?'finished':'scheduled',
+                home_score:[2,51,54].includes(i)?6:null,away_score:[2,51,54].includes(i)?3:null,score_unit:i===3?'goals':'legs',first_to:i===3?null:6,
                 start_time_confirmed:true,needs_review:false,predictions_enabled:true}));
               const t={id:'tour',name:'QA <img src=x onerror=alert(1)>',status:'published',starts_at:'2026-10-16T13:00:00Z'};
               let data={profiles:{username:'QA'},user_roles:{role:'user'},tournaments:one?t:[t],
@@ -31,7 +31,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
                 tournament_rounds:[{id:'round',name:'Ronde 1',round_order:1},{id:'round-2',name:'Ronde 2',round_order:2}],
                 tournament_scoring:[{scoring_mode:'replacement'}],round_scoring:[{round_id:'round',winner_points:1,exact_score_points:3}],
                 match_predictions:window.qaPredictions.filter(p=>filters.match_id?.includes(p.match_id)),pool_members:[],pools:[]}[table] || [];
-              return Promise.resolve({data,count:table==='matches'?53:undefined}).then(resolve,reject);
+              return Promise.resolve({data,count:table==='matches'?56:undefined}).then(resolve,reject);
             }};return q;
         },
         async rpc(name,args){
@@ -96,7 +96,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     page.on('dialog',dialog=>dialog.accept());
     await page.getByRole('button',{name:'Volgende',exact:true}).click();
     await page.locator('[data-online-match="match-50"]').waitFor();
-    assert.equal(await page.getByRole('button',{name:'Volgende',exact:true}).isDisabled(),true);assert((await page.locator('[data-online-match="match-52"] .match-meta').textContent()).includes('20:30'));assert.equal(await page.locator('[data-online-match="match-51"]').isVisible(),true);
+    assert.equal(await page.getByRole('button',{name:'Volgende',exact:true}).isDisabled(),true);assert((await page.locator('[data-online-match="match-52"] .match-meta').textContent()).includes('20:30'));assert.equal(await page.locator('[data-online-match="match-51"]').isVisible(),false);assert.equal(await page.locator('[data-online-match="match-53"]').isVisible(),true);assert.equal(await page.locator('[data-online-match="match-54"]').isVisible(),false);assert.equal(await page.locator('[data-online-match="match-55"]').isVisible(),false);
     await page.getByRole('button',{name:'Vorige',exact:true}).click();
     await page.locator('[data-online-match="match-0"]').waitFor();
     assert.equal(await page.locator('[data-online-match="match-0"] [name="away"]').inputValue(),'3','Paging preserves unsaved input');
@@ -105,10 +105,12 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     await page.getByText('Ophalen mislukt: Testverbinding verbroken').waitFor();
     await page.evaluate(()=>window.qaFailRead=false);
     await page.getByRole('button',{name:'Opnieuw proberen',exact:true}).click();
-    await page.locator('[data-online-match="match-51"]').waitFor();assert.equal(await page.locator('[data-pagination]').isVisible(),false);assert.equal(await page.locator('[data-online-match]').count(),2);await page.locator('[data-detail-tab=results]').click();assert((await page.locator('[data-detail-panel=results]').textContent()).includes('Speler 51'));await page.locator('#online-round').selectOption('');await page.locator('[data-detail-panel=results] tbody tr').first().waitFor();assert.equal(await page.locator('[data-detail-panel=results] tbody tr').count(),2);
+    await page.locator('[data-online-match="match-52"]').waitFor();assert.equal(await page.locator('[data-pagination]').isVisible(),false);assert.equal(await page.locator('[data-online-match]:visible').count(),2);await page.locator('[data-detail-tab=results]').click();assert((await page.locator('[data-detail-panel=results]').textContent()).includes('Speler 51'));await page.locator('#online-round').selectOption('');await page.locator('[data-detail-panel=results] tbody tr').first().waitFor();assert.equal(await page.locator('[data-detail-panel=results] tbody tr').count(),3);
     await page.getByRole('button',{name:'Home',exact:true}).click();
     await page.getByRole('button',{name:'Wedstrijden en voorspellingen'}).waitFor();await page.locator('.prediction-attention.remaining').waitFor();assert((await page.locator('.prediction-attention.remaining').textContent()).includes('Nog 48 te voorspellen'));
     assert.equal(await page.evaluate(()=>Object.values(localStorage).some(v=>v.includes('match-0'))),false,'No online predictions cached locally');
+    await page.getByRole('button',{name:'Wedstrijden en voorspellingen'}).click();await page.locator('[data-online-match="match-0"]').waitFor();await page.clock.fastForward(14*60*60*1000);
+    assert.equal(await page.locator('[data-online-match="match-0"]').isVisible(),false,'Previous local day disappears at midnight');assert.equal(await page.locator('[data-online-match="match-51"]').isVisible(),true,'Closed match for new local day appears');assert.equal(await page.locator('[data-online-match="match-53"]').isVisible(),true,'Future open match stays visible');assert.equal(await page.locator('[data-pagination]').isVisible(),false);
     assert.deepEqual(errors,[]);
     console.log('PASS: real routes, join without pool, own prediction create/reload, validation, drafts, server rejection, deadline timer, pagination, mobile width and retry');
   } finally {if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}

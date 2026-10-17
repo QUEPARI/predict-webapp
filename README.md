@@ -51,6 +51,12 @@ De mijlpaal voor [gebruikersnaam en wachtwoord zonder e-mail](docs/manual-accoun
 - De knop toont **Opgeslagen** zodra een voorspelling is opgeslagen, ook na opnieuw openen. Bij een wijziging wordt het weer **Opslaan**. Overbodige bevestigingsteksten onder de velden zijn verwijderd; fouten blijven zichtbaar.
 - Zie [opslagstatus en rondeoverzicht](docs/prediction-save-status-milestone.md).
 
+## Vandaag en open wedstrijden
+- Voorspellingen toont alle wedstrijden van vandaag in de lokale tijdzone, plus toekomstige wedstrijden die openstaan om te voorspellen. Oudere gesloten wedstrijden blijven onder Uitslagen. De rondekeuze blijft beschikbaar; er is geen datumfilter.
+- Bij lokale middernacht en bij een verlopen deadline wordt de selectie opnieuw bepaald, met bijpassende paginering.
+- Klassement is uit het hoofdmenu verwijderd en blijft binnen het toernooi bereikbaar. Hoofdmenu en beheermenu gebruiken even grote compacte knoppen; op smalle schermen lopen de knoppen door op een volgende regel.
+- Zie [vandaagselectie en menucontrole](docs/today-and-navigation-milestone.md).
+
 ## Account en voorkeuren (vervolg)
 
 - **Account** vervangt het navigatielabel Profiel. Gebruikersnaam, licht/donker/systeeminstelling en Uitloggen staan op deze pagina; de header bevat alleen de huisstijl.
