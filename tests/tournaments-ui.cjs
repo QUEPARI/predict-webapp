@@ -51,7 +51,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     await page.route('https://cdn.jsdelivr.net/**',route=>route.fulfill({contentType:'text/javascript',body:'export const createClient=()=>window.qaSupabase;'}));
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
     await page.getByText('Je doet nog niet mee aan een toernooi.',{exact:false}).waitFor();
-    await page.getByRole('button',{name:'Toernooien',exact:true}).click();
+    assert.equal(await page.locator('[data-my-tournaments] [data-online-open]').count(),0);assert.equal(await page.locator('[data-open-tournaments] [data-online-open]').count(),1);await page.getByRole('button',{name:'Home',exact:true}).click();
     await page.getByText('49 wedstrijden open om te voorspellen',{exact:true}).waitFor();await page.getByRole('button',{name:'Bekijk toernooi'}).click();
     await page.getByRole('button',{name:'Deelnemen aan dit toernooi'}).waitFor();
     assert.equal(await page.locator('[data-online-predict]').count(),0,'Nonparticipant cannot submit');
@@ -60,7 +60,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     await page.getByText('Je neemt nu deel aan dit toernooi.').waitFor();
     await page.getByText('Je doet mee · Punten uit afgeronde wedstrijden: 1.',{exact:false}).waitFor();
     await page.getByRole('button',{name:'Spelregels & puntentelling',exact:true}).click();await page.getByRole('heading',{name:'Spelregels & puntentelling'}).waitFor();assert((await page.locator('[data-detail-panel=rules]').textContent()).includes('first-to 6'));assert.equal(await page.locator('.match-rules').count(),0);await page.getByRole('button',{name:'Voorspellingen',exact:true}).click();const card=page.locator('[data-online-match="match-0"]');
-    assert(await page.locator('.nav').evaluate(e=>getComputedStyle(e).position==='static'&&e.getBoundingClientRect().top<document.querySelector('#online-tournaments').getBoundingClientRect().top),'Mobile menu above content');await card.locator('[name="home"]').fill('6');await card.locator('[name="away"]').fill('6');
+    assert(await page.locator('.top').evaluate(e=>getComputedStyle(e).position==='static'&&e.getBoundingClientRect().top<document.querySelector('#online-tournaments').getBoundingClientRect().top),'Mobile menu above content');await card.locator('[name="home"]').fill('6');await card.locator('[name="away"]').fill('6');
     await card.getByRole('button').click();
     await card.getByText('Vul een geldige eindstand voor dit wedstrijdformaat in.').waitFor();
     assert.equal(await page.evaluate(()=>window.qaCalls.filter(c=>c.name==='submit_match_prediction').length),0);
@@ -76,7 +76,7 @@ const http=require('node:http');const fs=require('node:fs');const path=require('
     assert(await page.evaluate(()=>window.qaCalls.some(c=>c.name==='submit_match_prediction'&&c.args.p_match_id==='match-3'&&c.args.p_home_score===2&&c.args.p_away_score===2)),'Football draw allowed');
     assert.equal(await page.locator('[data-online-match="match-1"] button').isDisabled(),true,'Postponed closed');
     assert.equal(await page.locator('[data-online-match="match-2"] button').isDisabled(),true,'Finished closed');
-    await page.getByRole('button',{name:'Home',exact:true}).click();await page.getByRole('button',{name:'Wedstrijden en voorspellingen'}).click();await card.getByRole('button',{name:'Opgeslagen',exact:true}).waitFor();assert(await card.getByRole('button').isDisabled());
+    await page.getByRole('button',{name:'Home',exact:true}).click();assert.equal(await page.locator('[data-open-tournaments] [data-online-open]').count(),0);assert.equal(await page.locator('[data-my-tournaments] [data-online-open]').count(),1);await page.getByRole('button',{name:'Wedstrijden en voorspellingen'}).click();await card.getByRole('button',{name:'Opgeslagen',exact:true}).waitFor();assert(await card.getByRole('button').isDisabled());
     fs.mkdirSync(path.join(__dirname,'..','test-results'),{recursive:true});for(const width of [320,390,1280]){await page.setViewportSize({width,height:900});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(__dirname,'..','test-results','saved-predictions-'+width+'.png')});}await page.setViewportSize({width:390,height:844});
     await card.locator('[name=away]').fill('3');assert.equal(await card.getByRole('button').textContent(),'Opslaan');assert(await card.getByRole('button').isEnabled());
     await page.evaluate(()=>window.qaFailSave=true);

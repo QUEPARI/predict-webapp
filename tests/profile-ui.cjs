@@ -51,7 +51,7 @@ const {chromium}=require('playwright');const http=require('node:http');const fs=
     await page.getByRole('button',{name:'Account opslaan'}).waitFor();
     await page.waitForFunction(()=>document.body.classList.contains('dark'));
     await page.emulateMedia({colorScheme:'light'});await page.waitForFunction(()=>!document.body.classList.contains('dark'));
-    assert.equal(await page.locator('.top button,.top .badge,.top-actions').count(),0);assert.equal(await page.locator('.top').innerText(),'P\nPredict\nSPORTVOORSPELLINGEN');assert.equal(await page.locator('#online-profile img').count(),0);
+    assert.equal(await page.locator('.top .badge,.top-actions,.nav').count(),0);assert.equal(await page.getByRole('button',{name:'Account',exact:true}).textContent(),'A');assert.equal(await page.getByRole('button',{name:'Beheer',exact:true}).count(),0);assert.equal(await page.locator('#online-profile img').count(),0);
     assert.equal(await page.getByRole('button',{name:'Verwijder lokale demogegevens'}).count(),0);
     await page.locator('#account-predictions table').waitFor();
     const first=page.locator('#account-predictions tbody tr').first();
@@ -59,7 +59,7 @@ const {chromium}=require('playwright');const http=require('node:http');const fs=
     await page.getByLabel('Weergavenaam',{exact:true}).fill('  Opgeslagen naam  ');
     await page.getByLabel('Thema',{exact:true}).selectOption('light');await page.getByRole('button',{name:'Account opslaan'}).click();
     await page.getByText('Account opgeslagen in Predict.').waitFor();assert.equal(profiles.a.display_name,'Opgeslagen naam');
-    await page.reload();await page.getByRole('button',{name:'Account opslaan'}).waitFor();
+    await page.reload();await page.getByRole('button',{name:'Account',exact:true}).click();await page.getByRole('button',{name:'Account opslaan'}).waitFor();
     assert.equal(await page.getByLabel('Weergavenaam',{exact:true}).inputValue(),'Opgeslagen naam');
     await page.getByRole('button',{name:'Volgende',exact:true}).click();
     await page.getByText('Speler 25 – Tegenstander',{exact:false}).waitFor();

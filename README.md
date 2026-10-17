@@ -2,6 +2,13 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Nieuwe startpagina en navigatie
+- Na inloggen verschijnt Mijn toernooien, met daaronder Open toernooien waaraan je nog kunt deelnemen. Toernooien worden niet dubbel getoond; na deelname staan ze onder Mijn toernooien.
+- Het Predict-logo brengt je naar deze startpagina. Rechts staan een ronde Account-knop met je gebruikersinitiaal en, alleen voor beheerders, een tandwiel voor Beheer. Het gewone hoofdmenu is verwijderd.
+- Privépoules staan in de tab Poules van het betreffende toernooi. Aanmaken, uitnodigingen, ledenbeheer, vergelijken en klassementen blijven via de bestaande beveiligde functies werken.
+- Schema-kaarten volgen hun inhoud, met het winnaarsvinkje bij de naam en scores rechts onder elkaar.
+- Zie [startpagina, header en toernooipoules](docs/tournament-hub-milestone.md).
+
 ## Profiel en voorkeuren
 De mijlpaal voor [gebruikersnaam en wachtwoord zonder e-mail](docs/manual-accounts-milestone.md) is gepubliceerd via PR #4 (`aa45d6f`) en door de gebruiker getest. Deelnemers activeren hun account met een eenmalige code van een beheerder. Wachtwoordherstel gebruikt ook een beheerderscode. SMTP en een eigen domein zijn niet nodig.
 
