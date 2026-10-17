@@ -161,3 +161,28 @@
 #ko-message:empty{display:none}
 .admin-shell .game-context,.admin-shell [data-game-context]{position:sticky;top:var(--admin-game-top,76px);z-index:4;align-self:start;background:var(--bg);padding:7px 0}
 .ranking-pagination{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;font-size:12px}
+.compact-match.prediction-pending,.compact-match.prediction-unpredicted{background:#e8ebef;color:#283442;border-color:#c8d0d9}
+.compact-match.prediction-winner{background:#d8efdc;color:#163d23;border-color:#92c59f}
+.compact-match.prediction-exact{background:#1c633c;color:#fff;border-color:#144d2d}
+.compact-match.prediction-wrong{background:#f7d9dc;color:#72202a;border-color:#df9ca4}
+.dark .compact-match.prediction-pending,.dark .compact-match.prediction-unpredicted{background:#2b3037;color:#e4e7ec;border-color:#515a65}
+.dark .compact-match.prediction-winner{background:#345e41;color:#e5f4e9;border-color:#679875}
+.dark .compact-match.prediction-exact{background:#134a2b;color:#fff;border-color:#4f9a6b}
+.dark .compact-match.prediction-wrong{background:#602e35;color:#ffe6e9;border-color:#ab6670}
+.match-comparable{cursor:pointer}
+.match-comparable .score-summary th,.match-comparable .score-summary td,.match-comparable .result-column{background:transparent;color:inherit;border-color:currentColor}
+.match-comparable .muted,.match-comparable .field label,.match-comparable .name-link{color:inherit}
+.closed-match-footer{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.closed-match-footer small,.closed-match-footer button{font-size:11px}
+.match-pool-dialog{width:min(620px,calc(100% - 24px));max-height:85svh;overflow:auto;border:1px solid var(--border);border-radius:16px;padding:18px;background:var(--panel);color:var(--txt)}
+.match-pool-dialog::backdrop{background:#0009}
+.match-pool-dialog h2,.match-pool-dialog h3{margin:0}
+.match-pool-dialog h3{margin-top:14px}
+.match-pool-dialog label{display:grid;gap:6px;font-size:13px}
+.match-pool-dialog td,.match-pool-dialog th{padding:9px 6px;font-size:13px}
+.match-pool-dialog .my-pool-prediction{background:var(--soft);font-weight:700}
+.match-pool-dialog table{min-width:0;width:100%;table-layout:fixed}
+.match-pool-dialog th:first-child{width:44%}
+.match-pool-dialog th:nth-child(2){width:34%}
+.match-pool-dialog th:last-child{width:22%}
+.match-pool-dialog th,.match-pool-dialog td{white-space:normal;overflow-wrap:anywhere}

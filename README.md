@@ -2,6 +2,12 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Gesloten wedstrijden en poulepop-up
+- Gesloten wedstrijdkaarten openen een pop-up met voorspellingen en punten van de eigen poule. Een eigen beheerde poule staat bovenaan; anders wordt de eerste eigen deelname gekozen. Wisselen kan via de dropdown. Alleen eigen poules van hetzelfde toernooi zijn beschikbaar.
+- De database controleert het actuele lidmaatschap van de kijker en de geselecteerde poule. Een handmatig gesloten toekomstige wedstrijd onthult niets; vergelijking opent pas na de deadline of werkelijke start. Leden staan met maximaal 10 per pagina in de pop-up.
+- Gesloten kaarten zijn donkergroen bij exact goed, lichtgroen bij juiste winnaar, rood bij onjuist en grijs zonder uitslag. Niet ingevulde voorspellingen blijven neutraal. Tekstlabels ondersteunen de kleuren in lichte/donkere modus.
+- Migratie `20261017131319_match_pool_popup.sql`; rollbacktest `supabase/tests/match_pool_popup.sql`. Geen bestaande voorspellingen of uitslagen worden gewijzigd.
+
 ## Naamcorrecties, klassementpagina’s en compact beheer
 - Deelnemersnamen kunnen ook na voorspellingen of gestarte wedstrijden worden gecorrigeerd. Schemaplekken, scores, deadlines en wedstrijdvoorspellingen blijven identiek; winnaarskeuzes volgen de naamcorrectie op dezelfde schemaplek. Namen blijven uniek en bestaande actieve deelnemers kunnen niet worden leeggemaakt.
 - Toernooi- en pouleklassementen tonen maximaal 10 spelers per pagina, ook in beheer. Namen openen een vergelijking. Het nieuwe toernooi-RPC controleert deelname en toont uitsluitend wedstrijden waarvan de deadline verstreken is of die werkelijk gestart zijn; een handmatig gesloten toekomstige wedstrijd blijft verborgen.
