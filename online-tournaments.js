@@ -166,7 +166,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
         await loadTournamentDetail(host,ctx,page,'Je neemt nu deel aan dit toernooi.',view);
       } catch(error) {if(current(target,ctx)){target.querySelector('#online-notice').textContent=error.message;join.disabled=false;}}
     };
-    async function compareMatch(m){try{const {showMatchPoolComparison}=await import('./pool-comparison.js?v=score-colors-20261017');if(current(target,ctx))showMatchPoolComparison(ctx,t.id,m,predictionOutcome(m,myPredictions.get(m.id)).label);}catch(error){if(current(target,ctx))target.querySelector('#online-notice').textContent='Vergelijken laden mislukt. Probeer opnieuw.';}}
+    async function compareMatch(m){try{const {showMatchPoolComparison}=await import('./pool-comparison.js?v=score-palette-20261017');if(current(target,ctx))showMatchPoolComparison(ctx,t.id,m,predictionOutcome(m,myPredictions.get(m.id)).label);}catch(error){if(current(target,ctx))target.querySelector('#online-notice').textContent='Vergelijken laden mislukt. Probeer opnieuw.';}}
     target.querySelectorAll('[data-online-match]').forEach(card=>{const m=list.find(m=>m.id===card.dataset.onlineMatch);const accessible=()=>{if(!open(m,t)){card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-label',m.home_name+' – '+m.away_name+'. Vergelijk voorspellingen in je poule');}};accessible();card.addEventListener('click',e=>{if(!open(m,t)&&!e.target.closest('button,input,select,a'))compareMatch(m);});card.addEventListener('keydown',e=>{if(e.target===card&&!open(m,t)&&['Enter',' '].includes(e.key)){e.preventDefault();compareMatch(m);}});});
     target.querySelectorAll('[data-online-predict]').forEach(form=>{
       const m=list.find(m=>m.id===form.dataset.onlinePredict);
@@ -221,7 +221,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
 async function loadTournamentRankings(host,ctx,tournamentId){
  const panel=document.createElement('section');panel.className='stack';host.replaceChildren(panel);
  const valid=()=>current(panel,ctx);
- const {renderLeaderboard,loadTournamentComparison,loadPoolComparison}=await import('./pool-comparison.js?v=score-colors-20261017');
+ const {renderLeaderboard,loadTournamentComparison,loadPoolComparison}=await import('./pool-comparison.js?v=score-palette-20261017');
  panel.innerHTML='<h3>Toernooiklassement</h3><div data-global-ranking role="status">Klassement laden…</div><h3>Mijn pouleklassementen</h3><div data-pool-rankings class="stack" role="region" aria-label="Mijn pouleklassementen">Poules laden…</div>';
  const global=panel.querySelector('[data-global-ranking]'),poolsHost=panel.querySelector('[data-pool-rankings]');
  const report=(host,error,retry)=>{host.innerHTML='<p role="alert"></p><button type="button" class="ghost">Opnieuw proberen</button>';host.querySelector('p').textContent=error.message||'Ophalen mislukt.';host.querySelector('button').onclick=retry;};
