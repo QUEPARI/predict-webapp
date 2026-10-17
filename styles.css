@@ -115,3 +115,18 @@
 
 .two{grid-template-columns:repeat(2,minmax(0,1fr))}.two>label{min-width:0}input[type=datetime-local]{max-width:100%;min-width:0}
 @media(max-width:600px){.two:has(input[type=datetime-local]){grid-template-columns:1fr}}
+.admin-shell .admin-fold{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:0 14px;min-width:0}
+.admin-shell .admin-fold>summary{display:flex;align-items:center;gap:10px;padding:14px 0;list-style:none}
+.admin-fold>summary::-webkit-details-marker{display:none}
+.admin-fold>summary:before{content:'▸';color:var(--accent);font-size:18px}
+.admin-fold[open]>summary:before{content:'▾'}
+.admin-fold[open]>summary{border-bottom:1px solid var(--border);margin-bottom:14px}
+.admin-fold[open]{padding-bottom:14px}
+.admin-shell .danger-zone{justify-self:start;width:fit-content;max-width:100%;padding:0 10px;border-color:#d33442;color:#c32635}
+.admin-shell .danger-zone>summary{font-size:12px;padding:9px 0;color:#c32635}
+.dark .admin-shell .danger-zone,.dark .admin-shell .danger-zone>summary{color:#ff8992}
+.danger-zone[open]{width:auto;padding-bottom:12px}
+.results-needed{border:1px solid #cf8030;border-left:4px solid #cf8030;border-radius:10px;padding:14px;background:var(--panel)}
+.results-needed ul{margin:10px 0;padding-left:20px}
+.game-archive{grid-column:1/-1}
+#admin-tournament-publications>[data-message]:empty{display:none}

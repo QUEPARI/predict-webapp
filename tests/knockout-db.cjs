@@ -52,6 +52,7 @@ const {PGlite}=require('../.local-test/node_modules/@electric-sql/pglite');
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/app_accent_settings.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261017095736_knockout_incomplete_drafts.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261017104818_game_previews_and_templates.sql'),'utf8'));
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261017113827_compact_game_management.sql'),'utf8').split('-- Hosted scheduler')[0]);
  await db.exec(fs.readFileSync(path.join(__dirname,'fixtures/game-entry-guards.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/tournament_counts.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/manual_knockout.sql'),'utf8'));
@@ -61,6 +62,7 @@ const {PGlite}=require('../.local-test/node_modules/@electric-sql/pglite');
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/compact_daily_matches.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/knockout_incomplete_drafts.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/game_previews_and_templates.sql'),'utf8'));
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/compact_game_management.sql'),'utf8'));
  const {rows}=await db.query('select count(*)::int n from public.tournaments');assert.equal(rows[0].n,0,'SQL suite rolls back every tournament');
  console.log('PASS: local PostgreSQL migration and transactional knockout integration tests; no hosted connection.');
  }finally{await db.close();}
