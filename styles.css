@@ -82,3 +82,20 @@
 
 #admin-tournament-publications [data-message]:empty{display:none}
 [data-global-ranking]>.table-wrap>table,.pool-ranking .table-wrap>table:not(.comparison-table){min-width:0}
+
+/* Centered wordmark, equal navigation targets and a footer below the content. */
+.layout:has(>.footer){display:flex;flex-direction:column;min-height:100vh;min-height:100svh;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+.layout>.footer{margin-top:auto;padding-top:26px;flex-shrink:0}
+.centered-header{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:0;flex-shrink:0}
+.centered-brand{text-align:center;min-width:0}
+.centered-brand .brand,.centered-brand .tag{display:block}
+.centered-header .header-home{justify-self:start}
+.centered-header .header-actions{justify-self:end;gap:0}
+.centered-header .header-icon,.centered-header .account-avatar{width:44px;height:44px;min-width:44px;min-height:44px;background:transparent;border:0;color:var(--txt)}
+.header-disc{display:grid;place-items:center;width:33px;height:33px;border:1px solid var(--border);border-radius:50%;background:var(--panel);font-size:17.25px}
+.header-disc.account-disc{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast);font-size:13.5px;font-weight:800}
+.centered-header button:focus-visible{outline:2px solid var(--accent);outline-offset:0;border-radius:50%}
+.tournament-title{margin-top:14px}
+@media(max-width:350px){.centered-brand .brand{font-size:20px}.centered-brand .tag{font-size:7px}}
+
+.login-header{justify-content:center;text-align:center}
