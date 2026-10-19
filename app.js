@@ -1,7 +1,7 @@
 import {validAccent,accentPalette,applyAccent} from './branding.js?v=header-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=mobile-archive-20261019';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=intro-autosave-20261019';
 import {loadOnlineProfile} from './online-profile.js?v=push-times-20261017';
 
 // Centrally configured branding; no user data is stored in the public response.
@@ -438,7 +438,7 @@ async function loadAdminMatches() {
   const sourceInfo=new Map((Array.isArray(sourceResponse.data)?sourceResponse.data:[]).map(t=>[t.id,t.score_source]));
   const rows = visible.map(m => {
     const sourceLocked=!!sourceResponse.error||!!sourceInfo.get(m.tournament_id)?.locked;
-    const start = m.scheduled_start ? fmt(m.scheduled_start) : 'Onbekend';
+    const start = m.scheduled_start ? fmt(m.scheduled_start) : 'NNB';
     const lockedForEdit = m.match_status !== 'scheduled' ||
       m.actual_start != null || m.predictions_enabled ||
       (m.scheduled_start != null && new Date(m.scheduled_start) <= new Date());
@@ -550,7 +550,7 @@ async function editAdminMatch(matchId) {
   const options = ['<option value="">Onbekend</option>', ...(rounds ?? []).map(r =>
     `<option value="${esc(r.round_id)}" ${r.round_id === match.round_id ? 'selected' : ''}>${esc(r.round_name)}</option>`
   )].join('');
-  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=mobile-archive-20261019');
+  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=intro-autosave-20261019');
   editor.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;gap:12px">
       <h2 id="admin-edit-title" style="margin:0">Wedstrijd bewerken</h2>
       <button type="button" class="ghost" id="admin-edit-close" aria-label="Sluiten">✕</button>
@@ -685,7 +685,7 @@ async function approveAdminMatch(matchId) {
     </div>
     <p><strong>${esc(match.home_name)} – ${esc(match.away_name)}</strong></p>
     <p class="hint">
-      Geplande starttijd: ${match.scheduled_start ? esc(fmt(match.scheduled_start)) : 'Onbekend'}.
+      Geplande starttijd: ${match.scheduled_start ? esc(fmt(match.scheduled_start)) : 'NNB'}.
       Starttijd bevestigd: ${match.start_time_confirmed ? 'ja' : 'nee'}.
     </p>
     <div class="notice">
@@ -797,7 +797,7 @@ async function recordAdminMatchResult(matchId) {
     </div>
     <p><strong>${esc(match.home_name)} – ${esc(match.away_name)}</strong></p>
     <p class="hint">${esc(match.tournament_name)} · ${esc(match.round_name ?? 'Ronde onbekend')} ·
-    Geplande start: ${match.scheduled_start ? esc(fmt(match.scheduled_start)) : 'Onbekend'}</p>
+    Geplande start: ${match.scheduled_start ? esc(fmt(match.scheduled_start)) : 'NNB'}</p>
     <p class="notice">${formatHint} Alleen de eerste registratie is toegestaan.
       De actie wordt vastgelegd in het auditlog. Een latere API-verificatie blijft noodzakelijk.</p>
     <form id="result-form" class="stack">
@@ -898,7 +898,7 @@ async function recordAdminMatchStart(matchId) {
     </div>
     <p><strong>${esc(match.home_name)} – ${esc(match.away_name)}</strong></p>
     <p class="hint">${esc(match.tournament_name)} · ${esc(match.round_name ?? 'Ronde onbekend')} ·
-      geplande start: ${match.scheduled_start ? esc(fmt(match.scheduled_start)) : 'Onbekend'}</p>
+      geplande start: ${match.scheduled_start ? esc(fmt(match.scheduled_start)) : 'NNB'}</p>
     <div class="notice">Gebruik deze functie alleen wanneer je via een betrouwbare livebron hebt
       vastgesteld dat de wedstrijd daadwerkelijk begonnen is.
       De wedstrijd krijgt status <strong>live</strong> en voorspellingen worden onmiddellijk
@@ -936,7 +936,7 @@ async function recordAdminMatchStart(matchId) {
     const enteredTime = dialog.querySelector('#start-actual-time').value;
     let verifiedStart = null;
     if (enteredTime) {
-      const {dutchToUTC}=await import('./knockout.js?v=mobile-archive-20261019');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
+      const {dutchToUTC}=await import('./knockout.js?v=intro-autosave-20261019');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
       if (!Number.isFinite(parsed.getTime()) || parsed.getTime() > Date.now()) {
         message.textContent = 'Vul een geldige werkelijke starttijd in die niet in de toekomst ligt.';
         return;
@@ -1130,7 +1130,7 @@ async function loadQaPredictionForm() {
     <h3 style="margin:0">${esc(match.home_name)} – ${esc(match.away_name)}</h3>
     <p class="muted mini">
       ${esc(match.round_name ?? 'Testronde')} · Deadline:
-      ${deadline ? esc(fmt(match.scheduled_start)) : 'Onbekend'} (Nederlandse tijd)
+      ${deadline ? esc(fmt(match.scheduled_start)) : 'NNB'} (Nederlandse tijd)
       · ${allowed ? 'Voorspellingen open' : 'Voorspellingen gesloten'}
     </p>
     <p>
@@ -1672,7 +1672,7 @@ render=function(){
   const target=document.createElement('section');target.id='admin-knockout';target.className='panel stack';
   document.querySelector('#account-invitations')?.after(target);
   knockoutScreenController=new AbortController();const signal=knockoutScreenController.signal,userId=currentUser.id;
-  import('./knockout.js?v=mobile-archive-20261019').then(({loadKnockoutAdmin})=>{
+  import('./knockout.js?v=intro-autosave-20261019').then(({loadKnockoutAdmin})=>{
     if(!signal.aborted&&target.isConnected)loadKnockoutAdmin(target,{supabase,signal,isCurrent:()=>currentUser?.id===userId,onSaved:()=>{loadAdminMatches();loadAdminTournamentPublications();}});
   }).catch(()=>{if(!signal.aborted&&target.isConnected)target.textContent='Knock-outbeheer laden mislukt. Open Beheer opnieuw.';});
 };
