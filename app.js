@@ -417,7 +417,7 @@ async function loadAdminMatches() {
   const target = document.getElementById('admin-matches');
   if (!target) return;
   target.textContent = 'Wedstrijden laden...';
-  const [response,resultResponse]=await Promise.all([supabase.rpc('admin_get_matches'),supabase.rpc('admin_match_results')]);
+  const [response,resultResponse,sourceResponse]=await Promise.all([supabase.rpc('admin_get_matches'),supabase.rpc('admin_match_results'),supabase.rpc('admin_tournament_catalog')]);
   const {data,error}=response;
   if (!target.isConnected) return;
   if (error) {
@@ -435,7 +435,9 @@ async function loadAdminMatches() {
   const reviewCount = scopedMatches.filter(m => m.needs_review).length;
   const isOpen=m=>m.predictions_enabled&&m.match_status==='scheduled'&&!m.actual_start&&!m.needs_review&&m.start_time_confirmed&&Date.parse(m.scheduled_start)>Date.now();
   const visible=scopedMatches.filter(m=>adminShowAllMatches||isOpen(m)||(m.home_score==null&&m.away_score==null&&['scheduled','live'].includes(m.match_status)&&(Date.parse(m.actual_start)<=Date.now()||Date.parse(m.scheduled_start)<=Date.now())));
+  const sourceInfo=new Map((Array.isArray(sourceResponse.data)?sourceResponse.data:[]).map(t=>[t.id,t.score_source]));
   const rows = visible.map(m => {
+    const sourceLocked=!!sourceResponse.error||!!sourceInfo.get(m.tournament_id)?.locked;
     const start = m.scheduled_start ? fmt(m.scheduled_start) : 'Onbekend';
     const lockedForEdit = m.match_status !== 'scheduled' ||
       m.actual_start != null || m.predictions_enabled ||
@@ -450,7 +452,7 @@ async function loadAdminMatches() {
       <td>${m.needs_review ? 'Controle nodig' : 'Gecontroleerd'}</td>
       <td>${isOpen(m)?'Voorspellen open':m.home_score!=null?'Afgerond':canRecordAdminResult(m)?'Uitslag nodig':'Voorspellen gesloten'}</td><td class="result-column">${m.home_score!=null?esc(m.home_score)+'–'+esc(m.away_score):'—'}</td>
       <td>
-        <details class="match-action-menu"><summary>Acties</summary><div class="stack">
+        ${sourceLocked?'<span class="muted mini">Mastercaller · alleen-lezen</span>':`<details class="match-action-menu"><summary>Acties</summary><div class="stack">
           <button class="btn secondary" data-edit-match="${esc(m.match_id)}"
             ${lockedForEdit ? 'disabled title="Wedstrijd niet wijzigbaar via deze procedure"' : 'title="Ronde en starttijd bewerken"'}>Bewerken</button>
           <button class="btn secondary" data-approve-match="${esc(m.match_id)}"
@@ -468,7 +470,7 @@ async function loadAdminMatches() {
             ${!canRecordAdminResult(m)
               ? 'disabled title="Uitslag vereist een geregistreerde werkelijke start of verstreken geplande starttijd, plus geldige ronde en formaat"'
               : 'title="Handmatige eindstand met auditregistratie invoeren"'}>Uitslag invoeren</button>
-        </div></details>
+        </div></details>`}
       </td>
     </tr>`;
   }).join('');
@@ -548,7 +550,7 @@ async function editAdminMatch(matchId) {
   const options = ['<option value="">Onbekend</option>', ...(rounds ?? []).map(r =>
     `<option value="${esc(r.round_id)}" ${r.round_id === match.round_id ? 'selected' : ''}>${esc(r.round_name)}</option>`
   )].join('');
-  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=mastercaller-20261019');
+  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=mastercaller-lock-20261019');
   editor.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;gap:12px">
       <h2 id="admin-edit-title" style="margin:0">Wedstrijd bewerken</h2>
       <button type="button" class="ghost" id="admin-edit-close" aria-label="Sluiten">✕</button>
@@ -934,7 +936,7 @@ async function recordAdminMatchStart(matchId) {
     const enteredTime = dialog.querySelector('#start-actual-time').value;
     let verifiedStart = null;
     if (enteredTime) {
-      const {dutchToUTC}=await import('./knockout.js?v=mastercaller-20261019');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
+      const {dutchToUTC}=await import('./knockout.js?v=mastercaller-lock-20261019');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
       if (!Number.isFinite(parsed.getTime()) || parsed.getTime() > Date.now()) {
         message.textContent = 'Vul een geldige werkelijke starttijd in die niet in de toekomst ligt.';
         return;
@@ -977,7 +979,7 @@ async function loadAdminTournamentPublications(force=false) {
   if(!force&&target.querySelector('[data-ko-dirty="true"]'))return;
   tournamentManagementController?.abort();tournamentManagementController=new AbortController();const managementSignal=tournamentManagementController.signal;
   const userId=currentUser.id;
-  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=mastercaller-20261019');
+  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=mastercaller-lock-20261019');
     if(!target.isConnected||managementSignal.aborted)return;
     await loadTournamentManagement(target,{supabase,signal:managementSignal,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole),
       onCreate:()=>{const general=document.getElementById('admin-tournament-publications');if(general?.querySelector('[data-ko-dirty="true"]')&&!confirm('Niet-opgeslagen toernooiwijzigingen laten vervallen?'))return;if(general)general.querySelectorAll('[data-ko-dirty]').forEach(el=>el.dataset.koDirty='false');adminGameId='';adminGameName='Nieuw toernooi';const ko=document.querySelector('#admin-knockout');if(ko)ko.dataset.tournament='';const create=document.querySelector('#ko-create');if(create)create.hidden=false;const open=()=>{if(managementSignal.aborted||currentUser?.id!==userId)return;const details=document.querySelector('#ko-create details');if(!details)return;document.removeEventListener('predict-knockout-ready',open);details.open=true;details.scrollIntoView({block:'start'});details.querySelector('input[name=name]')?.focus({preventScroll:true});};document.addEventListener('predict-knockout-ready',open,{signal:managementSignal});showAdminSection('schema');open();},
@@ -1670,7 +1672,7 @@ render=function(){
   const target=document.createElement('section');target.id='admin-knockout';target.className='panel stack';
   document.querySelector('#account-invitations')?.after(target);
   knockoutScreenController=new AbortController();const signal=knockoutScreenController.signal,userId=currentUser.id;
-  import('./knockout.js?v=mastercaller-20261019').then(({loadKnockoutAdmin})=>{
+  import('./knockout.js?v=mastercaller-lock-20261019').then(({loadKnockoutAdmin})=>{
     if(!signal.aborted&&target.isConnected)loadKnockoutAdmin(target,{supabase,signal,isCurrent:()=>currentUser?.id===userId,onSaved:()=>{loadAdminMatches();loadAdminTournamentPublications();}});
   }).catch(()=>{if(!signal.aborted&&target.isConnected)target.textContent='Knock-outbeheer laden mislukt. Open Beheer opnieuw.';});
 };
