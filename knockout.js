@@ -1,8 +1,9 @@
+import {scoreSourceFields,bindScoreSource,invokeMastercaller} from './score-source.js?v=mastercaller-20261019';
 import {roundTable,readRoundTable,unitSelect,roundNames} from './round-settings.js?v=refinements-20261017';
 import {layoutBracket} from './bracket.js?v=hub-20261017';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const tournamentLabel=s=>({draft:'Concept',announced:'Vooraankondiging',published:'Gepubliceerd',active:'Actief',completed:'Afgerond',archived:'Gepauzeerd / archief'}[s]||s);
-export const dutchTime=value=>value?new Intl.DateTimeFormat('nl-NL',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Amsterdam'}).format(new Date(value)):'Nog in te vullen';
+export const dutchTime=value=>value?new Intl.DateTimeFormat('nl-NL',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Amsterdam'}).format(new Date(value)):'Nog niet bekend';
 export function dutchInput(value){
   if(!value)return '';
   const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Amsterdam',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(value)).map(x=>[x.type,x.value]));
@@ -52,11 +53,11 @@ export async function loadKnockoutSchema(target,ctx,id,prefetched){
   }catch(e){if(alive(target,ctx))target.textContent='Schema laden mislukt: '+e.message;}
 }
 function drawSchema(target,data,admin=false){
- target.innerHTML=`<h2>Volledig toernooischema</h2><div class="ko-bracket compact-public">${data.rounds.map(r=>`<section class="stack ko-round"><h3>${esc(r.name)}</h3>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel ko-node" data-node="${esc(m.id)}">${person(m,'home')}${person(m,'away')}<small>${esc(m.start?new Intl.DateTimeFormat('nl-NL',{dateStyle:'short',timeStyle:'short',...(admin?{timeZone:'Europe/Amsterdam'}:{})}).format(new Date(m.start)):'Nog in te vullen')}</small></article>`).join('')}</section>`).join('')}</div>`;
+ target.innerHTML=`<h2>Volledig toernooischema</h2><div class="ko-bracket compact-public">${data.rounds.map(r=>`<section class="stack ko-round"><h3>${esc(r.name)}</h3>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel ko-node" data-node="${esc(m.id)}">${person(m,'home')}${person(m,'away')}<small>${esc(m.start?new Intl.DateTimeFormat('nl-NL',{dateStyle:'short',timeStyle:'short',...(admin?{timeZone:'Europe/Amsterdam'}:{})}).format(new Date(m.start)):'Nog niet bekend')}</small></article>`).join('')}</section>`).join('')}</div>`;
  layoutBracket(target.querySelector('.ko-bracket'),data);
 }
 export async function loadKnockoutAdmin(target,ctx){
-  target.innerHTML='<h2>Knock-outtoernooien</h2><p>Maak een schema met spelers of teams. Namen en tijden beheer je zelf; er wordt geen sport-API gebruikt.</p><div id="ko-create"></div><label for="ko-tour">Toernooi beheren</label><select id="ko-tour"><option value="">Kies een knock-outtoernooi</option></select><p id="ko-message" role="status"></p><div id="ko-editor" class="stack"></div>';
+  target.innerHTML='<h2>Knock-outtoernooien</h2><p>Maak een toernooi handmatig of laat Mastercaller (test) het schema, de planning en uitslagen leveren.</p><div id="ko-create"></div><label for="ko-tour">Toernooi beheren</label><select id="ko-tour"><option value="">Kies een knock-outtoernooi</option></select><p id="ko-message" role="status"></p><div id="ko-editor" class="stack"></div>';
   const $=x=>target.querySelector('#'+x),msg=$('ko-message');
   const rpc=async(name,args)=>{const r=await ctx.supabase.rpc(name,args);if(r.error)throw Error(r.error.message);return r.data;};
   let catalog,data,currentId='',busy=false,tickTimer,requestedId='';
@@ -149,10 +150,12 @@ export async function loadKnockoutAdmin(target,ctx){
   }
   try{
     await refreshCatalog();if(!alive(target,ctx))return;
-    const create=$('ko-create');create.innerHTML=`<details><summary>Nieuw knock-outtoernooi</summary><form class="stack"><label>Toernooinaam<input name="name" required maxlength="120"></label><label>Sport<select name="sport">${catalog.sports.map(s=>`<option value="${esc(s.id)}" data-slug="${esc(s.slug)}">${esc(s.name)}</option>`).join('')}</select></label><label>Toernooisjabloon<select name="template"></select></label><label>Deelnemers<select name="kind"><option value="players">Spelers</option><option value="teams">Teams</option></select></label><label>Aantal deelnemers<input name="count" type="number" min="2" max="128" value="8" required></label><p class="hint">Je maakt eerst een concept. Startdatum, first-to en punten mogen nog leeg blijven; die zijn verplicht bij publiceren. Vul namen later op de juiste schemaplek in.</p><div class="two"><label>Van (Nederland)<input name="start" type="datetime-local"></label><label>Tot (Nederland)<input name="end" type="datetime-local"></label></div><label>Status<select name="publication"><option value="draft">Concept</option><option value="announced">Vooraankondiging</option></select></label><label>Puntenmethode<select name="mode"><option value="replacement">Exacte score vervangt winnaarspunten</option><option value="additive">Exacte score telt bovenop winnaarspunten</option></select></label><div data-rounds class="stack"></div><label>Naam eigen sjabloon<input name="templateName" maxlength="80" placeholder="Bijvoorbeeld clubkampioenschap"></label><button type="button" data-save-template class="ghost">Format als sjabloon bewaren</button><p data-create-message role="status"></p><button type="submit" class="btn">Leeg toernooischema maken</button></form></details>`;
+    const create=$('ko-create');create.innerHTML=`<details><summary>Nieuw knock-outtoernooi</summary><form class="stack"><label>Toernooinaam<input name="name" required maxlength="120"></label><label>Sport<select name="sport">${catalog.sports.map(s=>`<option value="${esc(s.id)}" data-slug="${esc(s.slug)}">${esc(s.name)}</option>`).join('')}</select></label>${scoreSourceFields()}<div data-mc-create-options hidden><p class="hint">Deelnemers, ronden, spelvorm en beschikbare planning komen uit de uitslagen- en bracket-tab. Nieuwe eindstanden worden automatisch verwerkt.</p><div class="two"><label>Punten juiste winnaar<input name="mcWinner" type="number" min="0" max="1000" value="1"></label><label>Punten exacte score<input name="mcExact" type="number" min="0" max="1000" value="3"></label></div></div><div data-manual-create class="stack"><label>Toernooisjabloon<select name="template"></select></label><label>Deelnemers<select name="kind"><option value="players">Spelers</option><option value="teams">Teams</option></select></label><label>Aantal deelnemers<input name="count" type="number" min="2" max="128" value="8" required></label><p class="hint">Je maakt eerst een concept. Startdatum, first-to en punten mogen nog leeg blijven; die zijn verplicht bij publiceren. Vul namen later op de juiste schemaplek in.</p><div class="two"><label>Van (Nederland)<input name="start" type="datetime-local"></label><label>Tot (Nederland)<input name="end" type="datetime-local"></label></div><label>Status<select name="publication"><option value="draft">Concept</option><option value="announced">Vooraankondiging</option></select></label><label>Puntenmethode<select name="mode"><option value="replacement">Exacte score vervangt winnaarspunten</option><option value="additive">Exacte score telt bovenop winnaarspunten</option></select></label><div data-rounds class="stack"></div><label>Naam eigen sjabloon<input name="templateName" maxlength="80" placeholder="Bijvoorbeeld clubkampioenschap"></label><button type="button" data-save-template class="ghost">Format als sjabloon bewaren</button></div><p data-create-message role="status"></p><button type="submit" class="btn">Leeg toernooischema maken</button></form></details>`;
     const f=create.querySelector('form'),rules=f.querySelector('[data-rounds]'),feedback=f.querySelector('[data-create-message]');
-    let chosenTemplate=null;
-    function freezeCreate(flag){f.querySelectorAll('input,select,button').forEach(el=>el.disabled=flag);if(!flag)f.elements.kind.disabled=!!chosenTemplate;}
+    let chosenTemplate=null;const bindSource=bindScoreSource(f,()=>f.elements.sport.selectedOptions[0]?.dataset.slug==='darts');
+    function updateSource(){bindSource();const automatic=f.elements.scoreSource.value==='mastercaller_test';const manual=f.querySelector('[data-manual-create]');manual.hidden=automatic;manual.querySelectorAll('input,select,button').forEach(el=>el.disabled=automatic);f.querySelector('[data-mc-create-options]').hidden=!automatic;f.elements.name.required=!automatic;f.querySelector('button[type=submit]').textContent=automatic?'Toernooi uit Mastercaller maken':'Leeg toernooischema maken';}
+    f.elements.scoreSource.addEventListener('change',updateSource);
+    function freezeCreate(flag){f.querySelectorAll('input,select,button').forEach(el=>el.disabled=flag);if(!flag){updateSource();if(f.elements.scoreSource.value==='manual')f.elements.kind.disabled=!!chosenTemplate;}}
     function updateRounds(){
       const count=Number(f.elements.count.value);if(!Number.isInteger(count)||count<2||count>128){rules.textContent='Kies 2–128 deelnemers';return;}
       const darts=f.elements.sport.selectedOptions[0]?.dataset.slug==='darts',nr=Math.ceil(Math.log2(count));
@@ -161,7 +164,7 @@ export async function loadKnockoutAdmin(target,ctx){
     function templateOptions(){
       const darts=f.elements.sport.selectedOptions[0]?.dataset.slug==='darts';
       f.elements.template.innerHTML='<option value="">Vrij knock-outformat</option>'+(catalog.templates||[]).filter(t=>t.sport_id===f.elements.sport.value).map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('');
-      chosenTemplate=null;f.elements.count.readOnly=false;f.elements.kind.disabled=false;updateRounds();
+      updateSource();chosenTemplate=null;f.elements.count.readOnly=false;f.elements.kind.disabled=false;updateRounds();
     }
     function readRules(){return readRoundTable(rules,rules.querySelector('[data-tournament-unit]')?.value);}
     f.elements.template.onchange=()=>{
@@ -189,8 +192,14 @@ export async function loadKnockoutAdmin(target,ctx){
       const roster=Array(Number(f.elements.count.value)).fill('');
       busy=true;freezeCreate(true);
       try{
+        const useSource=f.elements.scoreSource.value==='mastercaller_test';
+        if(useSource){
+          const result=await invokeMastercaller(ctx.supabase,{action:'create',url:f.elements.mastercallerUrl.value.trim(),name:f.elements.name.value.trim(),winner_points:Number(f.elements.mcWinner.value),exact_points:Number(f.elements.mcExact.value)});
+          if(!alive(target,ctx))return;create.dataset.koDirty='false';currentId=result.id;await refreshCatalog();await read();create.querySelector('details').open=false;
+          document.dispatchEvent(new CustomEvent('predict-admin-schema-created',{detail:{id:result.id,name:result.name}}));scopeEditor();msg.textContent='Mastercaller-toernooi aangemaakt: '+result.participants+' deelnemers. Automatische synchronisatie actief.';ctx.onSaved?.();return;
+        }
         const id=await rpc('create_knockout_game',{p_name:f.elements.name.value.trim(),p_sport:f.elements.sport.value,p_kind:f.elements.kind.value,p_roster:roster,p_start:dutchToUTC(f.elements.start.value),p_mode:f.elements.mode.value,
-          p_rules:readRules(),p_end:dutchToUTC(f.elements.end.value),p_status:f.elements.publication.value});
+          p_rules:readRules(),p_end:dutchToUTC(f.elements.end.value),p_status:f.elements.publication.value,...(useSource?{p_source:'mastercaller_test',p_url:f.elements.mastercallerUrl.value.trim()}: {})});
         if(!alive(target,ctx))return;create.dataset.koDirty='false';currentId=id;await refreshCatalog();await read();create.querySelector('details').open=false;$('ko-editor').scrollIntoView({block:'start'});document.dispatchEvent(new CustomEvent('predict-admin-schema-created',{detail:{id,name:f.elements.name.value.trim()}}));scopeEditor();msg.textContent='Concept aangemaakt. Namen, tijden en punten kun je later aanvullen.';ctx.onSaved?.();
       }catch(error){if(alive(target,ctx))feedback.textContent=error.message;}finally{busy=false;if(alive(target,ctx))freezeCreate(false);}
     };

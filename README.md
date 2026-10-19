@@ -2,6 +2,15 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Mastercaller (test) — 19 oktober 2026
+- Bij **Nieuw toernooi → Uitslagen** kies je **Handmatige invoer** of **Scores ophalen via Mastercaller (test)**.
+- In testmodus vul je de Mastercaller-uitslagenlink in. Het schema, spelers, rondeformats en beschikbare planning worden uit de uitslagen- en bracket-tab opgebouwd; er is geen handmatige goedkeuringswachtrij. Complete knock-outs met 2/4/8/16/32/64/128 spelers zijn ondersteund. Andere formats worden afgewezen zonder een gedeeltelijk toernooi te maken.
+- Punten starten op 1 voor de winnaar en 3 voor de exacte eindstand; dit kun je vóór aanmaken aanpassen. Het aangemaakte toernooi wordt gepubliceerd. TBA-tijden openen geen voorspellingen en blijven automatisch op bronupdates wachten.
+- Achtergrondcontrole vóór de start elke 4 uur; bij begonnen/geplande wedstrijden zonder eindstand elke 15 minuten. Bij TBA geldt vanaf de eerste toernooidag de 15-minutenfallback. Na alle eindstanden stopt het ophalen.
+- De specifieke European Championship 2026-pagina bevat 32 spelers en 31 schemaposities. **De serververbinding met Mastercaller wordt momenteel geweigerd (HTTP 418).** Aanmaken uit de bron mislukt daarom met een duidelijke melding; de live proef is nog niet geslaagd. Geen toegangsbescherming omzeild.
+- Bronparsing, authenticatie, automatische schema-inrichting, scoreverwerking, doorplaatsing, puntentelling, intervallen en mobiele formulieren zijn lokaal getest. Historische handmatige toernooien behouden hun bestaande invoerwijze.
+- Details: [Mastercaller-integratie](supabase/functions/sync-mastercaller/README.md).
+
 ## Kleur alleen op voorspelde scores
 - Wedstrijdkaarten gebruiken de normale lichte/donkere paneelachtergrond. Alleen de voorspelde score is blauw (open), grijs (uitslag ontbreekt), donkergroen (exact), lichtgroen (winnaar goed) of rood (onjuist).
 - Dezelfde scorekleurvlakken staan in de wedstrijdpop-up en in de kolom Jouw voorspelling bij Uitslagen. Niet ingevulde voorspellingen blijven neutraal.

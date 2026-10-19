@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@supabase/supabase-js": "2.118.0",
+    "linkedom": "0.18.12"
+  },
+  "type": "module",
+  "private": true
+}
