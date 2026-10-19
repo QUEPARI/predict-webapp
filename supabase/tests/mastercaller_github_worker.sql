@@ -23,7 +23,9 @@ begin
  if current_setting('request.jwt.claim.sub')<>b::text then raise exception 'FAIL actor not restored';end if;
  perform set_config('request.jwt.claim.sub',a::text,true);perform set_config('role','authenticated',true);
  result:=public.get_mastercaller_creation_status(j);if (result->>'id')::uuid<>tid or result->>'status'<>'done' then raise exception 'FAIL status %',result;end if;
+ perform set_config('role','none',true);update predict_private.mastercaller_cache set fetched_at=now()-interval '2 hours';perform set_config('role','authenticated',true);
  result:=public.request_mastercaller_game(snap->>'url','QA fresh cache',1,3,'replacement');if result->>'status'<>'done' or result->>'id' is null then raise exception 'FAIL cache create %',result;end if;
+ perform set_config('role','none',true);if (select last_attempt>now()-interval '1 hour' from predict_private.mastercaller_sources where tournament_id=(result->>'id')::uuid) then raise exception 'FAIL cached creation reset polling clock';end if;perform set_config('role','authenticated',true);
  perform public.request_mastercaller_refresh(tid);
  perform set_config('role','none',true);
  update predict_private.mastercaller_sources set last_attempt=now()-interval '2 minutes' where tournament_id=tid;
