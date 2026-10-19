@@ -1,5 +1,10 @@
 name: Mastercaller connection test
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/mastercaller-probe.yml
+      - scripts/mastercaller/**
   push:
     branches: [codex/mastercaller-github-fetch]
     paths:
