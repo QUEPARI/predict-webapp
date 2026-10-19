@@ -1,7 +1,7 @@
 // Geometry checks with a fictitious 48-player Euro Tour bracket.
 const {chromium}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 (async()=>{
- const server=http.createServer((req,res)=>{req.url=req.url.split('?')[0];const file=req.url.slice(1);if(['bracket.js','knockout.js','styles.css'].includes(file)){res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':'text/css');res.end(fs.readFileSync(path.join(__dirname,'..',file)));}else {res.setHeader('Content-Type','text/html');res.end('<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><main class="layout stack" id="target"></main>');}});
+ const server=http.createServer((req,res)=>{req.url=req.url.split('?')[0];const file=req.url.slice(1);if(['bracket.js','knockout.js','score-source.js','styles.css'].includes(file)){res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':'text/css');res.end(fs.readFileSync(path.join(__dirname,'..',file)));}else {res.setHeader('Content-Type','text/html');res.end('<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><main class="layout stack" id="target"></main>');}});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
  try{browser=await chromium.launch({headless:true,channel:'msedge'});const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
  for(const width of [1280,390,320]){

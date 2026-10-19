@@ -1,0 +1,31 @@
+const assert=require('node:assert/strict');
+(async()=>{
+ const {parseResults,parseBracket,sourceUrl,fetchResults,amsterdamStart}=await import('../supabase/functions/sync-mastercaller/parser.js');
+ const url='https://mastercaller.com/tournaments/swiss-darts-trophy/2026/results';
+ // Structural fixture transcribed from the actual Mastercaller rendered DOM.
+ const card=(h='Jonny Clayton',a='Luke Humphries',hs=8,as=4)=>`<div><div class="relative">Sun 11 Oct - 22:15</div><div class="grid grid-cols-1"><div><a href="/players/jonny-clayton">${h}</a><div class="bg-green-500">${hs}</div></div><div><div class="bg-red-500">${as}</div><a href="/players/luke-humphries">${a}</a></div></div></div>`;
+ const page=(cards=card(),heading='Final')=>`<html><body><h1>Swiss Darts Trophy</h1><p>Professional Darts Corporation</p><div><div><h3>${heading}</h3></div>${cards}</div></body></html>`;
+ const p=parseResults(page(),url);assert.equal(p.records.length,1);assert.deepEqual(p.records[0],{depth:0,round:'Final',home_name:'Jonny Clayton',away_name:'Luke Humphries',home_score:8,away_score:4,date:'2026-10-11'});
+ assert.equal(sourceUrl('https://mastercaller.nl/toernooien/swiss-darts-trophy/2026/uitslagen'),url);
+ for(const bad of ['http://mastercaller.com/tournaments/a/2026/results','https://mastercaller.com.evil.com/tournaments/a/2026/results',url+'?x=1','https://user:pass@mastercaller.com/tournaments/a/2026/results'])assert.throws(()=>sourceUrl(bad));
+ assert.throws(()=>parseResults(page(card()+card()),url),/Dubbele/);
+ assert.throws(()=>parseResults(page(card('A','B',6,6)),url),/Afwijkende/);
+ assert.throws(()=>parseResults(page().replace('8</div>','–</div>'),url),/Onleesbare/);
+ assert.equal(parseResults(page(card().replaceAll('bg-green-500','bg-gray').replaceAll('bg-red-500','bg-gray')),url).records.length,0,'pending matches are skipped');
+ assert.throws(()=>parseResults(page().replace('Professional Darts Corporation','WDF'),url),/PDC/);
+ assert.throws(()=>parseResults(page(card(),'Pool A'),url),/knock/);
+ const resultPage=page(card('QA A','QA B',6,3),'Semi-finals').replace('</body>','<p>Start Date: 9 Oct 2026 End Date: 11 Oct 2026</p></body>');
+ const source=parseResults(resultPage,url);
+ const match=(col,row,h='',a='')=>`<div class="match-holder" data-col="${col}" data-row="${row}"><div class="player1" data-playerid="${h}"><div class="name">${h}</div></div><div class="player2" data-playerid="${a}"><div class="name">${a}</div></div></div>`;
+ const round=(col,label,best)=>`<div class="round-holder" data-col="${col}"><h2 class="round-title">${label}</h2><span class="round-format">Best of ${best} Legs</span></div>`;
+ const bracket=`<div class="bracket-container">${round(1,'Semi-finals',11)}${round(2,'Final',21)}${match(1,1,'QA A','QA B')}${match(1,2,'QA C','QA D')}${match(2,1)}</div>`;
+ const auto=parseBracket(bracket,source);assert.equal(auto.bracket.length,3);assert.deepEqual(auto.roster,['QA A','QA B','QA C','QA D']);assert.equal(auto.rounds[1].first_to,11);assert.equal(auto.bracket[0].start,'2026-10-11T20:15:00.000Z');
+ assert.throws(()=>parseBracket(bracket.replace('Best of 21 Legs','Unknown'),source),/format/);
+ assert.throws(()=>parseBracket(bracket.replaceAll('QA D',''),source),/automatisch/);
+ assert.equal(amsterdamStart('2026-10-25','02','30'),null,'ambiguous DST must stay closed');
+ assert.equal(amsterdamStart('2026-03-29','02','30'),null,'nonexistent DST must stay closed');
+ const pending=parseResults(resultPage.replaceAll('bg-green-500','bg-gray').replaceAll('bg-red-500','bg-gray').replace('22:15','TBA'),url);assert.equal(pending.fixtures[0].start,null);assert.equal(pending.records.length,0);
+ await assert.rejects(()=>fetchResults(url,async()=>new Response('Forbidden',{status:403})),/HTTP 403/);
+ await assert.rejects(()=>fetchResults(url,async()=>new Response('oops',{headers:{'content-type':'application/json'}})),/geen HTML/);
+ console.log('PASS: Mastercaller parsing, round depth/date, final markers, duplicates, pending scores, URL allowlist, 403 and invalid content.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

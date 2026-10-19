@@ -69,6 +69,12 @@ const {PGlite}=require('../.local-test/node_modules/@electric-sql/pglite');
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/roster_and_tournament_comparison.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261017131319_match_pool_popup.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/match_pool_popup.sql'),'utf8'));
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261019171204_mastercaller_test_scores.sql'),'utf8').split('-- Hosted scheduler')[0]);
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/mastercaller_scores.sql'),'utf8'));
+ const automatic=fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261019172012_mastercaller_automatic_tournament.sql'),'utf8');
+ await db.exec(automatic.replace(/create or replace function predict_private\.dispatch_mastercaller\(\)[\s\S]*?end \$\$;/,''));
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261019172156_mastercaller_scoring_lock.sql'),'utf8'));
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/mastercaller_automatic.sql'),'utf8'));
  const {rows}=await db.query('select count(*)::int n from public.tournaments');assert.equal(rows[0].n,0,'SQL suite rolls back every tournament');
  console.log('PASS: local PostgreSQL migration and transactional knockout integration tests; no hosted connection.');
  }finally{await db.close();}
