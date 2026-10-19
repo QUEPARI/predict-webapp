@@ -2,6 +2,11 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Automatisch beheer vergrendeld — 19 oktober 2026
+- Mastercaller-toernooien tonen schema, deelnemers, planning en uitslagen alleen-lezen. Ook de oudere wedstrijdacties en API-routes worden op de server geblokkeerd. Naam, afbeelding en pauzeren/hervatten blijven beschikbaar; de bron van automatisch aangemaakte toernooien staat vast.
+- Zodra de finale-eindstand bekend is, stopt zowel automatisch als handmatig ophalen, ook als er elders nog een uitslag ontbreekt.
+- De eindgrens van een Mastercaller-toernooi staat op 00:00 Nederlandse tijd op de **volgende** dag. Voor European Championship 2026 is dat 26 oktober 00:00; de volledige speeldag 25 oktober valt binnen de periode.
+
 ## Mastercaller (test) — 19 oktober 2026
 - Bij **Nieuw toernooi → Uitslagen** kies je **Handmatige invoer** of **Scores ophalen via Mastercaller (test)**.
 - In testmodus vul je de Mastercaller-uitslagenlink in. Het schema, spelers, rondeformats en beschikbare planning worden uit de uitslagen- en bracket-tab opgebouwd; er is geen handmatige goedkeuringswachtrij. Complete knock-outs met 2/4/8/16/32/64/128 spelers zijn ondersteund. Andere formats worden afgewezen zonder een gedeeltelijk toernooi te maken.
