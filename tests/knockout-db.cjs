@@ -79,6 +79,9 @@ const {PGlite}=require('../.local-test/node_modules/@electric-sql/pglite');
  await db.exec(readonly.split('-- Hosted dispatcher')[0]);
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/mastercaller_readonly.sql'),'utf8'));
  const {rows}=await db.query('select count(*)::int n from public.tournaments');assert.equal(rows[0].n,0,'SQL suite rolls back every tournament');
+ await db.exec('alter table public.matches add constraint predictions_require_start check(not predictions_enabled or scheduled_start is not null)');
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261019181523_tournament_archive_unknown_times.sql'),'utf8'));
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/tournament_archive_unknown_times.sql'),'utf8'));
  console.log('PASS: local PostgreSQL migration and transactional knockout integration tests; no hosted connection.');
  }finally{await db.close();}
 })().catch(e=>{console.error({message:e.message,detail:e.detail,where:e.where,internalQuery:e.internalQuery});process.exitCode=1;});
