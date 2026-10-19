@@ -1,0 +1,28 @@
+name: Mastercaller sync
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/mastercaller-sync.yml
+      - scripts/mastercaller/**
+      - supabase/functions/mastercaller-github/**
+  schedule:
+    - cron: '3-59/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: mastercaller-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: npm ci --prefix scripts/mastercaller --ignore-scripts --no-audit --no-fund
+      - run: ln -s "$PWD/scripts/mastercaller/node_modules" node_modules
+      - run: node scripts/mastercaller/sync.mjs

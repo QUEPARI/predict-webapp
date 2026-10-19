@@ -1,5 +1,4 @@
 import {createClient} from '@supabase/supabase-js';
-import {fetchResults,fetchTournament} from './parser.js';
 
 const headers={'Access-Control-Allow-Origin':'https://quepari.github.io','Access-Control-Allow-Headers':'authorization,apikey,content-type,x-client-info','Access-Control-Allow-Methods':'POST,OPTIONS','Cache-Control':'no-store'};
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers});
@@ -25,30 +24,15 @@ export async function handle(req:Request){
   }
   const body=await req.text();if(body.length>2000)return reply({error:'Verzoek te groot'},400);
   const input=JSON.parse(body||'{}');
-  if(input.action==='preview'){
-   const parsed=await fetchTournament(input.url);
-   return reply({title:parsed.title,rounds:parsed.rounds,count:parsed.records.length,participants:parsed.roster.length});
+  if(worker)return reply({message:'Ophalen loopt nu via GitHub Actions.',processed:0});
+  const userDb=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:'Bearer '+sessionToken}},auth:{persistSession:false,autoRefreshToken:false}});
+  if(input.action==='create'){
+   const result=await userDb.rpc('request_mastercaller_game',{p_url:input.url,p_name:input.name||null,p_winner:input.winner_points??1,p_exact:input.exact_points??3,p_mode:input.mode||'replacement'});
+   if(result.error)return reply({error:result.error.message},400);return reply(result.data);
   }
-  if(!worker&&input.action==='create'){
-   const snapshot=await fetchTournament(input.url);
-   const userDb=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:'Bearer '+sessionToken}},auth:{persistSession:false,autoRefreshToken:false}});
-   const created=await userDb.rpc('create_mastercaller_game',{p_snapshot:snapshot,p_name:input.name||null,p_winner:input.winner_points??1,p_exact:input.exact_points??3,p_mode:input.mode||'replacement'});
-   if(created.error)return reply({error:created.error.message},400);
-   return reply({id:created.data,name:input.name||snapshot.title+' '+new URL(snapshot.url).pathname.split('/')[3],participants:snapshot.roster.length,matches:snapshot.bracket.length});
-  }
-  if(!worker&&!/^[a-f0-9-]{36}$/i.test(input.tournament_id||''))return reply({error:'Kies een toernooi'},400);
-  const claim=await db.rpc('claim_mastercaller_jobs',{p_tournament:worker?null:input.tournament_id,p_actor:actor});
-  if(claim.error)return reply({error:'Ophalen niet gestart. Controleer de broninstelling.'},400);
-  if(!claim.data.length)return reply({message:'Nog niet opnieuw beschikbaar. Wacht één minuut, of controleer of Mastercaller is ingesteld.',processed:0});
-  const reports=[];
-  for(const job of claim.data){
-   let parsed:any=null,error:string|null=null;
-   try{parsed=await (job.automatic_setup?fetchTournament(job.url):fetchResults(job.url));}catch(e){error=e instanceof Error?e.message:'Bron niet bereikbaar';}
-   const done=await db.rpc('finish_mastercaller_job',{p_tournament:job.tournament_id,p_lease:job.lease,p_records:parsed?.records||[],p_error:error,p_snapshot:job.automatic_setup?parsed:null});
-   if(done.error)throw Error('Verwerking niet afgerond; probeer later opnieuw.');
-   reports.push(done.data);
-  }
-  return reply({processed:reports.length,reports});
+  if(!/^[a-f0-9-]{36}$/i.test(input.tournament_id||''))return reply({error:'Kies een toernooi'},400);
+  const result=await userDb.rpc('request_mastercaller_refresh',{p_id:input.tournament_id});
+  if(result.error)return reply({error:result.error.message},400);return reply(result.data);
  }catch(e){return reply({error:e instanceof Error?e.message:'Ophalen mislukt'},400);}
 }
 // Own authentication: validated admin JWT or a Vault-backed worker secret above.

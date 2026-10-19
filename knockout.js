@@ -1,4 +1,4 @@
-import {scoreSourceFields,bindScoreSource,invokeMastercaller} from './score-source.js?v=mobile-archive-20261019';
+import {scoreSourceFields,bindScoreSource,invokeMastercaller,awaitMastercallerCreation} from './score-source.js?v=github-mastercaller-20261019';
 import {roundTable,readRoundTable,unitSelect,roundNames} from './round-settings.js?v=refinements-20261017';
 import {layoutBracket} from './bracket.js?v=hub-20261017';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -195,7 +195,8 @@ export async function loadKnockoutAdmin(target,ctx){
       try{
         const useSource=f.elements.scoreSource.value==='mastercaller_test';
         if(useSource){
-          const result=await invokeMastercaller(ctx.supabase,{action:'create',url:f.elements.mastercallerUrl.value.trim(),name:f.elements.name.value.trim(),winner_points:Number(f.elements.mcWinner.value),exact_points:Number(f.elements.mcExact.value)});
+          let result=await invokeMastercaller(ctx.supabase,{action:'create',url:f.elements.mastercallerUrl.value.trim(),name:f.elements.name.value.trim(),winner_points:Number(f.elements.mcWinner.value),exact_points:Number(f.elements.mcExact.value)});
+          if(result.job_id){create.dataset.koDirty='false';result=await awaitMastercallerCreation(ctx.supabase,result,{signal:ctx.signal,isCurrent:()=>alive(target,ctx),onStatus:text=>feedback.textContent=text});}
           if(!alive(target,ctx))return;create.dataset.koDirty='false';currentId=result.id;await refreshCatalog();await read();create.querySelector('details').open=false;
           document.dispatchEvent(new CustomEvent('predict-admin-schema-created',{detail:{id:result.id,name:result.name}}));scopeEditor();msg.textContent='Mastercaller-toernooi aangemaakt: '+result.participants+' deelnemers. Automatische synchronisatie actief.';ctx.onSaved?.();return;
         }

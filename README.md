@@ -256,3 +256,10 @@ Upload de bestanden naar een GitHub-repository en stel **Settings → Pages → 
 - `docs/roadmap.md`: volledige vervolgbouw en afvinkcriteria.
 
 **Geen API-sleutels, service_role keys of wachtwoorden in GitHub plaatsen.**
+
+## Mastercaller via GitHub Actions — 19 oktober 2026
+- De bron blokkeert ophalen vanuit Supabase soms met HTTP 418. Een echte GitHub-run heeft beide pagina's met HTTP 200 opgehaald en 32 spelers/31 wedstrijden gevalideerd. Ophalen gebeurt daarom via `.github/workflows/mastercaller-sync.yml`.
+- De worker draait iedere vijf minuten en vraagt alleen taken op die volgens de bestaande regels aan de beurt zijn: vóór de start iedere vier uur, bij begonnen wedstrijden iedere vijftien minuten, geen taken na een finale-eindstand. Handmatig ophalen zet een verzoek in dezelfde wachtrij. GitHub-planning kan vertraging oplopen.
+- Bij een nieuw toernooi wordt een recent gecontroleerd schema direct gebruikt. Anders staat de aanvraag in een bewaakte wachtrij en volgt de pagina de voortgang. De aanvraag blijft op de achtergrond bestaan als je de pagina sluit. Dubbele nog lopende aanvragen met dezelfde invoer worden samengevoegd.
+- Een kortlevend, ondertekend GitHub OIDC-token wordt gecontroleerd op issuer/audience, repository- en eigenaar-ID, main-ref, exact workflowpad, event en runner. Er staan geen Supabase-beheersleutels of workergeheimen in GitHub. Wachtrijen en cache staan in het private schema; alleen beheerders mogen aanvragen indienen en alleen de oorspronkelijke aanvrager mag de voortgang lezen.
+- De oude Supabase-ophaalcron is uitgeschakeld. De parser, bronvalidatie, puntentelling, deadlines, readonlybescherming en stoppen na de finale blijven behouden.

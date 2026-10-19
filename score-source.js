@@ -1,9 +1,22 @@
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export function scoreSourceFields(){return `<label>Uitslagen<select name="scoreSource"><option value="manual">Handmatige invoer</option><option value="mastercaller_test">Scores ophalen via Mastercaller (test)</option></select></label><div data-mastercaller-fields hidden><label>Mastercaller-uitslagenlink<input name="mastercallerUrl" type="url" placeholder="https://mastercaller.nl/toernooien/european-championship/2026/uitslagen"></label><p class="hint">Automatisch vóór de start elke 4 uur; tijdens wedstrijden elke 15 minuten totdat de eindstand bekend is. Bij tijd NNB kun je met bekende spelers alvast voorspellen tot de toernooistart. Beschikbaarheid hangt af van Mastercaller.</p></div>`;}
+export function scoreSourceFields(){return `<label>Uitslagen<select name="scoreSource"><option value="manual">Handmatige invoer</option><option value="mastercaller_test">Scores ophalen via Mastercaller (test)</option></select></label><div data-mastercaller-fields hidden><label>Mastercaller-uitslagenlink<input name="mastercallerUrl" type="url" placeholder="https://mastercaller.nl/toernooien/european-championship/2026/uitslagen"></label><p class="hint">Ophalen via GitHub. Automatisch vóór de start elke 4 uur; tijdens wedstrijden elke 15 minuten totdat de eindstand bekend is. Bij tijd NNB kun je met bekende spelers alvast voorspellen tot de toernooistart. Beschikbaarheid hangt af van Mastercaller.</p></div>`;}
 export async function invokeMastercaller(client,body){
  const result=await client.functions.invoke('sync-mastercaller',{body});
  if(result.error){let message=result.error.message;try{const detail=await result.error.context?.json();if(detail?.error)message=detail.error;}catch{}throw Error(message||'Mastercaller ophalen mislukt.');}
  if(result.data?.error)throw Error(result.data.error);return result.data;
+}
+export async function awaitMastercallerCreation(client,result,{signal,isCurrent=()=>true,onStatus=()=>{}}={}){
+ if(!result.job_id)return result;
+ onStatus(result.message||'GitHub haalt het toernooi op. Dit kan enkele minuten duren.');
+ for(let attempt=0;attempt<240;attempt++){
+  await new Promise((resolve,reject)=>{if(signal?.aborted)return reject(Error('Aanvraag opgeslagen; wachten gestopt.'));const abort=()=>{clearTimeout(timer);reject(Error('Aanvraag opgeslagen; wachten gestopt.'));};const timer=setTimeout(()=>{signal?.removeEventListener('abort',abort);resolve();},3000);signal?.addEventListener('abort',abort,{once:true});});
+  if(!isCurrent())throw Error('Aanvraag opgeslagen; wachten gestopt.');
+  const r=await client.rpc('get_mastercaller_creation_status',{p_job:result.job_id});
+  if(r.error)throw Error('Aanvraag opgeslagen, maar de status kon niet worden geladen. Het toernooi wordt op de achtergrond aangemaakt.');
+  if(r.data?.status==='done')return r.data;
+  if(r.data?.status==='failed')throw Error(r.data.error||'Mastercaller ophalen mislukt. Probeer later opnieuw.');
+ }
+ throw Error('De aanvraag staat nog in de wachtrij. Het toernooi verschijnt automatisch in Spellen beheren zodra de bron is opgehaald.');
 }
 export function bindScoreSource(form,isDarts=()=>true){
  const select=form.elements.scoreSource,url=form.elements.mastercallerUrl,fields=form.querySelector('[data-mastercaller-fields]');
