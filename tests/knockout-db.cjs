@@ -83,6 +83,7 @@ const {PGlite}=require('../.local-test/node_modules/@electric-sql/pglite');
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261019181523_tournament_archive_unknown_times.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/tournament_archive_unknown_times.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261019191326_mastercaller_github_worker.sql'),'utf8').split('-- Hosted scheduler:')[0]);
+ await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261019191752_preserve_mastercaller_cache_time.sql'),'utf8'));
  await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/tests/mastercaller_github_worker.sql'),'utf8'));
  console.log('PASS: local PostgreSQL migration and transactional knockout integration tests; no hosted connection.');
  }finally{await db.close();}
