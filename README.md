@@ -2,6 +2,11 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Mobiel, NNB en spelarchief — 19 oktober 2026
+- Nieuw toernooi toont geen bestaande-toernooikeuze. De dubbele uitslagenkop en het label Gepubliceerd op beschikbare spelkaarten zijn verwijderd; de footer is gecentreerd.
+- Uitslagen passen op mobiel zonder horizontaal scrollen. De vergelijkingskolommen blijven bovenaan hun scrollvlak staan.
+- Afgeronde spellen met alle uitslagen tonen Toernooi afgelopen. Via Archiveren in beheer verdwijnen ze uit het actieve beheeroverzicht; spelers houden hun bestaande zeven dagen op het hoofdscherm en kunnen daarna via Spelarchief terugkijken. Alle gegevens blijven behouden; beheerarchivering is omkeerbaar.
+
 ## Automatisch beheer vergrendeld — 19 oktober 2026
 - Mastercaller-toernooien tonen schema, deelnemers, planning en uitslagen alleen-lezen. Ook de oudere wedstrijdacties en API-routes worden op de server geblokkeerd. Naam, afbeelding en pauzeren/hervatten blijven beschikbaar; de bron van automatisch aangemaakte toernooien staat vast.
 - Zodra de finale-eindstand bekend is, stopt zowel automatisch als handmatig ophalen, ook als er elders nog een uitslag ontbreekt.
@@ -10,7 +15,7 @@
 ## Mastercaller (test) — 19 oktober 2026
 - Bij **Nieuw toernooi → Uitslagen** kies je **Handmatige invoer** of **Scores ophalen via Mastercaller (test)**.
 - In testmodus vul je de Mastercaller-uitslagenlink in. Het schema, spelers, rondeformats en beschikbare planning worden uit de uitslagen- en bracket-tab opgebouwd; er is geen handmatige goedkeuringswachtrij. Complete knock-outs met 2/4/8/16/32/64/128 spelers zijn ondersteund. Andere formats worden afgewezen zonder een gedeeltelijk toernooi te maken.
-- Punten starten op 1 voor de winnaar en 3 voor de exacte eindstand; dit kun je vóór aanmaken aanpassen. Het aangemaakte toernooi wordt gepubliceerd. TBA-tijden openen geen voorspellingen en blijven automatisch op bronupdates wachten.
+- Punten starten op 1 voor de winnaar en 3 voor de exacte eindstand; dit kun je vóór aanmaken aanpassen. Het aangemaakte toernooi wordt gepubliceerd. NNB-tijden blijven leeg. Met bekende spelers kun je alvast voorspellen tot de toernooistart; zodra een individuele tijd bekend is geldt die deadline. Verstreken bekende deadlines blijven gesloten.
 - Achtergrondcontrole vóór de start elke 4 uur; bij begonnen/geplande wedstrijden zonder eindstand elke 15 minuten. Bij TBA geldt vanaf de eerste toernooidag de 15-minutenfallback. Na alle eindstanden stopt het ophalen.
 - De specifieke European Championship 2026-pagina bevat 32 spelers en 31 schemaposities. **De serververbinding met Mastercaller wordt momenteel geweigerd (HTTP 418).** Aanmaken uit de bron mislukt daarom met een duidelijke melding; de live proef is nog niet geslaagd. Geen toegangsbescherming omzeild.
 - Bronparsing, authenticatie, automatische schema-inrichting, scoreverwerking, doorplaatsing, puntentelling, intervallen en mobiele formulieren zijn lokaal getest. Historische handmatige toernooien behouden hun bestaande invoerwijze.
