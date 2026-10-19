@@ -1,6 +1,6 @@
 import {loadScoreSource} from './score-source.js?v=mobile-archive-20261019';
 import {showTournamentImage,createSquareCrop} from './tournament-images.js?v=crop-20261017';
-import {dutchInput,dutchToUTC,dutchTime} from './knockout.js?v=mobile-archive-20261019';
+import {dutchInput,dutchToUTC,dutchTime} from './knockout.js?v=intro-autosave-20261019';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const labels={draft:'Concept',announced:'Vooraankondiging',published:'Gepubliceerd',active:'Actief',completed:'Afgerond',archived:'Gepauzeerd / archief'};
 export async function loadTournamentManagement(target,ctx){

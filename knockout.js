@@ -3,7 +3,7 @@ import {roundTable,readRoundTable,unitSelect,roundNames} from './round-settings.
 import {layoutBracket} from './bracket.js?v=hub-20261017';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const tournamentLabel=s=>({draft:'Concept',announced:'Vooraankondiging',published:'Gepubliceerd',active:'Actief',completed:'Afgerond',archived:'Gepauzeerd / archief'}[s]||s);
-export const dutchTime=value=>value?new Intl.DateTimeFormat('nl-NL',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Amsterdam'}).format(new Date(value)):'NNB (nog niet bekend)';
+export const dutchTime=value=>value?new Intl.DateTimeFormat('nl-NL',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Amsterdam'}).format(new Date(value)):'NNB';
 export function dutchInput(value){
   if(!value)return '';
   const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Amsterdam',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(value)).map(x=>[x.type,x.value]));
@@ -53,7 +53,7 @@ export async function loadKnockoutSchema(target,ctx,id,prefetched){
   }catch(e){if(alive(target,ctx))target.textContent='Schema laden mislukt: '+e.message;}
 }
 function drawSchema(target,data,admin=false){
- target.innerHTML=`<h2>Volledig toernooischema</h2><div class="ko-bracket compact-public">${data.rounds.map(r=>`<section class="stack ko-round"><h3>${esc(r.name)}</h3>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel ko-node" data-node="${esc(m.id)}">${person(m,'home')}${person(m,'away')}<small>${esc(m.start?new Intl.DateTimeFormat('nl-NL',{dateStyle:'short',timeStyle:'short',...(admin?{timeZone:'Europe/Amsterdam'}:{})}).format(new Date(m.start)):'NNB (nog niet bekend)')}</small></article>`).join('')}</section>`).join('')}</div>`;
+ target.innerHTML=`<h2>Volledig toernooischema</h2><div class="ko-bracket compact-public">${data.rounds.map(r=>`<section class="stack ko-round"><h3>${esc(r.name)}</h3>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel ko-node" data-node="${esc(m.id)}">${person(m,'home')}${person(m,'away')}<small>${esc(m.start?new Intl.DateTimeFormat('nl-NL',{dateStyle:'short',timeStyle:'short',...(admin?{timeZone:'Europe/Amsterdam'}:{})}).format(new Date(m.start)):'NNB')}</small></article>`).join('')}</section>`).join('')}</div>`;
  layoutBracket(target.querySelector('.ko-bracket'),data);
 }
 export async function loadKnockoutAdmin(target,ctx){

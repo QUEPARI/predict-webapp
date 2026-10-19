@@ -2,6 +2,12 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Introductie en automatisch opslaan — 19 oktober 2026
+- Mijn spellen sorteert op begindatum van nieuw naar oud. Onbekende wedstrijdtijden heten overal NNB, ook in schema en beheer; voorspellingskaarten tonen geen wedstrijdstatuslabels.
+- Niet-deelnemers zien een introductie met toernooiafbeelding, periode, aftelling tot de toernooistart, uitleg en Speel mee. De aftelling is geen nieuwe aanmelddeadline; de bestaande deelnamecontrole blijft gelden.
+- Geldige scoreparen slaan automatisch op na een invoerpauze van 650 ms of bij verlaten van een invoerveld. Opslag per wedstrijd is geserialiseerd, recentere invoer wordt niet overschreven, fouten behouden de invoer en bieden Opnieuw proberen. De bestaande serverdeadline en scorevalidatie blijven gelden.
+- Afgelopen toernooien openen op Uitslagen en tonen geen tab Voorspellingen. De zeven dagen op het hoofdscherm en het spelarchief blijven behouden.
+
 ## Mobiel, NNB en spelarchief — 19 oktober 2026
 - Nieuw toernooi toont geen bestaande-toernooikeuze. De dubbele uitslagenkop en het label Gepubliceerd op beschikbare spelkaarten zijn verwijderd; de footer is gecentreerd.
 - Uitslagen passen op mobiel zonder horizontaal scrollen. De vergelijkingskolommen blijven bovenaan hun scrollvlak staan.
