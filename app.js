@@ -1,10 +1,11 @@
-import {showSourceResultDialog} from './source-results.js?v=manual-results-20261022';
+import {bindAdminScoreAlert} from './admin-score-alert.js?v=archive-20261022';
+import {showSourceResultDialog} from './source-results.js?v=archive-20261022';
 import {loadAdminAccounts} from './admin-accounts.js?v=accounts-20261022';
 import {validAccent,accentPalette,applyAccent} from './branding.js?v=header-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=rules-20261022';
-import {loadOnlineProfile} from './online-profile.js?v=push-times-20261017';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=archive-20261022';
+import {loadOnlineProfile} from './online-profile.js?v=archive-20261022';
 
 // Centrally configured branding; no user data is stored in the public response.
 let brandAccent=null,appearanceRevision=0,appearanceController=null;
@@ -98,7 +99,7 @@ function score(m,p){if(!m.official||!p)return 0;const a=m.official,b=p;const exa
 function points(tid){return fixtures.filter(m=>m.tournament===tid).reduce((s,m)=>s+score(m,state.predictions[m.id]),0)}
 function missing(tid){return fixtures.filter(m=>m.tournament===tid&&!locked(m)&&!state.predictions[m.id]).length}
 function nav(){return '<div class="nav" hidden></div>';}
-function header(){const initial=Array.from(currentProfile?.username||'G')[0].toLocaleUpperCase('nl-NL');return `<header class="top centered-header"><button type="button" class="header-icon header-home" data-tab="home" aria-label="Home" title="Naar Mijn spellen"><span class="header-disc"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10H15v-6H9v6H3z"/></svg></span></button><button type="button" class="centered-brand wordmark-home" data-tab="home" aria-label="Naar Home"><span class="brand">PREDICT.</span><span class="tag">SPORTVOORSPELLINGEN</span></button><div class="header-actions">${['admin','super_admin'].includes(currentRole)?'<button type="button" class="header-icon" data-tab="admin" aria-label="Beheer" title="Beheer"><span class="header-disc">⚙</span></button>':''}<button type="button" class="account-avatar" data-tab="profile" aria-label="Account" title="Accountinstellingen"><span class="header-disc account-disc">${esc(initial)}</span></button></div></header>`;}
+function header(){const initial=Array.from(currentProfile?.username||'G')[0].toLocaleUpperCase('nl-NL');return `<header class="top centered-header"><button type="button" class="header-icon header-home" data-tab="home" aria-label="Home" title="Naar Mijn spellen"><span class="header-disc"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10H15v-6H9v6H3z"/></svg></span></button><button type="button" class="centered-brand wordmark-home" data-tab="home" aria-label="Naar Home"><span class="brand">PREDICT.</span><span class="tag">SPORTVOORSPELLINGEN</span></button><div class="header-actions">${['admin','super_admin'].includes(currentRole)?'<button type="button" class="header-icon" data-tab="admin" aria-label="Beheer" title="Beheer"><span class="header-disc">⚙</span></button><button type="button" class="header-icon score-alert" data-admin-score-alert hidden aria-label="Uitslagen nodig"><span class="header-disc"><strong aria-hidden="true">!</strong><small data-score-count></small></span></button>':''}<button type="button" class="account-avatar" data-tab="profile" aria-label="Account" title="Accountinstellingen"><span class="header-disc account-disc">${esc(initial)}</span></button></div></header>`;}
 
 function tournamentCard(t){return `<div class="panel stack"><div class="row"><span class="sport">${t.sport==='darts'?'DARTS':'VOETBAL'}</span><span class="pill mutedpill">${esc(t.state)}</span></div><h2 style="margin:0">${esc(t.name)}</h2><div class="muted mini">${esc(t.description)}</div><div class="row"><span class="mini muted">${missing(t.id)} nog te voorspellen</span><span class="mini"><b>${points(t.id)} pt</b></span></div><button class="btn" data-open="${t.id}">Open toernooi →</button></div>`}
 function home(){return `<h1>Mijn toernooien</h1><p class="sub">Welkom, ${esc(state.user)}. Overzicht van jouw toernooien en voorspellingen.</p><div class="notice">Dit is een lokale demonstratie met fictieve wedstrijden. Er worden nog geen echte accounts, poules of uitslagen gesynchroniseerd.</div><div class="grid">${tournaments.filter(t=>state.joined.includes(t.id)).map(tournamentCard).join('')}</div>`}
@@ -375,9 +376,7 @@ render = function () {
   document.getElementById('admin-refresh').onclick =
     loadAdminMatches;
 
-  loadAdminMatches();
-  loadAdminTournamentPublications();
-  loadAdminLeaderboards();
+
 };
 
 // Gebruik dezelfde beschikbaarheidscontrole in de tabel en de uitslagpop-up.
@@ -407,34 +406,30 @@ function canRecordAdminResult(match) {
 
 let adminGameId='',adminGameName='',adminGameKnockout=true;
 let adminMatchesCache = [];
-let adminShowAllMatches=false;
+let adminShowAllMatches=false,adminPendingOnly=false;
 
 async function loadAdminMatches() {
   const target = document.getElementById('admin-matches');
-  if (!target) return;
+  if (!target||target.closest('[data-admin-panel]')?.hidden) return;
   target.textContent = 'Wedstrijden laden...';
-  const [response,resultResponse,sourceResponse]=await Promise.all([supabase.rpc('admin_get_matches'),supabase.rpc('admin_match_results'),supabase.rpc('admin_tournament_catalog')]);
-  const {data,error}=response;
-  if (!target.isConnected) return;
-  if (error) {
-    console.error('Wedstrijdbeheer:', error);
-    target.textContent = 'Wedstrijden laden mislukt.';
-    return;
-  }
-  const results=new Map((resultResponse.data||[]).map(x=>[x.id,x]));
-  const sources=new Map((Array.isArray(sourceResponse.data)?sourceResponse.data:[]).map(t=>[t.id,t]));
-  adminMatchesCache = (data??[]).map(m=>({...m,...results.get(m.match_id),source_locked:!!sources.get(m.tournament_id)?.score_source?.locked,source_start:sources.get(m.tournament_id)?.start}));
+  const tournament=adminGameId||target.dataset.tournament||null;
+  if(!tournament&&!adminPendingOnly){target.textContent='Kies eerst een toernooi.';return;}
+  const response=await supabase.rpc('admin_match_overview',{p_tournament:adminPendingOnly?null:tournament,p_pending:adminPendingOnly});
+  const {data,error}=response;if(!target.isConnected)return;
+  if(error){target.textContent='Wedstrijden laden mislukt: '+error.message;return;}
+  const resultResponse={data:[]},sourceResponse={data:[]};
+  adminMatchesCache=data||[];
   if (adminMatchesCache.length === 0) {
     target.textContent = 'Geen wedstrijden gevonden.';
     return;
   }
-  const scopedMatches=adminMatchesCache.filter(m=>!target.dataset.tournament||m.tournament_id===target.dataset.tournament);
+  const scopedMatches=adminMatchesCache.filter(m=>adminPendingOnly||!target.dataset.tournament||m.tournament_id===target.dataset.tournament);
   const reviewCount = scopedMatches.filter(m => m.needs_review).length;
   const isOpen=m=>m.predictions_enabled&&m.match_status==='scheduled'&&!m.actual_start&&!m.needs_review&&m.start_time_confirmed&&Date.parse(m.scheduled_start)>Date.now();
-  const visible=scopedMatches.filter(m=>adminShowAllMatches||isOpen(m)||(m.source_locked&&m.home_score==null&&canRecordSourceResult(m))||(m.home_score==null&&m.away_score==null&&['scheduled','live'].includes(m.match_status)&&(Date.parse(m.actual_start)<=Date.now()||Date.parse(m.scheduled_start)<=Date.now())));
+  const visible=adminPendingOnly?scopedMatches:scopedMatches.filter(m=>adminShowAllMatches||isOpen(m)||(m.source_locked&&m.home_score==null&&canRecordSourceResult(m))||(m.home_score==null&&m.away_score==null&&['scheduled','live'].includes(m.match_status)&&(Date.parse(m.actual_start)<=Date.now()||Date.parse(m.scheduled_start)<=Date.now())));
   const sourceInfo=new Map((Array.isArray(sourceResponse.data)?sourceResponse.data:[]).map(t=>[t.id,t.score_source]));
   const rows = visible.map(m => {
-    const sourceLocked=!!sourceResponse.error||!!sourceInfo.get(m.tournament_id)?.locked;
+    const sourceLocked=!!m.source_locked;
     const start = m.scheduled_start ? fmt(m.scheduled_start) : 'NNB';
     const lockedForEdit = m.match_status !== 'scheduled' ||
       m.actual_start != null || m.predictions_enabled ||
@@ -471,13 +466,13 @@ async function loadAdminMatches() {
       </td>
     </tr>`;
   }).join('');
-  target.innerHTML = `<p class="muted mini">${resultResponse.error?'Uitslagen laden mislukt: '+esc(resultResponse.error.message)+'. ':''}Nog af te handelen · ${visible.length} van ${scopedMatches.length} wedstrijden. ${reviewCount} vereisen controle.</p><label class="choice"><input type="checkbox" id="admin-show-all" ${adminShowAllMatches?'checked':''}>Toon alle wedstrijden</label>${!visible.length?'<p>Geen wedstrijden om af te handelen.</p>':''}
+  target.innerHTML = `<p class="muted mini">${resultResponse.error?'Uitslagen laden mislukt: '+esc(resultResponse.error.message)+'. ':''}Nog af te handelen · ${visible.length} van ${scopedMatches.length} wedstrijden. ${reviewCount} vereisen controle.</p>${adminPendingOnly?'':`<label class="choice"><input type="checkbox" id="admin-show-all" ${adminShowAllMatches?'checked':''}>Toon alle wedstrijden</label>`}${!visible.length?'<p>Geen wedstrijden om af te handelen.</p>':''}
   <table><thead><tr><th>Toernooi</th><th>Speler 1</th><th>Speler 2</th><th>Ronde</th><th>Starttijd</th><th>Starttijdstatus</th><th>Controle</th><th>Voorspellen</th><th class="result-column">Uitslag</th><th>Actie</th></tr></thead>
   <tbody>${rows}</tbody></table>`;
   target.querySelector('table').classList.add('admin-match-table');
   const columnLabels=['Toernooi','Speler 1','Speler 2','Ronde','Starttijd','Starttijdstatus','Controle','Voorspellen','Uitslag','Actie'];
   target.querySelectorAll('tbody tr').forEach(row=>[...row.cells].forEach((cell,i)=>cell.dataset.label=columnLabels[i]));
-  target.querySelector('#admin-show-all').onchange=e=>{adminShowAllMatches=e.target.checked;loadAdminMatches();};
+  const allToggle=target.querySelector('#admin-show-all');if(allToggle)allToggle.onchange=e=>{adminShowAllMatches=e.target.checked;loadAdminMatches();};
   target.querySelectorAll('.match-action-menu button').forEach(b=>b.addEventListener('click',()=>b.closest('details').open=false));
   target.querySelectorAll('[data-edit-match]').forEach(button => {
     button.onclick = () => editAdminMatch(button.dataset.editMatch);
@@ -973,11 +968,11 @@ async function recordAdminMatchStart(matchId) {
 // Deze handeling opent GEEN wedstrijden voor voorspellingen.
 async function loadAdminTournamentPublications(force=false) {
   const target=document.getElementById('admin-tournament-publications');
-  if(!target||!['admin','super_admin'].includes(currentRole))return;
+  if(!target||!['admin','super_admin'].includes(currentRole)||!force&&target.closest('[data-admin-panel]')?.hidden)return;
   if(!force&&target.querySelector('[data-ko-dirty="true"]'))return;
   tournamentManagementController?.abort();tournamentManagementController=new AbortController();const managementSignal=tournamentManagementController.signal;
   const userId=currentUser.id;
-  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=manual-results-20261022');
+  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=archive-20261022');
     if(!target.isConnected||managementSignal.aborted)return;
     await loadTournamentManagement(target,{supabase,signal:managementSignal,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole),
       onCreate:()=>{const general=document.getElementById('admin-tournament-publications');if(general?.querySelector('[data-ko-dirty="true"]')&&!confirm('Niet-opgeslagen toernooiwijzigingen laten vervallen?'))return;if(general)general.querySelectorAll('[data-ko-dirty]').forEach(el=>el.dataset.koDirty='false');adminGameId='';adminGameName='Nieuw toernooi';const ko=document.querySelector('#admin-knockout');if(ko)ko.dataset.tournament='';const create=document.querySelector('#ko-create');if(create)create.hidden=false;const open=()=>{if(managementSignal.aborted||currentUser?.id!==userId)return;const details=document.querySelector('#ko-create details');if(!details)return;document.removeEventListener('predict-knockout-ready',open);details.open=true;details.scrollIntoView({block:'start'});details.querySelector('input[name=name]')?.focus({preventScroll:true});};document.addEventListener('predict-knockout-ready',open,{signal:managementSignal});showAdminSection('schema');open();},
@@ -1487,17 +1482,23 @@ render=function(){
   if(!currentUser||!['admin','super_admin'].includes(currentRole)||state.tab!=='admin')return;
   const target=document.createElement('section');target.id='admin-knockout';target.className='panel stack';
   document.querySelector('#account-invitations')?.after(target);
+
+};
+
+
+function loadAdminKnockout(){const target=document.getElementById('admin-knockout');if(!target||target.dataset.loaded)return;target.dataset.loaded='true';
   knockoutScreenController=new AbortController();const signal=knockoutScreenController.signal,userId=currentUser.id;
   import('./knockout.js?v=manual-results-20261022').then(({loadKnockoutAdmin})=>{
     if(!signal.aborted&&target.isConnected)loadKnockoutAdmin(target,{supabase,signal,isCurrent:()=>currentUser?.id===userId,onSaved:()=>{loadAdminMatches();loadAdminTournamentPublications();}});
   }).catch(()=>{if(!signal.aborted&&target.isConnected)target.textContent='Knock-outbeheer laden mislukt. Open Beheer opnieuw.';});
-};
+}
 
 let tournamentManagementController=null;
 let templateManagementController=null;
 let selectedAdminSection='tournaments';
 let adminNavObserver=null;
 function openAdminGameSection(id,name,knockout,section){
+ adminPendingOnly=false;
  if(section==='schema'&&document.querySelector('#admin-knockout [data-ko-dirty="true"]')&&!confirm('Niet-opgeslagen schemawijzigingen laten vervallen?'))return;
  adminGameId=id;adminGameName=name;adminGameKnockout=knockout;
  const ko=document.getElementById('admin-knockout'),matches=document.getElementById('admin-matches');if(ko)ko.dataset.tournament=id;if(matches)matches.dataset.tournament=id;
@@ -1520,6 +1521,8 @@ function showAdminSection(id){
  document.querySelectorAll('[data-admin-panel]').forEach(panel=>panel.hidden=panel.dataset.adminPanel!==id);
  document.querySelectorAll('[data-admin-section]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.adminSection===(['schema','matches','rankings'].includes(id)?'tournaments':id))));
  if(['schema','matches','rankings'].includes(id))refreshAdminGameContext();if(id==='templates')loadAdminTemplates();
+ if(id==='matches')loadAdminMatches();if(id==='tournaments'&&!document.getElementById('admin-tournament-publications')?.querySelector('[data-admin-games]'))loadAdminTournamentPublications();if(id==='schema')loadAdminKnockout();
+ if(id==='settings'){const h=document.getElementById('app-appearance');if(h&&!h.children.length)loadAppearanceSettings(h);}
  if(id==='notifications'){const host=document.getElementById('admin-push');if(host&&!host.children.length)import('./push-notifications.js?v=push-times-20261017').then(({loadPushAdmin})=>{if(host.isConnected)loadPushAdmin(host,supabase);}).catch(()=>host.textContent='Meldingen laden mislukt.');}
 }
 document.addEventListener('predict-admin-schema-created',e=>{if(!e.detail?.id)return;adminGameId=e.detail.id;adminGameName=e.detail.name;adminGameKnockout=true;const ko=document.getElementById('admin-knockout');if(ko)ko.dataset.tournament=adminGameId;const host=document.getElementById('admin-tournament-publications');if(host)host.dataset.selectedTournament=adminGameId;refreshAdminGameContext();});
@@ -1528,10 +1531,10 @@ const renderBeforeAdminNavigation=render;
 render=function(){
  adminNavObserver?.disconnect();templateManagementController?.abort();templateManagementController=new AbortController();tournamentManagementController?.abort();renderBeforeAdminNavigation();if(!currentUser||!['admin','super_admin'].includes(currentRole)||state.tab!=='admin')return;
  const publication=document.getElementById('admin-tournament-publications'),old=publication?.closest('section');if(!old)return;
- const shell=document.createElement('section');shell.className='admin-shell stack';shell.innerHTML='<h1>Beheer</h1><nav class="admin-subnav" aria-label="Beheeronderdelen"></nav>';
+ const shell=document.createElement('section');shell.className='admin-shell stack';shell.innerHTML='<h1>Beheer</h1><div data-blocked-archives></div><nav class="admin-subnav" aria-label="Beheeronderdelen"></nav>';
  document.querySelector('.nav')?.after(shell);
  const nav=shell.querySelector('nav');
- const appearance=document.createElement('section');appearance.id='app-appearance';appearance.className='panel stack';loadAppearanceSettings(appearance);
+ const appearance=document.createElement('section');appearance.id='app-appearance';appearance.className='panel stack';
  const templates=document.createElement('section');templates.id='admin-templates';templates.className='panel stack';
  const pushPanel=document.createElement('section');pushPanel.id='admin-push';pushPanel.className='panel stack';
  const groups=[['settings','Instellingen',appearance],['notifications','Meldingen',pushPanel],['tournaments','Spellen',publication],['templates','Sjablonen',templates],['schema','Schema’s',document.getElementById('admin-knockout')],['matches','Wedstrijden',document.getElementById('admin-matches')?.closest('.panel')],['accounts','Accounts',document.getElementById('account-invitations')],['rankings','Klassementen',document.getElementById('admin-leaderboards')]];
@@ -1541,5 +1544,15 @@ render=function(){
 
 const renderBeforeHeaderNavigation=render;
 render=function(){renderBeforeHeaderNavigation();if(currentUser)document.querySelectorAll('.nav').forEach(el=>el.remove());};
+
+
+let stopScoreAlert=null;
+const renderBeforeScoreAlert=render;
+render=function(){stopScoreAlert?.();stopScoreAlert=null;renderBeforeScoreAlert();const button=document.querySelector('[data-admin-score-alert]');if(!button||!currentUser)return;const user=currentUser.id;
+ stopScoreAlert=bindAdminScoreAlert(button,supabase,{isCurrent:()=>currentUser?.id===user&&['admin','super_admin'].includes(currentRole),onOpen:()=>{
+ if(([...document.querySelectorAll('[data-online-predict] input')].some(i=>i.value!==i.defaultValue)||document.querySelector('[data-ko-dirty="true"],[data-profile-form][data-dirty="true"]'))&&!confirm('Niet-opgeslagen wijzigingen laten vervallen?'))return;
+ onlineTournamentId=null;state.tab='admin';selectedAdminSection='matches';adminGameId='';adminGameName='Uitslagen nodig';adminPendingOnly=true;save();render();
+ }});
+};
 
 readAppAppearance().catch(()=>{});

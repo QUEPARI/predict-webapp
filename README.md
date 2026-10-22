@@ -2,6 +2,14 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Definitief archief en uitslagmeldingen — 22 oktober 2026
+- Iedere vijf minuten controleert de bestaande archieftaak welke toernooien ten minste 72 uur voorbij zijn. Bij complete uitslagen worden het algemene en alle pouleklassementen eenmalig vastgelegd, inclusief namen, rangpositie, punten en tiebreakgegevens. Vrijstellingen en geannuleerde wedstrijden vragen geen eindstand; een ontbrekende winnaarbonus blokkeert definitief vastleggen.
+- Alle voorspellingen, wedstrijden en schema’s blijven bewaard. Definitieve wedstrijdgegevens zijn vergrendeld. De archiefpagina haalt uitsluitend de opgeslagen klassementen op; vergelijking, schema en voorspellingen worden niet geladen. Pouletoegang gebruikt de vastgelegde ledenlijst.
+- Startpagina, profiel en beheer gebruiken alleen actieve toernooien. Het definitieve archief wordt pas bij uitklappen geladen. Ook verborgen beheerpanelen halen geen wedstrijdgegevens op.
+- Het oranje uitroepteken naast Beheer verschijnt voor beheerders bij gestarte wedstrijden zonder eindstand, in zowel licht als donker. Het opent direct de invoerlijst. Een lichte telling ververst na opslag, bij terugkeer naar het tabblad en uiterlijk iedere minuut.
+- Handmatige broninvoer toont uitsluitend gestarte wedstrijden zonder eindstand. De Mastercaller-toernooiperiode is tekst, geen invoerveld; de server weigert handmatige periodewijzigingen.
+- Migratie: `20261022080253_final_standings_archive_and_score_alerts.sql`. Integratie: `supabase/tests/archive_and_alerts.sql` (rollback). Mobiele browsercontrole: `tests/archive-alerts-ui.cjs`.
+
 ## Handmatige bronuitslagen en accountbeheer — 22 oktober 2026
 - Mastercaller-uitslagen kunnen handmatig worden ingevoerd en aangepast via Algemeen of Wedstrijden. De scorevelden gebruiken dezelfde numerieke toetsenbordinstelling als voorspellingen. Schema, deelnemers en planning blijven automatisch beheerd.
 - Uitslagen verwerken punten en doorplaatsing. Een handmatige uitslag blijft behouden bij een afwijkende bronuitslag, met een blijvende melding, ook wanneer de bron door een andere winnaar een afwijkend vervolgschema toont. Een identieke latere bronuitslag bevestigt de invoer. Het veranderen van de winnaar blijft geblokkeerd als de vervolgwedstrijd voorspellingen heeft of gestart is.

@@ -18,7 +18,7 @@ function resultForm(host,ctx,tournament,m,onSaved){
   if(!sourceResultAllowed(m,tournament)){message.textContent='Uitslaginvoer is nog niet beschikbaar voor deze wedstrijd.';return;}
   if(!confirm(`Uitslag opslaan: ${m.home} ${home} – ${away} ${m.away}? Punten en doorplaatsing worden bijgewerkt.`))return;
   busy=true;form.querySelectorAll('input,button').forEach(x=>x.disabled=true);message.textContent='Uitslag opslaan…';
-  try{const r=await ctx.supabase.rpc('admin_record_source_result',{p_match:m.id,p_home:home,p_away:away});if(r.error)throw r.error;if(!alive())return;host.dataset.koDirty='false';message.textContent='Uitslag opgeslagen.';await onSaved?.();}
+  try{const r=await ctx.supabase.rpc('admin_record_source_result',{p_match:m.id,p_home:home,p_away:away});if(r.error)throw r.error;if(!alive())return;host.dataset.koDirty='false';message.textContent='Uitslag opgeslagen.';document.dispatchEvent(new CustomEvent('predict-results-changed'));await onSaved?.();}
   catch(error){if(alive())message.textContent='Niet opgeslagen: '+error.message;}
   finally{busy=false;if(alive())form.querySelectorAll('input,button').forEach(x=>x.disabled=false);}
  };
@@ -28,16 +28,16 @@ export async function loadSourceResults(host,ctx,id,onSaved){
  const alive=()=>host.isConnected&&ctx.isCurrent()&&!ctx.signal?.aborted;let round='',status='pending',revision=0;
  host.oninput=e=>e.stopPropagation();
  async function read(){
-  const version=++revision,r=await ctx.supabase.rpc('get_knockout_schema',{p_id:id});if(!alive()||version!==revision)return;if(r.error)throw r.error;
-  const data=r.data;if(!data?.score_source?.locked)return;
-  host.innerHTML='<details class="admin-fold" open><summary>Handmatige uitslagen</summary><p class="hint">Bij een bronstoring kun je hier de eindstand invoeren. Correcties die de winnaar veranderen kunnen worden geblokkeerd als de vervolgwedstrijd al voorspellingen heeft of gestart is.</p><div class="toolbar"><label>Ronde<select data-result-round><option value="">Alle rondes</option>'+data.rounds.map(r=>`<option value="${r.order}">${esc(r.name)}</option>`).join('')+'</select></label><label>Uitslagen<select data-result-status><option value="pending">Nog in te vullen</option><option value="all">Alle wedstrijden</option></select></label></div><p role="status" data-result-feedback></p><div data-source-result-list class="stack"></div></details>';
-  const roundSelect=host.querySelector('[data-result-round]'),statusSelect=host.querySelector('[data-result-status]');roundSelect.value=round;statusSelect.value=status;
+  const version=++revision,r=await ctx.supabase.rpc('admin_match_overview',{p_tournament:id,p_pending:true});if(!alive()||version!==revision)return;if(r.error)throw r.error;
+  const rows=r.data||[],data={status:rows[0]?.tournament_status||'published',start:rows[0]?.source_start,rounds:[...new Map(rows.map(m=>[m.round_order,{order:m.round_order,name:m.round_name}])).values()],matches:rows.map(m=>({...m,id:m.match_id,home:m.home_name,away:m.away_name,start:m.scheduled_start,status:m.match_status,unit:m.score_unit,round:m.round_order}))};
+  host.innerHTML='<details class="admin-fold" open><summary>Handmatige uitslagen</summary><p class="hint">Bij een bronstoring kun je hier de eindstand invoeren. Correcties die de winnaar veranderen kunnen worden geblokkeerd als de vervolgwedstrijd al voorspellingen heeft of gestart is.</p><div class="toolbar"><label>Ronde<select data-result-round><option value="">Alle rondes</option>'+data.rounds.map(r=>`<option value="${r.order}">${esc(r.name)}</option>`).join('')+'</select></label></div><p role="status" data-result-feedback></p><div data-source-result-list class="stack"></div></details>';
+  const roundSelect=host.querySelector('[data-result-round]');roundSelect.value=round;
   function draw(){
-   const matches=data.matches.filter(m=>!m.bye&&(!round||m.round===Number(round))&&(status==='all'||m.home_score==null));
+   const matches=data.matches.filter(m=>!m.bye&&(!round||m.round===Number(round))&&m.home_score==null&&m.away_score==null&&['scheduled','live'].includes(m.status)&&Date.parse(m.actual_start||m.start)<=Date.now());
    const list=host.querySelector('[data-source-result-list]');list.innerHTML=matches.map(m=>`<article class="result-entry" data-source-result="${esc(m.id)}"><strong>${esc(m.home)} – ${esc(m.away)}</strong><span>${m.home_score!=null?esc(m.home_score)+' – '+esc(m.away_score):'Nog geen uitslag'}</span><button type="button" class="ghost mini" ${sourceResultAllowed(m,data)?'':'disabled'}>${m.home_score!=null?'Uitslag aanpassen':'Uitslag invullen'}</button>${!sourceResultAllowed(m,data)?'<span class="hint">Beschikbaar na de start, met twee bekende deelnemers.</span>':''}<div data-source-result-form></div></article>`).join('')||'<p>Geen wedstrijden binnen deze selectie.</p>';
    list.querySelectorAll('[data-source-result]').forEach(card=>{const button=card.querySelector('button'),formHost=card.querySelector('[data-source-result-form]'),m=matches.find(m=>m.id===card.dataset.sourceResult);button.onclick=()=>{button.hidden=true;resultForm(formHost,ctx,data,m,async()=>{await read();if(alive())host.querySelector('[data-result-feedback]').textContent='Uitslag opgeslagen; punten en schema bijgewerkt.';onSaved?.();});};card.addEventListener('result-cancel',()=>button.hidden=false);});
   }
-  const select=()=>{if(host.querySelector('[data-ko-dirty="true"]')&&!confirm('Niet-opgeslagen uitslag laten vervallen?')){roundSelect.value=round;statusSelect.value=status;return;}round=roundSelect.value;status=statusSelect.value;draw();};roundSelect.onchange=select;statusSelect.onchange=select;draw();
+  const select=()=>{if(host.querySelector('[data-ko-dirty="true"]')&&!confirm('Niet-opgeslagen uitslag laten vervallen?')){roundSelect.value=round;return;}round=roundSelect.value;draw();};roundSelect.onchange=select;draw();
  }
  try{await read();}catch(error){if(alive())host.textContent='Handmatige uitslagen laden mislukt: '+error.message;}
 }

@@ -7,14 +7,14 @@ export async function loadOnlineProfile(target,ctx){
   try {
     const [profile,entries,tours]=await Promise.all([
       ctx.supabase.from('profiles').select('username,display_name,theme').eq('id',ctx.userId).single(),
-      ctx.supabase.from('tournament_entries').select('tournament_id').eq('user_id',ctx.userId),
-      ctx.supabase.from('tournaments').select('id,name').order('name')
+      Promise.resolve({data:[]}),
+      (async()=>{const r=await ctx.supabase.rpc('get_active_tournament_catalog');return r.error?r:{data:r.data.tournaments.filter(t=>t.joined)};})()
     ]);
     if(!active(target,ctx))return;
     const error=[profile,entries,tours].find(r=>r.error)?.error;
     if(error||!profile.data)throw new Error(error?.message||'Eigen profiel niet gevonden.');
     const p=ctx.onLoaded(profile.data)||profile.data,joined=new Set((entries.data||[]).map(e=>e.tournament_id));
-    const available=(tours.data||[]).filter(t=>joined.has(t.id));
+    const available=tours.data||[];
     target.innerHTML=`<h1>Account</h1><p class="sub">Je accountvoorkeuren en eigen voorspellingen.</p>
       <form class="panel stack" data-profile-form data-dirty="false">
         <div class="muted mini">Gebruikersnaam: ${esc(p.username)}</div>

@@ -1,3 +1,4 @@
+import {renderArchivedTournament} from './tournament-archive.js?v=archive-20261022';
 import {showTournamentImage} from './tournament-images.js?v=header-20261017';
 // Public user screens. Supabase remains authoritative for access, scores and deadlines.
 const labels = {announced:'Vooraankondiging',published:'Gepubliceerd',active:'Actief',completed:'Afgerond',archived:'Gepauzeerd / archief',scheduled:'Gepland',postponed:'Uitgesteld',live:'Bezig',finished:'Afgerond',cancelled:'Geannuleerd'};
@@ -23,26 +24,18 @@ export function predictionOutcome(m,p){
 }
 
 export async function loadTournamentCatalog(target,ctx) {
-  try {
-    const [tours,entries] = await Promise.all([
-      ctx.supabase.from('tournaments').select('id,name,status,starts_at,ends_at').neq('status','draft').order('starts_at').order('id'),
-      ctx.supabase.from('tournament_entries').select('tournament_id').eq('user_id',ctx.userId)
-    ]);
-    if (!current(target,ctx)) return;
-    if (tours.error || entries.error) throw new Error((tours.error || entries.error).message);
-    const joined = new Set((entries.data || []).map(e=>e.tournament_id));
-    const all=[...(tours.data||[])].sort((a,b)=>(Date.parse(a.starts_at)||Infinity)-(Date.parse(b.starts_at)||Infinity)||a.name.localeCompare(b.name));
-    const card=t=>{return `<article class="panel tournament-tile"><button class="tournament-tile-link" aria-label="${esc(t.name)} · ${joined.has(t.id)?'Wedstrijden en voorspellingen':'Bekijk toernooi'}" data-online-open="${esc(t.id)}"><span class="tournament-art" data-tour-art="${esc(t.id)}" aria-hidden="true"></span><span class="tournament-tile-body"><h2>${esc(t.name)}</h2>${!joined.has(t.id)&&t.status!=='published'?`<span class="muted mini">${esc(labels[t.status]||t.status)}</span>`:''}${t.status==='announced'?'<span class="mini">Binnenkort · deelname opent later</span>':`<span class="prediction-count mini" data-tour-count="${esc(t.id)}" role="status">Open wedstrijden laden…</span>`}<span class="mini muted game-dates">${esc(dateRange(t.starts_at,t.ends_at))}</span></span><span class="tile-arrow" aria-hidden="true">›</span></button></article>`;};
-    const inArchive=t=>t.status==='archived'||Date.parse(t.ends_at)+168*60*60*1000<=Date.now();
-    const newestFirst=(a,b)=>(Date.parse(b.starts_at)||-Infinity)-(Date.parse(a.starts_at)||-Infinity)||a.name.localeCompare(b.name);
-    const archive=all.filter(t=>joined.has(t.id)&&inArchive(t)),mine=all.filter(t=>joined.has(t.id)&&!inArchive(t)),available=all.filter(t=>!joined.has(t.id)&&['announced','published','active'].includes(t.status)&&!inArchive(t));
-    target.innerHTML=`<h1>Mijn spellen</h1><div class="grid" data-my-tournaments>${[...mine].sort(newestFirst).map(card).join('')||'<p>Je doet nog niet mee aan een toernooi.</p>'}</div><h2 class="available-title">Beschikbare spellen</h2><div class="grid" data-open-tournaments>${available.map(card).join('')||'<p>Geen andere open toernooien beschikbaar.</p>'}</div><details class="admin-fold game-archive" data-player-archive><summary>Spelarchief (${archive.length})</summary><div class="grid">${archive.map(card).join('')||'<p>Nog geen spellen in het archief.</p>'}</div></details>`;
-    let countTimer;
-    const updateCounts=async()=>{try{const r=await ctx.supabase.rpc('get_tournament_prediction_counts');if(!current(target,ctx))return;if(r.error||!Array.isArray(r.data?.tournaments))throw Error('Aantallen niet beschikbaar');const counts=new Map(r.data.tournaments.map(c=>[c.id,c]));target.querySelectorAll('[data-tour-count]').forEach(el=>{const c=counts.get(el.dataset.tourCount)||{open_count:0,remaining_count:0};if(c.completed){el.innerHTML='<strong>Toernooi afgelopen</strong>';return;}el.innerHTML=`<span>${Number(c.open_count)} wedstrijden open om te voorspellen</span>${joined.has(el.dataset.tourCount)?`<strong class="prediction-attention ${c.remaining_count>0?'remaining':c.open_count>0?'complete':''}">${c.remaining_count>0?'Nog '+Number(c.remaining_count)+' te voorspellen':c.open_count>0?'Alle open wedstrijden voorspeld ✓':'Geen open wedstrijden'}</strong>`:''}`;});const delay=Date.parse(r.data.next_deadline)-Date.parse(r.data.server_now);if(Number.isFinite(delay)&&delay>0)countTimer=setTimeout(updateCounts,Math.min(delay+100,2147483647));}catch(e){if(current(target,ctx))target.querySelectorAll('[data-tour-count]').forEach(el=>el.textContent='Aantal open wedstrijden niet beschikbaar.');}};
-    ctx.signal.addEventListener('abort',()=>clearTimeout(countTimer),{once:true});updateCounts();
-    target.querySelectorAll('[data-tour-art]').forEach(el=>showTournamentImage(el,ctx.supabase,el.dataset.tourArt));
-    target.querySelectorAll('[data-online-open]').forEach(b=>b.onclick=()=>ctx.onOpen(b.dataset.onlineOpen));
-  } catch (error) {showError(target,ctx,error,()=>loadTournamentCatalog(target,ctx));}
+ try{
+  const response=await ctx.supabase.rpc('get_active_tournament_catalog');if(!current(target,ctx))return;if(response.error)throw response.error;
+  const all=response.data?.tournaments||[],joined=new Set(all.filter(t=>t.joined).map(t=>t.id));
+  const card=(t,archived=false)=>`<article class="panel tournament-tile"><button type="button" class="tournament-tile-link" data-online-open="${esc(t.id)}"><span class="tournament-art" data-tour-art="${esc(t.id)}" aria-hidden="true"></span><span class="tournament-tile-body"><h2>${esc(t.name)}</h2>${archived?'<span class="mini">Definitief eindklassement</span>':t.status==='announced'?'<span class="mini">Binnenkort · deelname opent later</span>':`<span class="prediction-count mini" data-tour-count="${esc(t.id)}" role="status">Open wedstrijden laden…</span>`}<span class="mini muted game-dates">${esc(dateRange(t.starts_at,t.ends_at))}</span></span><span class="tile-arrow" aria-hidden="true">›</span></button></article>`;
+  const mine=all.filter(t=>t.joined).sort((a,b)=>(Date.parse(b.starts_at)||-Infinity)-(Date.parse(a.starts_at)||-Infinity)),available=all.filter(t=>!t.joined&&['announced','published','active'].includes(t.status));
+  target.innerHTML=`<h1>Mijn spellen</h1><div class="grid" data-my-tournaments>${mine.map(t=>card(t)).join('')||'<p>Je doet nog niet mee aan een toernooi.</p>'}</div><h2 class="available-title">Beschikbare spellen</h2><div class="grid" data-open-tournaments>${available.map(t=>card(t)).join('')||'<p>Geen andere open toernooien beschikbaar.</p>'}</div><details class="admin-fold game-archive" data-player-archive><summary>Spelarchief (${Number(response.data?.archive_count)||0})</summary><div class="grid" data-archive-list></div></details>`;
+  function bind(host){host.querySelectorAll('[data-tour-art]').forEach(el=>showTournamentImage(el,ctx.supabase,el.dataset.tourArt));host.querySelectorAll('[data-online-open]').forEach(b=>b.onclick=()=>ctx.onOpen(b.dataset.onlineOpen));}bind(target);
+  let loaded=false,loading=false;const archive=target.querySelector('[data-player-archive]'),archiveHost=target.querySelector('[data-archive-list]');
+  async function readArchive(){if(loading||loaded)return;loading=true;archiveHost.textContent='Archief laden…';try{const r=await ctx.supabase.rpc('get_tournament_archive_catalog');if(!current(target,ctx))return;if(r.error)throw r.error;archiveHost.innerHTML=(r.data||[]).map(t=>card(t,true)).join('')||'<p>Nog geen definitieve klassementen.</p>';bind(archiveHost);loaded=true;}catch(error){if(current(target,ctx)){archiveHost.innerHTML='<p role="alert"></p><button class="ghost">Opnieuw proberen</button>';archiveHost.querySelector('p').textContent=error.message;archiveHost.querySelector('button').onclick=readArchive;}}finally{loading=false;}}
+  archive.ontoggle=()=>{if(archive.open)readArchive();};
+  let timer;const counts=async()=>{try{const r=await ctx.supabase.rpc('get_tournament_prediction_counts');if(!current(target,ctx))return;if(r.error)throw r.error;const map=new Map((r.data?.tournaments||[]).map(t=>[t.id,t]));target.querySelectorAll('[data-tour-count]').forEach(el=>{const c=map.get(el.dataset.tourCount)||{open_count:0,remaining_count:0};el.innerHTML=c.completed?'<strong>Toernooi afgelopen</strong>':`<span>${Number(c.open_count)||0} wedstrijden open om te voorspellen</span>${joined.has(el.dataset.tourCount)?`<strong class="prediction-attention ${c.remaining_count>0?'remaining':c.open_count>0?'complete':''}">${c.remaining_count>0?'Nog '+Number(c.remaining_count)+' te voorspellen':c.open_count>0?'Alle open wedstrijden voorspeld ✓':'Geen open wedstrijden'}</strong>`:''}`;});const next=Date.parse(r.data?.next_deadline)-Date.parse(r.data?.server_now);if(next>0)timer=setTimeout(counts,Math.min(next+100,2147483647));}catch{if(current(target,ctx))target.querySelectorAll('[data-tour-count]').forEach(el=>el.textContent='Aantal open wedstrijden niet beschikbaar.');}};ctx.signal.addEventListener('abort',()=>clearTimeout(timer),{once:true});if(all.length)counts();
+ }catch(error){showError(target,ctx,error,()=>loadTournamentCatalog(target,ctx));}
 }
 
 function renderTournamentIntro(target,ctx,t,onPreview,onJoin){
@@ -79,6 +72,8 @@ function showError(target,ctx,error,retry) {
 export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'predictions',round:''}) {
   const target=document.createElement('section');target.className='stack tournament-detail';target.textContent='Toernooi laden...';host.replaceChildren(target);
   try {
+    const archive=await ctx.supabase.rpc('get_tournament_archive',{p_id:ctx.tournamentId});
+    if(!current(target,ctx))return;if(archive.error)throw archive.error;if(archive.data?.archived){renderArchivedTournament(target,ctx,archive.data);return;}
     const [tour,entry] = await Promise.all([
       ctx.supabase.from('tournaments').select('id,name,status,starts_at,ends_at').eq('id',ctx.tournamentId).single(),
       ctx.supabase.from('tournament_entries').select('tournament_id').eq('tournament_id',ctx.tournamentId).eq('user_id',ctx.userId)
