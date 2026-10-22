@@ -1,0 +1,57 @@
+// npm install --prefix /tmp/predict-dom-test jsdom@27.0.1 --ignore-scripts
+// NODE_PATH=/tmp/predict-dom-test/node_modules node tests/pool-direct-invitations-dom.cjs
+const {JSDOM}=require('jsdom'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const root=path.join(__dirname,'..');
+const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+const functions=app.slice(app.indexOf('async function loadPrivatePools('),app.indexOf('// Replace the remaining tournament demo routes'));
+const binding=fs.readFileSync(path.join(root,'pool-invitations.js'),'utf8').replace('export function','function');
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+(async()=>{
+ const dom=new JSDOM('<div id="private-pools"></div>',{runScripts:'outside-only',url:'https://predict.test'}),w=dom.window;
+ w.HTMLElement.prototype.scrollIntoView=function(){};
+ const calls=[],pools=[{id:'pool',tournament_id:'t',name:'Vrienden <img src=x>',owner_id:'owner'},{id:'other',tournament_id:'t',name:'Andere poule',owner_id:'someone'}];
+ let role='user',member=true,pending=true,deleteError=false,inviteError=false,searchError=false,searchResolvers=[];
+ const sb={from(table){let filters={},one=false;const q={select(){return q},eq(k,v){filters[k]=v;return q},order(){return q},single(){one=true;return q},then(ok){let data=table==='pools'?pools.filter(p=>!filters.id||p.id===filters.id):table==='pool_members'?filters.pool_id?[{user_id:'owner'},{user_id:'member'}]:member?[{pool_id:'pool'}]:[]:table==='tournaments'?[{id:'t',name:'Toernooi',status:'published'}]:table==='tournament_rounds'?[]:[];return Promise.resolve({data:one?data[0]:data}).then(ok)}};return q},async rpc(name,args){calls.push({name,args});
+ if(name==='get_my_pool_invitations')return {data:pending?[{id:'inv',pool_id:'invited',pool_name:'Uitgenodigd <img src=x>',tournament_id:'t',tournament_name:'Toernooi'}]:[]};
+ if(name==='get_tournament_leaderboard')return {data:[{user_id:'owner',display_name:'Eigenaar',rank_position:1,earned_points:0,correct_winners:0},{user_id:'member',display_name:'Lid',rank_position:2,earned_points:0,correct_winners:0}]};
+ if(name==='search_pool_users'){if(searchError)return {error:{message:'Zoeken tijdelijk mislukt'}};if(args.p_query==='slow')return await new Promise(resolve=>searchResolvers.push(resolve));return {data:[{user_id:'u1',username:'Thomas <img src=x>'},{user_id:'u2',username:'Tommy'},{user_id:'u3',username:'Tom'},{user_id:'u4',username:'Tom vierde'}]};}
+ if(name==='send_pool_invitation')return inviteError?{error:{message:'Uitnodigen tijdelijk mislukt'}}:{data:'new-inv'};
+ if(name==='respond_pool_invitation'){pending=false;return {data:'pool'}};
+ if(name==='delete_pool'){if(deleteError)return {error:{message:'Verwijderen tijdelijk mislukt'}};pools.splice(pools.findIndex(p=>p.id===args.p_pool_id),1);return {data:null}};
+ return {data:null};}};
+ Object.assign(w,{supabase:sb,currentUser:{id:'owner'},currentRole:role,esc:value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),confirm:()=>true});
+ w.eval(binding+'\n'+functions);
+ const $=s=>w.document.querySelector(s),$$=s=>[...w.document.querySelectorAll(s)],event=(el,name)=>el.dispatchEvent(new w.Event(name,{bubbles:true,cancelable:true}));
+ const fill=async value=>{const input=$('#private-invite-user');input.value=value;event(input,'input');await sleep(300)};
+ await w.loadPrivatePools($('#private-pools'),'t');
+ assert.equal($$('[data-delete-pool]').length,1);assert.equal($$('[data-pool-detail]').length,1);assert.equal($$('img').length,0);assert.equal($('#private-invite-code'),null);
+ $('[data-pool-detail]').click();await sleep(10);
+ const send=()=>$('#private-invite-form [type=submit]');assert(send().disabled);
+ await fill('To');assert.equal(calls.filter(c=>c.name==='search_pool_users').length,0);
+ await fill('Tom');assert.equal($$('[data-suggested-user]').length,3);assert(send().disabled);assert.equal($$('img').length,0);
+ event($('#private-invite-form'),'submit');await sleep(10);assert.equal(calls.filter(c=>c.name==='send_pool_invitation').length,0,'Free text cannot be submitted');
+ $('[data-suggested-user]').click();assert(!send().disabled);
+ await fill('Thomas');assert(send().disabled,'Typing after selection clears selected ID');
+ $('[data-suggested-user]').click();event($('#private-invite-form'),'submit');await sleep(10);
+ assert(calls.some(c=>c.name==='send_pool_invitation'&&c.args.p_user_id==='u1'&&!('p_email' in c.args)));assert(send().disabled);assert.equal($('#private-invite-user').value,'');assert($('#private-invite-result').textContent.includes('Spel > Poules'));
+ await fill('slow');await fill('Tom');searchResolvers.shift()({data:[{user_id:'stale',username:'Stale'}]});await sleep(10);assert.equal($$('[data-suggested-user]').length,3,'Stale search response ignored');
+ inviteError=true;$('[data-suggested-user]').click();event($('#private-invite-form'),'submit');await sleep(10);assert(!send().disabled,'Retry enabled');assert($('#private-invite-result').textContent.includes('tijdelijk'));inviteError=false;
+ searchError=true;await fill('Tom');assert.equal($$('[data-suggested-user]').length,0);assert($('#private-invite-result').textContent.includes('Zoeken tijdelijk'));searchError=false;
+ $('#private-detail-back').click();await sleep(10);
+ $('[data-decline-invitation]').click();await sleep(10);assert(calls.some(c=>c.name==='respond_pool_invitation'&&c.args.p_accept===false));assert.equal($$('[data-decline-invitation]').length,0);
+ pending=true;await w.loadPrivatePools($('#private-pools'));$('[data-accept-invitation]').click();await sleep(10);assert(calls.some(c=>c.name==='respond_pool_invitation'&&c.args.p_accept===true));
+ w.confirm=()=>false;$('[data-delete-pool]').click();await sleep(10);assert.equal(calls.filter(c=>c.name==='delete_pool').length,0);
+ w.confirm=()=>true;deleteError=true;$('[data-delete-pool]').click();await sleep(10);assert($('#pool-message').textContent.includes('tijdelijk'));assert(!$('[data-delete-pool]').disabled);deleteError=false;
+ $('[data-delete-pool]').click();await sleep(10);assert.equal($$('[data-delete-pool]').length,0);
+ w.currentRole='admin';member=false;await w.loadPrivatePools($('#private-pools'));assert.equal($$('[data-delete-pool]').length,1,'Admin sees other owners pools');$('[data-delete-pool]').click();await sleep(10);assert.equal(pools.length,0);
+ const tourSource=fs.readFileSync(path.join(root,'online-tournaments.js'),'utf8');
+ const intro=tourSource.slice(tourSource.indexOf('function renderTournamentIntro('),tourSource.indexOf('function showError('));
+ const helpers=tourSource.slice(tourSource.indexOf('const labels'),tourSource.indexOf('export async function loadTournamentCatalog')).replace('export function','function');
+ w.showTournamentImage=()=>{};
+ w.eval('(function(){'+helpers+'\n'+intro+';window.testIntro=renderTournamentIntro;})()');
+ const controller=new w.AbortController();let opened=false;
+ const introHost=w.document.createElement('div');w.document.body.append(introHost);
+ w.testIntro(introHost,{supabase:sb,signal:controller.signal,isCurrent:()=>true},{id:'t',name:'Toernooi',status:'published'},()=>{},async()=>{},()=>{opened=true});
+ introHost.querySelector('[data-intro-pools]').click();assert(opened,'Non-participant can open pools directly from tournament intro');controller.abort();
+ console.log('PASS: direct invitations, three-character threshold, max three suggestions, required selection and selection reset, escaping, stale searches, errors/retry, accept/decline, owner/admin deletion and confirmation.');dom.window.close();
+})().catch(e=>{console.error(e);process.exitCode=1});

@@ -38,12 +38,12 @@ export async function loadTournamentCatalog(target,ctx) {
  }catch(error){showError(target,ctx,error,()=>loadTournamentCatalog(target,ctx));}
 }
 
-function renderTournamentIntro(target,ctx,t,onPreview,onJoin){
+function renderTournamentIntro(target,ctx,t,onPreview,onJoin,onPools){
   const upcoming=Date.parse(t.starts_at)>Date.now();
   target.classList.add('tournament-intro');
   target.innerHTML=`<article class="intro-card"><div class="tournament-art" data-intro-art></div><div><h1>${esc(t.name)}</h1><p class="muted">${esc(dateRange(t.starts_at,t.ends_at))}</p><p class="mini">Start toernooi: ${esc(date(t.starts_at))}</p></div></article>
     <section class="intro-hero"><div class="tournament-art intro-art" data-intro-art></div><div class="intro-countdown"><p data-countdown-title>${upcoming?'Toernooi begint over':'Toernooi begonnen'}</p><div class="countdown-digits" data-countdown aria-label="Tijd tot toernooistart"></div></div></section>
-    <section class="intro-invitation"><h2>Voorspel de wedstrijden.<br>Speel mee met ${esc(t.name)}.</h2><p class="muted">Daag je vrienden uit en volg samen het klassement.</p><button class="btn intro-join" id="intro-join">Speel mee <span aria-hidden="true">→</span></button><p role="status" data-intro-message></p>${onPreview&&t.status!=='announced'?'<button class="ghost" data-intro-preview>Bekijk schema en spelregels</button>':''}</section>
+    <section class="intro-invitation"><h2>Voorspel de wedstrijden.<br>Speel mee met ${esc(t.name)}.</h2><p class="muted">Daag je vrienden uit en volg samen het klassement.</p><button class="btn intro-join" id="intro-join">Speel mee <span aria-hidden="true">→</span></button><p role="status" data-intro-message></p>${onPools?'<button class="btn secondary" data-intro-pools>Poules</button>':''}${onPreview&&t.status!=='announced'?'<button class="ghost" data-intro-preview>Bekijk schema en spelregels</button>':''}</section>
     <section class="intro-explanation panel"><h2>Zo werkt het</h2><p>Vul je scorevoorspellingen in vóór de wedstrijddeadline. Verdien punten voor de juiste winnaar en de exacte score.</p><p>Je voorspellingen tellen mee voor het toernooi en je poules. Maak na deelname een poule of sluit je aan bij vrienden.</p></section>`;
   target.querySelectorAll('[data-intro-art]').forEach(el=>showTournamentImage(el,ctx.supabase,t.id,t.name));
   const button=target.querySelector('#intro-join'),message=target.querySelector('[data-intro-message]');let busy=false,timer;
@@ -57,6 +57,7 @@ function renderTournamentIntro(target,ctx,t,onPreview,onJoin){
   }
   button.onclick=async()=>{if(busy||!canJoin())return;busy=true;button.disabled=true;message.textContent='Deelnemen…';try{await onJoin();}catch(error){if(current(target,ctx))message.textContent='Deelnemen mislukt: '+error.message;}finally{busy=false;if(current(target,ctx))button.disabled=!canJoin();}};
   target.querySelector('[data-intro-preview]')?.addEventListener('click',onPreview);
+  target.querySelector('[data-intro-pools]')?.addEventListener('click',onPools);
   tick();timer=setInterval(tick,1000);ctx.signal.addEventListener('abort',()=>clearInterval(timer),{once:true});
 }
 
@@ -86,7 +87,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
         const {error}=await ctx.supabase.rpc('join_tournament',{p_tournament_id:t.id});
         if(error)throw Error(error.message);
         if(current(target,ctx))await loadTournamentDetail(host,ctx,0,'Je neemt nu deel aan dit toernooi.',{tab:'predictions',round:''});
-      });return;
+      },ctx.onPools&&['published','active'].includes(t.status)?()=>loadTournamentDetail(host,ctx,0,'',{...view,tab:'pools',preview:true}):null);return;
     }
     if(t.status==='announced'){renderTournamentIntro(target,ctx,t,null,null);return;}
 

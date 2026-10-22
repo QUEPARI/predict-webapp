@@ -1,10 +1,11 @@
+import {bindPoolInvite} from './pool-invitations.js?v=pools-20261022';
 import {bindAdminScoreAlert} from './admin-score-alert.js?v=archive-20261022';
 import {showSourceResultDialog} from './source-results.js?v=archive-20261022';
 import {loadAdminAccounts} from './admin-accounts.js?v=accounts-20261022';
 import {validAccent,accentPalette,applyAccent} from './branding.js?v=header-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=names-20261022';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=pools-20261022';
 import {loadOnlineProfile} from './online-profile.js?v=archive-20261022';
 
 // Centrally configured branding; no user data is stored in the public response.
@@ -1219,13 +1220,14 @@ async function loadPrivatePools(host,tournamentId) {
   const scope=target?.dataset.tournament;
   if (!target || !currentUser) return;
   const userId = currentUser.id;
-  const [memberships, poolResponse, tournamentsResponse] = await Promise.all([
+  const [memberships, poolResponse, tournamentsResponse, invitationsResponse] = await Promise.all([
     supabase.from('pool_members').select('pool_id').eq('user_id', userId),
     supabase.from('pools').select('id,name,tournament_id,owner_id').order('name'),
-    supabase.from('tournaments').select('id,name,status').order('name')
+    supabase.from('tournaments').select('id,name,status').order('name'),
+    supabase.rpc('get_my_pool_invitations')
   ]);
   if (!target.isConnected || currentUser?.id !== userId) return;
-  const failure = memberships.error || poolResponse.error || tournamentsResponse.error;
+  const failure = memberships.error || poolResponse.error || tournamentsResponse.error || invitationsResponse.error;
   if (failure) {
     target.textContent = 'Poules laden mislukt: ' + failure.message;
     const retry = document.createElement('button'); retry.className = 'btn secondary';
@@ -1233,14 +1235,18 @@ async function loadPrivatePools(host,tournamentId) {
     return;
   }
   const ids = new Set((memberships.data || []).map(m => m.pool_id));
-  const mine = (poolResponse.data || []).filter(p => ids.has(p.id)&&(!scope||p.tournament_id===scope));
+  const admin=['admin','super_admin'].includes(currentRole);
+  const mine = (poolResponse.data || []).filter(p => (ids.has(p.id)||admin)&&(!scope||p.tournament_id===scope));
+  const invitations=(invitationsResponse.data||[]).filter(i=>!scope||i.tournament_id===scope);
   const tournamentsById = new Map((tournamentsResponse.data || []).map(t => [t.id, t]));
   const openTours = (tournamentsResponse.data || []).filter(t => ['published','active'].includes(t.status)&&(!scope||t.id===scope));
   target.innerHTML = `<p id="pool-message" role="status"></p>
+    <section class="stack" aria-label="Poule-uitnodigingen"><h2>Uitnodigingen</h2>${invitations.length?invitations.map(i=>`<article class="panel stack"><h3>${esc(i.pool_name)}</h3><p>${esc(i.tournament_name)}</p><div class="actions"><button class="btn" data-accept-invitation="${esc(i.id)}">Accepteren</button><button class="btn secondary" data-decline-invitation="${esc(i.id)}">Weigeren</button></div></article>`).join(''):'<p>Geen openstaande uitnodigingen.</p>'}</section>
     <div class="grid">${mine.length ? mine.map(p => `<article class="panel stack">
       <h2>${esc(p.name)}</h2><div class="muted">${esc(tournamentsById.get(p.tournament_id)?.name || 'Toernooi')}</div>
-      <div>${p.owner_id === userId ? 'Jij beheert deze poule' : 'Pouledeelnemer'}</div>
+      <div>${p.owner_id === userId ? 'Jij beheert deze poule' : ids.has(p.id)?'Pouledeelnemer':'Beheerder'}</div>
       <button class="btn secondary" data-pool-detail="${esc(p.id)}">Leden en klassement</button>
+      ${p.owner_id===userId||admin?`<button class="btn secondary" data-delete-pool="${esc(p.id)}">Poule verwijderen</button>`:''}
     </article>`).join('') : '<p>Je bent nog geen lid van een privépoule.</p>'}</div>
     <form id="private-create-form" class="panel stack"><h2>Poule aanmaken</h2>
       <label for="private-pool-name">Poulenaam</label><input id="private-pool-name" required minlength="2" maxlength="80">
@@ -1249,19 +1255,15 @@ async function loadPrivatePools(host,tournamentId) {
       <p class="hint">Je wordt automatisch deelnemer van het toernooi en beheerder van de poule.</p>
       <button class="btn" ${openTours.length ? '' : 'disabled'}>Poule aanmaken</button>
     </form>
-    <form id="private-accept-form" class="panel stack"><h2>Uitnodiging accepteren</h2>
-      <label for="private-invite-code">Uitnodigingscode</label><input id="private-invite-code" required pattern="[0-9a-f]{64}" maxlength="64" autocomplete="off" spellcheck="false">
-      <p class="hint">Log in met het account waarvoor je bent uitgenodigd. Een code is zeven dagen geldig en eenmalig bruikbaar.</p>
-      <button class="btn">Lid worden</button>
-    </form><div id="private-pool-detail" class="stack"></div>`;
+    <div id="private-pool-detail" class="stack"></div>`;
   const message = target.querySelector('#pool-message');
   async function submit(form, rpc, args) {
-    const button = form.querySelector('button'); button.disabled = true; message.textContent = 'Bezig...';
+    const button = form.querySelector('button'); form.querySelectorAll('button').forEach(b=>b.disabled=true); message.textContent = 'Bezig...';
     try {
       const {data,error} = await supabase.rpc(rpc, args);
       if (!target.isConnected || currentUser?.id !== userId) return;
       if (error) {message.textContent = error.message; return;}
-      if(rpc==='accept_pool_invitation'&&scope&&data){
+      if(rpc==='respond_pool_invitation'&&args.p_accept&&scope&&data){
         const accepted=await supabase.from('pools').select('id,tournament_id').eq('id',data).single();
         if(!target.isConnected||currentUser?.id!==userId)return;
         if(!accepted.error&&accepted.data?.tournament_id&&accepted.data.tournament_id!==scope){
@@ -1270,20 +1272,30 @@ async function loadPrivatePools(host,tournamentId) {
           onlineTournamentId=accepted.data.tournament_id;initialTournamentTab='pools';tournamentNotice='Uitnodiging geaccepteerd.';state.tab='home';render();return;
         }
       }
-      if(scope&&target.dataset.joined==='false'){onlineTournamentId=scope;initialTournamentTab='pools';tournamentNotice=rpc==='create_pool'?'Poule aangemaakt. Je neemt nu ook deel aan dit toernooi.':'Uitnodiging geaccepteerd.';state.tab='home';render();return;}
-      await loadPrivatePools(target);if(target.isConnected){const feedback=target.querySelector('#pool-message');if(feedback){feedback.textContent=rpc==='create_pool'?'Poule aangemaakt.':'Uitnodiging geaccepteerd.';feedback.className='success';}}
+      if(scope&&target.dataset.joined==='false'&&(rpc==='create_pool'||args.p_accept)){onlineTournamentId=scope;initialTournamentTab='pools';tournamentNotice=rpc==='create_pool'?'Poule aangemaakt. Je neemt nu ook deel aan dit toernooi.':'Uitnodiging geaccepteerd.';state.tab='home';render();return;}
+      await loadPrivatePools(target);if(target.isConnected){const feedback=target.querySelector('#pool-message');if(feedback){feedback.textContent=rpc==='create_pool'?'Poule aangemaakt.':args.p_accept?'Uitnodiging geaccepteerd.':'Uitnodiging geweigerd.';feedback.className='success';}}
     } catch {if (target.isConnected) message.textContent = 'Verbinding mislukt. Probeer opnieuw.';}
-    finally {if (button.isConnected) button.disabled = false;}
+    finally {if (button.isConnected) form.querySelectorAll('button').forEach(b=>b.disabled=false);}
   }
   const create = target.querySelector('#private-create-form');
   create.onsubmit = event => {event.preventDefault(); submit(create,'create_pool', {
     p_tournament_id: target.querySelector('#private-pool-tournament').value,
     p_name: target.querySelector('#private-pool-name').value.trim()
   });};
-  const accept = target.querySelector('#private-accept-form');
-  accept.onsubmit = event => {event.preventDefault(); submit(accept,'accept_pool_invitation', {
-    p_token: target.querySelector('#private-invite-code').value.trim()
-  });};
+  target.querySelectorAll('[data-accept-invitation],[data-decline-invitation]').forEach(button=>{
+    button.onclick=()=>submit(button.closest('article'),'respond_pool_invitation',{
+      p_invitation_id:button.dataset.acceptInvitation||button.dataset.declineInvitation,p_accept:!!button.dataset.acceptInvitation
+    });
+  });
+  target.querySelectorAll('[data-delete-pool]').forEach(button=>button.onclick=async()=>{
+    const pool=mine.find(p=>p.id===button.dataset.deletePool);
+    if(!confirm(`Poule “${pool.name}” definitief verwijderen? Alle pouleleden en uitnodigingen worden verwijderd. Je toernooivoorspellingen blijven bewaard.`))return;
+    button.disabled=true;
+    try{const r=await supabase.rpc('delete_pool',{p_pool_id:pool.id});if(!target.isConnected||currentUser?.id!==userId)return;if(r.error)throw r.error;
+      await loadPrivatePools(target);if(target.isConnected)target.querySelector('#pool-message').textContent='Poule verwijderd.';
+    }catch(error){if(target.isConnected)message.textContent=error.message||'Verwijderen mislukt. Probeer opnieuw.';}
+    finally{if(button.isConnected)button.disabled=false;}
+  });
   target.querySelectorAll('[data-pool-detail]').forEach(button => {
     button.onclick = () => loadPrivatePoolDetail(mine.find(p => p.id === button.dataset.poolDetail));
   });
@@ -1317,11 +1329,10 @@ async function loadPrivatePoolDetail(pool) {
       ${rounds.data.map(r => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('')}</select>
     <div id="private-pool-ranking" class="table-wrap" role="status"></div>
     ${owner ? `<form id="private-invite-form" class="stack"><h3>Lid uitnodigen</h3>
-      <label for="private-invite-email">Gebruikersnaam van het lid</label><input id="private-invite-email" required maxlength="254" autocomplete="off">
-      <button class="btn">Uitnodigingscode maken</button>
-      <p class="hint">Deel de code zelf met de bedoelde ontvanger. Die heeft een bestaand Predict-account nodig.
-      Een nieuwe code voor hetzelfde adres maakt de vorige ongeldig.</p>
-      <div id="private-invite-result" role="status"></div></form>
+      <label for="private-invite-user">Gebruikersnaam van het lid</label><input id="private-invite-user" required maxlength="254" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="private-invite-result">
+      <div data-user-suggestions class="stack" aria-label="Gevonden gebruikers"></div>
+      <button class="btn" type="submit" disabled>Gebruiker uitnodigen</button>
+      <p id="private-invite-result" role="status">Typ minimaal 3 letters en selecteer een gebruiker.</p></form>
       <button class="btn secondary" id="private-revoke">Alle openstaande uitnodigingen intrekken</button>` :
       '<button class="btn secondary" id="private-leave">Poule verlaten</button>'}`;
   target.querySelector('#private-detail-back').onclick=()=>loadPrivatePools(overview);
@@ -1362,21 +1373,7 @@ async function loadPrivatePoolDetail(pool) {
   const leave = target.querySelector('#private-leave'); if (leave) leave.onclick = () => manage('leave',null,leave);
   const revoke = target.querySelector('#private-revoke'); if (revoke) revoke.onclick = () => manage('revoke',null,revoke);
   const invite = target.querySelector('#private-invite-form');
-  if (invite) invite.onsubmit = async event => {
-    event.preventDefault(); const button = invite.querySelector('button'); button.disabled = true;
-    const result = target.querySelector('#private-invite-result'); result.textContent = 'Code maken...';
-    try {
-      const {data,error} = await supabase.rpc('invite_pool_member',{
-        p_pool_id:pool.id,p_email:target.querySelector('#private-invite-email').value.trim()
-      });
-      if (!target.isConnected) return;
-      if (error) {result.textContent = error.message; return;}
-      result.innerHTML = '<label for="private-created-code">Kopieer deze eenmalige code voor de ontvanger</label><input id="private-created-code" readonly autocomplete="off"><p class="hint">Deze code wordt alleen nu getoond en niet op dit apparaat opgeslagen.</p>';
-      result.querySelector('input').value = data;
-      result.querySelector('input').onclick = event => event.target.select();
-    } catch {if (target.isConnected) result.textContent = 'Verbinding mislukt. Probeer opnieuw.';}
-    finally {if (button.isConnected) button.disabled = false;}
-  };
+  if(invite)bindPoolInvite(invite,{supabase,poolId:pool.id,isCurrent:()=>currentUser?.id===userId});
   }catch(error){if(target.isConnected){target.innerHTML='<button class="ghost">← Mijn poules</button><p role="alert"></p>';target.querySelector('p').textContent='Poule laden mislukt: '+error.message;target.querySelector('button').onclick=()=>loadPrivatePools(overview);}}
 }
 
