@@ -1,3 +1,4 @@
+import {installPullRefresh} from './pull-refresh.js?v=pull-20261022';
 import {bindPoolInvite} from './pool-invitations.js?v=pools-20261022';
 import {bindAdminScoreAlert} from './admin-score-alert.js?v=archive-20261022';
 import {showSourceResultDialog} from './source-results.js?v=archive-20261022';
@@ -1380,7 +1381,7 @@ async function loadPrivatePoolDetail(pool) {
 // Replace the remaining tournament demo routes with authenticated online screens.
 // Obsolete local demo IDs must never select an online tournament or prediction.
 state.tournament = null;
-let onlineTournamentId = null;let initialTournamentTab='predictions',tournamentNotice='';
+let onlineTournamentId = null;let initialTournamentTab='predictions',initialTournamentRound='',tournamentNotice='';
 let onlineScreenController = null;
 home = discover = function () {return '<section id="online-tournaments" class="stack" aria-label="Toernooien">Toernooien laden...</section>';};
 const renderBeforeOnlineTournaments = render;
@@ -1407,9 +1408,9 @@ render = function () {
   const userId=currentUser.id;
   const ctx={supabase,userId,signal:onlineScreenController.signal,isCurrent:()=>currentUser?.id===userId,
     mode:state.tab,tournamentId:onlineTournamentId,
-    onOpen:id=>{onlineTournamentId=id;initialTournamentTab='predictions';render();},
+    onOpen:id=>{onlineTournamentId=id;initialTournamentTab='predictions';initialTournamentRound='';render();},
     onBack:()=>{onlineTournamentId=null;render();},onPools:(panel,joined)=>{panel.dataset.joined=String(joined);return loadPrivatePools(panel,onlineTournamentId);}};
-  if (onlineTournamentId) {loadTournamentDetail(target,ctx,0,tournamentNotice,{tab:initialTournamentTab,round:''});tournamentNotice='';}
+  if (onlineTournamentId) {loadTournamentDetail(target,ctx,0,tournamentNotice,{tab:initialTournamentTab,round:initialTournamentRound});tournamentNotice='';}
   else loadTournamentCatalog(target,ctx);
 };
 
@@ -1553,3 +1554,18 @@ render=function(){stopScoreAlert?.();stopScoreAlert=null;renderBeforeScoreAlert(
 };
 
 readAppAppearance().catch(()=>{});
+
+// Refresh database-backed screens without navigating away or reloading source scores.
+installPullRefresh({
+ canRefresh:()=>{
+  const dirty=document.querySelector('[data-ko-dirty="true"],[data-profile-form][data-dirty="true"]')||
+   [...document.querySelectorAll('[data-online-predict] input,#private-pools input')].some(input=>!input.readOnly&&input.value!==input.defaultValue);
+  return !dirty||confirm('Verversen en niet-opgeslagen wijzigingen laten vervallen?');
+ },
+ onRefresh:()=>{
+  const active=document.querySelector('[data-detail-tab][aria-pressed="true"]');
+  if(active)initialTournamentTab=active.dataset.detailTab;
+  initialTournamentRound=document.getElementById('online-round')?.value||'';
+  render();
+ }
+});
