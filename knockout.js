@@ -1,4 +1,4 @@
-import {scoreSourceFields,bindScoreSource,invokeMastercaller,awaitMastercallerCreation} from './score-source.js?v=github-mastercaller-20261019';
+import {scoreSourceFields,bindScoreSource,invokeMastercaller,awaitMastercallerCreation} from './score-source.js?v=manual-results-20261022';
 import {roundTable,readRoundTable,unitSelect,roundNames} from './round-settings.js?v=refinements-20261017';
 import {layoutBracket} from './bracket.js?v=hub-20261017';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -88,7 +88,7 @@ export async function loadKnockoutAdmin(target,ctx){
   }
   function renderEditor(){
     const host=$('ko-editor'),openedFolds=[...host.querySelectorAll('.admin-fold[open]')].map(el=>el.id);
-    if(data.score_source?.locked){clearInterval(tickTimer);host.innerHTML='<p class="notice" data-source-readonly>Mastercaller beheert dit toernooi. Schema, deelnemers, planning en uitslagen zijn alleen-lezen.</p><div data-source-schema></div>';drawSchema(host.querySelector('[data-source-schema]'),data,true);return;}
+    if(data.score_source?.locked){clearInterval(tickTimer);host.innerHTML='<p class="notice" data-source-readonly>Mastercaller beheert dit toernooi. Schema, deelnemers en planning zijn alleen-lezen. Handmatige uitslagen kun je invoeren via Algemeen of Wedstrijden.</p><div data-source-schema></div>';drawSchema(host.querySelector('[data-source-schema]'),data,true);return;}
     host.innerHTML=`${['draft','announced'].includes(data.status)?'<button class="btn" id="ko-publish">Publiceren en complete wedstrijden openen</button>':''}<div class="toolbar ko-filters"><label>Status<select id="ko-filter"><option value="pending">Nog af te handelen</option><option value="all">Alle wedstrijden</option><option>Uitslag nodig</option><option>Nog aanvullen</option><option>Afgerond</option><option>Uitgesteld</option></select></label><label>Ronde<select id="ko-round-filter"><option value="">Alle rondes</option>${data.rounds.map(r=>`<option value="${r.order}">${esc(r.name)}</option>`).join('')}</select></label></div><div id="ko-cards" class="stack"></div><div id="ko-full"></div>`;
     {
       const editable=['draft','announced'].includes(data.status);

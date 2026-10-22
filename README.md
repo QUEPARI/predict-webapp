@@ -2,6 +2,13 @@
 
 **Status 16 oktober 2026:** JavaScript/HTML/CSS op GitHub Pages met Supabase-authenticatie, beheerdersfuncties, beveiligde voorspellingen, toernooi- en pouleklassementen, echte privépoules en online profielbeheer. De gebruikersschermen gebruiken Supabase. **Geen volledig afgeronde productie-app.**
 
+## Handmatige bronuitslagen en accountbeheer — 22 oktober 2026
+- Mastercaller-uitslagen kunnen handmatig worden ingevoerd en aangepast via Algemeen of Wedstrijden. De scorevelden gebruiken dezelfde numerieke toetsenbordinstelling als voorspellingen. Schema, deelnemers en planning blijven automatisch beheerd.
+- Uitslagen verwerken punten en doorplaatsing. Een handmatige uitslag blijft behouden bij een afwijkende bronuitslag, met een blijvende melding. Een identieke latere bronuitslag bevestigt de invoer. Het veranderen van de winnaar blijft geblokkeerd als de vervolgwedstrijd voorspellingen heeft of gestart is.
+- Accounts toont alle geregistreerde gebruikers, inclusief rol, accountstatus en zoekfunctie. Alleen hoofdbeheerders kunnen gebruikers beheerder maken of beheerrechten intrekken. Hoofdbeheeraccounts zijn beschermd; rolwijzigingen worden gelogd.
+- Het oude QA-formulier en de tab Testomgeving zijn verwijderd. De toernooitab heet Spelregels.
+- Migratie: `20261022072156_manual_mastercaller_results_and_account_roles.sql`. Databasetests gebruiken rollback; mobiele browsertests gebruiken een mockbackend. Alle 76 bestaande voorspellingen bleven ongewijzigd bij publicatie.
+
 ## Introductie en automatisch opslaan — 19 oktober 2026
 - Mijn spellen sorteert op begindatum van nieuw naar oud. Onbekende wedstrijdtijden heten overal NNB, ook in schema en beheer; voorspellingskaarten tonen geen wedstrijdstatuslabels.
 - Niet-deelnemers zien een introductie met toernooiafbeelding, periode, aftelling tot de toernooistart, uitleg en Speel mee. De aftelling is geen nieuwe aanmelddeadline; de bestaande deelnamecontrole blijft gelden.

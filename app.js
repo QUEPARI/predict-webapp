@@ -1,7 +1,9 @@
+import {showSourceResultDialog} from './source-results.js?v=manual-results-20261022';
+import {loadAdminAccounts} from './admin-accounts.js?v=accounts-20261022';
 import {validAccent,accentPalette,applyAccent} from './branding.js?v=header-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=intro-autosave-20261019';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=rules-20261022';
 import {loadOnlineProfile} from './online-profile.js?v=push-times-20261017';
 
 // Centrally configured branding; no user data is stored in the public response.
@@ -345,12 +347,6 @@ render = function () {
       Toernooistatus laden...
     </div>
 
-    <div class="section-head">
-      <h2>QA-test: echte voorspelling</h2>
-    </div>
-    <div class="panel stack" id="qa-prediction-panel">
-      QA-testwedstrijd laden...
-    </div>
 
     <div class="section-head">
       <h2>Echte klassementen</h2>
@@ -381,12 +377,12 @@ render = function () {
 
   loadAdminMatches();
   loadAdminTournamentPublications();
-  loadQaPredictionForm();
   loadAdminLeaderboards();
 };
 
 // Gebruik dezelfde beschikbaarheidscontrole in de tabel en de uitslagpop-up.
 // De databasefunctie admin_record_match_result herhaalt alle controles.
+function canRecordSourceResult(m){return ['scheduled','live','finished'].includes(m.match_status)&&!m.needs_review&&!/^Winnaar wedstrijd|^Deelnemer |^Vrijgesteld/.test(m.home_name)&&!/^Winnaar wedstrijd|^Deelnemer |^Vrijgesteld/.test(m.away_name)&&(m.match_status==='finished'||Date.parse(m.actual_start||m.scheduled_start||m.source_start)<=Date.now());}
 function canRecordAdminResult(match) {
   const startedByActualTime =
     match.match_status === 'live' &&
@@ -426,7 +422,8 @@ async function loadAdminMatches() {
     return;
   }
   const results=new Map((resultResponse.data||[]).map(x=>[x.id,x]));
-  adminMatchesCache = (data??[]).map(m=>({...m,...results.get(m.match_id)}));
+  const sources=new Map((Array.isArray(sourceResponse.data)?sourceResponse.data:[]).map(t=>[t.id,t]));
+  adminMatchesCache = (data??[]).map(m=>({...m,...results.get(m.match_id),source_locked:!!sources.get(m.tournament_id)?.score_source?.locked,source_start:sources.get(m.tournament_id)?.start}));
   if (adminMatchesCache.length === 0) {
     target.textContent = 'Geen wedstrijden gevonden.';
     return;
@@ -434,7 +431,7 @@ async function loadAdminMatches() {
   const scopedMatches=adminMatchesCache.filter(m=>!target.dataset.tournament||m.tournament_id===target.dataset.tournament);
   const reviewCount = scopedMatches.filter(m => m.needs_review).length;
   const isOpen=m=>m.predictions_enabled&&m.match_status==='scheduled'&&!m.actual_start&&!m.needs_review&&m.start_time_confirmed&&Date.parse(m.scheduled_start)>Date.now();
-  const visible=scopedMatches.filter(m=>adminShowAllMatches||isOpen(m)||(m.home_score==null&&m.away_score==null&&['scheduled','live'].includes(m.match_status)&&(Date.parse(m.actual_start)<=Date.now()||Date.parse(m.scheduled_start)<=Date.now())));
+  const visible=scopedMatches.filter(m=>adminShowAllMatches||isOpen(m)||(m.source_locked&&m.home_score==null&&canRecordSourceResult(m))||(m.home_score==null&&m.away_score==null&&['scheduled','live'].includes(m.match_status)&&(Date.parse(m.actual_start)<=Date.now()||Date.parse(m.scheduled_start)<=Date.now())));
   const sourceInfo=new Map((Array.isArray(sourceResponse.data)?sourceResponse.data:[]).map(t=>[t.id,t.score_source]));
   const rows = visible.map(m => {
     const sourceLocked=!!sourceResponse.error||!!sourceInfo.get(m.tournament_id)?.locked;
@@ -452,7 +449,7 @@ async function loadAdminMatches() {
       <td>${m.needs_review ? 'Controle nodig' : 'Gecontroleerd'}</td>
       <td>${isOpen(m)?'Voorspellen open':m.home_score!=null?'Afgerond':canRecordAdminResult(m)?'Uitslag nodig':'Voorspellen gesloten'}</td><td class="result-column">${m.home_score!=null?esc(m.home_score)+'–'+esc(m.away_score):'—'}</td>
       <td>
-        ${sourceLocked?'<span class="muted mini">Mastercaller · alleen-lezen</span>':`<details class="match-action-menu"><summary>Acties</summary><div class="stack">
+        ${sourceLocked?`<span class="muted mini">Mastercaller</span>${sourceResponse.error?'':`<button class="ghost mini" data-result-match="${esc(m.match_id)}" ${canRecordSourceResult(m)?'':'disabled'}>${m.home_score!=null?'Uitslag aanpassen':'Uitslag invoeren'}</button>`}`:`<details class="match-action-menu"><summary>Acties</summary><div class="stack">
           <button class="btn secondary" data-edit-match="${esc(m.match_id)}"
             ${lockedForEdit ? 'disabled title="Wedstrijd niet wijzigbaar via deze procedure"' : 'title="Ronde en starttijd bewerken"'}>Bewerken</button>
           <button class="btn secondary" data-approve-match="${esc(m.match_id)}"
@@ -550,7 +547,7 @@ async function editAdminMatch(matchId) {
   const options = ['<option value="">Onbekend</option>', ...(rounds ?? []).map(r =>
     `<option value="${esc(r.round_id)}" ${r.round_id === match.round_id ? 'selected' : ''}>${esc(r.round_name)}</option>`
   )].join('');
-  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=github-mastercaller-20261019');
+  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=manual-results-20261022');
   editor.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;gap:12px">
       <h2 id="admin-edit-title" style="margin:0">Wedstrijd bewerken</h2>
       <button type="button" class="ghost" id="admin-edit-close" aria-label="Sluiten">✕</button>
@@ -763,6 +760,7 @@ async function recordAdminMatchResult(matchId) {
   if (!['admin', 'super_admin'].includes(currentRole)) return;
   const match = adminMatchesCache.find(m => m.match_id === matchId);
   if (!match) return;
+  if(match.source_locked){const userId=currentUser.id;return showSourceResultDialog({supabase,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole)},match.tournament_id,matchId,async()=>{await loadAdminMatches();await loadAdminTournamentPublications();});}
 
   document.getElementById('admin-result-dialog')?.close();
   const dialog = document.createElement('dialog');
@@ -803,9 +801,9 @@ async function recordAdminMatchResult(matchId) {
     <form id="result-form" class="stack">
       <div class="row" style="gap:12px;flex-wrap:wrap">
         <div class="field"><label for="result-home">${esc(match.home_name)}</label>
-          <input id="result-home" type="number" required min="0" max="999" step="1" style="max-width:120px"></div>
+          <input id="result-home" inputmode="numeric" type="number" required min="0" max="99" step="1" style="max-width:120px"></div>
         <div class="field"><label for="result-away">${esc(match.away_name)}</label>
-          <input id="result-away" type="number" required min="0" max="999" step="1" style="max-width:120px"></div>
+          <input id="result-away" inputmode="numeric" type="number" required min="0" max="99" step="1" style="max-width:120px"></div>
       </div>
       <label><input id="result-verified" type="checkbox" required>
         Ik heb de eindstand gecontroleerd aan de hand van een betrouwbare uitslagenbron.</label>
@@ -936,7 +934,7 @@ async function recordAdminMatchStart(matchId) {
     const enteredTime = dialog.querySelector('#start-actual-time').value;
     let verifiedStart = null;
     if (enteredTime) {
-      const {dutchToUTC}=await import('./knockout.js?v=github-mastercaller-20261019');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
+      const {dutchToUTC}=await import('./knockout.js?v=manual-results-20261022');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
       if (!Number.isFinite(parsed.getTime()) || parsed.getTime() > Date.now()) {
         message.textContent = 'Vul een geldige werkelijke starttijd in die niet in de toekomst ligt.';
         return;
@@ -979,7 +977,7 @@ async function loadAdminTournamentPublications(force=false) {
   if(!force&&target.querySelector('[data-ko-dirty="true"]'))return;
   tournamentManagementController?.abort();tournamentManagementController=new AbortController();const managementSignal=tournamentManagementController.signal;
   const userId=currentUser.id;
-  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=mobile-archive-20261019');
+  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=manual-results-20261022');
     if(!target.isConnected||managementSignal.aborted)return;
     await loadTournamentManagement(target,{supabase,signal:managementSignal,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole),
       onCreate:()=>{const general=document.getElementById('admin-tournament-publications');if(general?.querySelector('[data-ko-dirty="true"]')&&!confirm('Niet-opgeslagen toernooiwijzigingen laten vervallen?'))return;if(general)general.querySelectorAll('[data-ko-dirty]').forEach(el=>el.dataset.koDirty='false');adminGameId='';adminGameName='Nieuw toernooi';const ko=document.querySelector('#admin-knockout');if(ko)ko.dataset.tournament='';const create=document.querySelector('#ko-create');if(create)create.hidden=false;const open=()=>{if(managementSignal.aborted||currentUser?.id!==userId)return;const details=document.querySelector('#ko-create details');if(!details)return;document.removeEventListener('predict-knockout-ready',open);details.open=true;details.scrollIntoView({block:'start'});details.querySelector('input[name=name]')?.focus({preventScroll:true});};document.addEventListener('predict-knockout-ready',open,{signal:managementSignal});showAdminSection('schema');open();},
@@ -1052,188 +1050,6 @@ function showPublishTournamentDialog(tournament) {
   };
 }
 
-
-/*
- * PREDICT - Gecontroleerde QA-voorspelling
- * Gebruikt uitsluitend Supabase RPC en de RLS-regels.
- * De gewone lokale demonstratiegegevens blijven onaangetast.
- */
-async function loadQaPredictionForm() {
-  const target = document.getElementById('qa-prediction-panel');
-  if (!target || !currentUser) return;
-  target.textContent = 'QA-gegevens ophalen...';
-
-  const { data: tours, error: tourError } =
-    await supabase.rpc('admin_list_tournaments');
-  if (!target.isConnected) return;
-  if (tourError) {
-    target.textContent = `Testtoernooi ophalen mislukt: ${tourError.message}`;
-    return;
-  }
-  const qaTours = (tours ?? []).filter(t => t.name === 'Predict QA - dartstest');
-  if (qaTours.length !== 1) {
-    target.textContent = 'QA-testtoernooi ontbreekt of is niet uniek.';
-    return;
-  }
-  const tournament = qaTours[0];
-  if (tournament.status !== 'published' && tournament.status !== 'active') {
-    target.textContent = 'QA-testtoernooi is nog niet gepubliceerd.';
-    return;
-  }
-
-  const {data: allMatches, error: matchError} = await supabase.rpc(
-    'admin_get_matches', {p_tournament_id: tournament.id}
-  );
-  if (!target.isConnected) return;
-  if (matchError) {
-    target.textContent = `Testwedstrijd ophalen mislukt: ${matchError.message}`;
-    return;
-  }
-  const qaMatches = (allMatches ?? []).filter(m =>
-    m.home_name === 'Testspeler A' &&
-    m.away_name === 'Testspeler B'
-  );
-  if (qaMatches.length !== 1) {
-    target.textContent = 'Er is niet precies één QA-testwedstrijd.';
-    return;
-  }
-  const match = qaMatches[0];
-
-  const {data: predictions, error: predictionError} = await supabase
-    .from('match_predictions')
-    .select('id,home_score,away_score,updated_at')
-    .eq('match_id', match.match_id)
-    .eq('user_id', currentUser.id)
-    .limit(1);
-  if (!target.isConnected) return;
-  if (predictionError) {
-    target.textContent =
-      `Eigen voorspelling ophalen mislukt: ${predictionError.message}`;
-    return;
-  }
-  const prediction = predictions?.[0] ?? null;
-  const deadline = match.scheduled_start
-    ? new Date(match.scheduled_start) : null;
-  const allowed = match.predictions_enabled === true &&
-    match.start_time_confirmed === true &&
-    match.needs_review === false &&
-    match.match_status === 'scheduled' &&
-    match.actual_start == null &&
-    deadline && Number.isFinite(deadline.getTime()) &&
-    deadline > new Date();
-
-  target.innerHTML = `
-    <p class="muted mini">
-      Alleen voor de fictieve QA-wedstrijd. Opslaan gebeurt echt in
-      Supabase; geen lokale demovoorspelling.
-    </p>
-    <h3 style="margin:0">${esc(match.home_name)} – ${esc(match.away_name)}</h3>
-    <p class="muted mini">
-      ${esc(match.round_name ?? 'Testronde')} · Deadline:
-      ${deadline ? esc(fmt(match.scheduled_start)) : 'NNB'} (Nederlandse tijd)
-      · ${allowed ? 'Voorspellingen open' : 'Voorspellingen gesloten'}
-    </p>
-    <p>
-      ${prediction
-        ? `Huidige eigen voorspelling: <strong>${prediction.home_score}–${prediction.away_score}</strong>`
-        : 'Nog geen voorspelling opgeslagen.'}
-    </p>
-    <form id="qa-prediction-form" class="stack">
-      <div class="two">
-        <div class="field">
-          <label for="qa-home-score">${esc(match.home_name)} (legs)</label>
-          <input id="qa-home-score" type="number" min="0" max="99" step="1"
-            value="${prediction ? prediction.home_score : 6}"
-            required ${allowed ? '' : 'disabled'}>
-        </div>
-        <div class="field">
-          <label for="qa-away-score">${esc(match.away_name)} (legs)</label>
-          <input id="qa-away-score" type="number" min="0" max="99" step="1"
-            value="${prediction ? prediction.away_score : 3}"
-            required ${allowed ? '' : 'disabled'}>
-        </div>
-      </div>
-      <p class="hint">
-        Best of 11 legs: precies één speler moet 6 legs hebben;
-        de andere speler maximaal 5.
-      </p>
-      <p id="qa-prediction-feedback" role="status"></p>
-      <div class="row" style="gap:8px;flex-wrap:wrap">
-        <button class="btn" type="submit" ${allowed ? '' : 'disabled'}>
-          ${prediction ? 'Voorspelling wijzigen' : 'Voorspelling indienen'}
-        </button>
-        <button class="btn secondary" type="button" id="qa-reload">
-          Vernieuwen
-        </button>
-      </div>
-    </form>
-    <div id="qa-points-panel" class="notice" role="status">
-      ${match.match_status === 'finished'
-        ? 'Officiële testuitslag en punten ophalen...'
-        : 'Punten verschijnen zodra de testwedstrijd is afgerond.'}
-    </div>
-  `;
-
-  if (match.match_status === 'finished') {
-    const pointsTarget = target.querySelector('#qa-points-panel');
-    const { data: pointRows, error: pointsError } = await supabase.rpc(
-      'get_my_match_points',
-      { p_tournament_id: tournament.id }
-    );
-    if (!target.isConnected || !pointsTarget.isConnected) return;
-    if (pointsError) {
-      pointsTarget.textContent = `Punten ophalen mislukt: ${pointsError.message}`;
-      console.error('QA-punten:', pointsError);
-    } else {
-      const forMatch = (pointRows ?? []).filter(row => row.match_id === match.match_id);
-      if (forMatch.length !== 1) {
-        pointsTarget.textContent = 'Geen unieke afgeronde voorspelling gevonden voor deze wedstrijd.';
-      } else {
-        const p = forMatch[0];
-        pointsTarget.innerHTML = `
-          <h3 style="margin:0 0 8px">Testresultaat uit Supabase</h3>
-          <p>Voorspelling: <strong>${esc(p.predicted_home)}–${esc(p.predicted_away)}</strong></p>
-          <p>Uitslag: <strong>${esc(p.actual_home)}–${esc(p.actual_away)}</strong></p>
-          <p>Juiste winnaar: <strong>${p.correct_winner ? 'Ja' : 'Nee'}</strong> ·
-             Exacte uitslag: <strong>${p.exact_score ? 'Ja' : 'Nee'}</strong></p>
-          <p><strong>Behaalde punten: ${esc(p.earned_points)}</strong></p>
-        `;
-      }
-    }
-  }
-
-  target.querySelector('#qa-reload').onclick = loadQaPredictionForm;
-  target.querySelector('#qa-prediction-form').onsubmit = async event => {
-    event.preventDefault();
-    const a = Number(target.querySelector('#qa-home-score').value);
-    const b = Number(target.querySelector('#qa-away-score').value);
-    const feedback = target.querySelector('#qa-prediction-feedback');
-    const button = target.querySelector('button[type="submit"]');
-
-    if (!Number.isInteger(a) || !Number.isInteger(b) ||
-        !((a === 6 && b >= 0 && b < 6) ||
-          (b === 6 && a >= 0 && a < 6))) {
-      feedback.textContent = 'Ongeldige legstand: één speler moet precies 6 legs winnen.';
-      return;
-    }
-    button.disabled = true;
-    feedback.textContent = 'Voorspelling naar Supabase versturen...';
-
-    const {data: savedId, error} = await supabase.rpc(
-      'submit_match_prediction',
-      {p_match_id: match.match_id, p_home_score: a, p_away_score: b}
-    );
-    if (!target.isConnected) return;
-    if (error) {
-      feedback.textContent = `Opslaan geweigerd: ${error.message}`;
-      button.disabled = false;
-      console.error('QA voorspelling:', error);
-      return;
-    }
-    feedback.textContent = `Opgeslagen in Supabase (ID: ${savedId}).`;
-    await loadQaPredictionForm();
-  };
-}
 
 
 /*
@@ -1640,7 +1456,7 @@ render=function(){
   renderBeforeAccountInvitations();
   if(!currentUser||!['admin','super_admin'].includes(currentRole)||state.tab!=='admin')return;
   const panel=document.createElement('section');panel.className='panel stack';panel.id='account-invitations';
-  panel.innerHTML='<h2>Accounts en herstelcodes</h2><p>Deel een eenmalige link rechtstreeks met de juiste persoon. Activatie is zeven dagen geldig, wachtwoordherstel één uur. De gebruiker kiest zelf een wachtwoord; er wordt geen e-mail verstuurd.</p><form class="stack"><label for="account-invite-username">Gebruikersnaam voor accountbeheer</label><input id="account-invite-username" autocomplete="off" maxlength="128" required spellcheck="false"><button class="btn" value="activate">Account uitnodigen</button><button class="ghost" value="reset">Herstelcode maken</button><button class="ghost" type="button" id="revoke-account-invite">Openstaande codes intrekken</button></form><p id="account-invite-message" role="status"></p><div id="account-invite-result"></div>';
+  panel.innerHTML='<div data-admin-accounts></div><h2>Accounts en herstelcodes</h2><p>Deel een eenmalige link rechtstreeks met de juiste persoon. Activatie is zeven dagen geldig, wachtwoordherstel één uur. De gebruiker kiest zelf een wachtwoord; er wordt geen e-mail verstuurd.</p><form class="stack"><label for="account-invite-username">Gebruikersnaam voor accountbeheer</label><input id="account-invite-username" autocomplete="off" maxlength="128" required spellcheck="false"><button class="btn" value="activate">Account uitnodigen</button><button class="ghost" value="reset">Herstelcode maken</button><button class="ghost" type="button" id="revoke-account-invite">Openstaande codes intrekken</button></form><p id="account-invite-message" role="status"></p><div id="account-invite-result"></div>';
   document.querySelector('.nav')?.after(panel);
   const form=panel.querySelector('form'),username=panel.querySelector('input'),message=panel.querySelector('#account-invite-message'),result=panel.querySelector('#account-invite-result');
   async function submit(kind){
@@ -1672,7 +1488,7 @@ render=function(){
   const target=document.createElement('section');target.id='admin-knockout';target.className='panel stack';
   document.querySelector('#account-invitations')?.after(target);
   knockoutScreenController=new AbortController();const signal=knockoutScreenController.signal,userId=currentUser.id;
-  import('./knockout.js?v=github-mastercaller-20261019').then(({loadKnockoutAdmin})=>{
+  import('./knockout.js?v=manual-results-20261022').then(({loadKnockoutAdmin})=>{
     if(!signal.aborted&&target.isConnected)loadKnockoutAdmin(target,{supabase,signal,isCurrent:()=>currentUser?.id===userId,onSaved:()=>{loadAdminMatches();loadAdminTournamentPublications();}});
   }).catch(()=>{if(!signal.aborted&&target.isConnected)target.textContent='Knock-outbeheer laden mislukt. Open Beheer opnieuw.';});
 };
@@ -1698,7 +1514,9 @@ function refreshAdminGameContext(){
 }
 async function loadAdminTemplates(){const target=document.getElementById('admin-templates');if(!target||target.children.length)return;target.textContent='Sjablonen laden…';try{const {loadTemplateManagement}=await import('./template-management.js?v=refinements-20261017');if(!target.isConnected)return;await loadTemplateManagement(target,{supabase,signal:templateManagementController.signal,isCurrent:()=>['admin','super_admin'].includes(currentRole),onSaved:()=>document.dispatchEvent(new CustomEvent('predict-knockout-templates-changed'))});}catch(error){if(target.isConnected)target.textContent='Sjablonen laden mislukt: '+error.message;}}
 function showAdminSection(id){
+ if(id==='qa')id='tournaments';
  selectedAdminSection=id;
+ if(id==='accounts'){const host=document.querySelector('[data-admin-accounts]'),userId=currentUser?.id;if(host&&!host.dataset.loaded){host.dataset.loaded='true';loadAdminAccounts(host,{supabase,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole)});}}
  document.querySelectorAll('[data-admin-panel]').forEach(panel=>panel.hidden=panel.dataset.adminPanel!==id);
  document.querySelectorAll('[data-admin-section]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.adminSection===(['schema','matches','rankings'].includes(id)?'tournaments':id))));
  if(['schema','matches','rankings'].includes(id))refreshAdminGameContext();if(id==='templates')loadAdminTemplates();
@@ -1716,7 +1534,7 @@ render=function(){
  const appearance=document.createElement('section');appearance.id='app-appearance';appearance.className='panel stack';loadAppearanceSettings(appearance);
  const templates=document.createElement('section');templates.id='admin-templates';templates.className='panel stack';
  const pushPanel=document.createElement('section');pushPanel.id='admin-push';pushPanel.className='panel stack';
- const groups=[['settings','Instellingen',appearance],['notifications','Meldingen',pushPanel],['tournaments','Spellen',publication],['templates','Sjablonen',templates],['schema','Schema’s',document.getElementById('admin-knockout')],['matches','Wedstrijden',document.getElementById('admin-matches')?.closest('.panel')],['accounts','Accounts',document.getElementById('account-invitations')],['rankings','Klassementen',document.getElementById('admin-leaderboards')],['qa','Testomgeving',document.getElementById('qa-prediction-panel')]];
+ const groups=[['settings','Instellingen',appearance],['notifications','Meldingen',pushPanel],['tournaments','Spellen',publication],['templates','Sjablonen',templates],['schema','Schema’s',document.getElementById('admin-knockout')],['matches','Wedstrijden',document.getElementById('admin-matches')?.closest('.panel')],['accounts','Accounts',document.getElementById('account-invitations')],['rankings','Klassementen',document.getElementById('admin-leaderboards')]];
  groups.forEach(([id,label,content])=>{if(!content)return;const panel=document.createElement('section');panel.dataset.adminPanel=id;panel.className='stack';panel.setAttribute('aria-label',label);const button=document.createElement('button');button.type='button';button.textContent=label;button.dataset.adminSection=id;button.onclick=()=>{if(id==='tournaments'){delete publication.dataset.selectedTournament;loadAdminTournamentPublications(true);}showAdminSection(id);};if(!['schema','matches','rankings'].includes(id))nav.append(button);if(id==='matches'){const refresh=document.getElementById('admin-refresh');if(refresh)panel.append(refresh);}panel.append(content);shell.append(panel);});
  old.remove();const updateAdminOffset=()=>shell.style.setProperty('--admin-game-top',(nav.getBoundingClientRect().height)+'px');adminNavObserver=new ResizeObserver(updateAdminOffset);adminNavObserver.observe(nav);updateAdminOffset();showAdminSection(selectedAdminSection);
 };
