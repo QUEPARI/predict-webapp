@@ -1,0 +1,20 @@
+const {JSDOM}=require('jsdom'),fs=require('node:fs'),assert=require('node:assert/strict');
+(async()=>{
+ const dom=new JSDOM('<div id="target" data-source-inline></div>',{runScripts:'outside-only'}),w=dom.window;
+ const source=fs.readFileSync('score-source.js','utf8').replaceAll('export async function','async function').replaceAll('export function','function');w.eval(source);
+ const host=w.document.querySelector('#target'),calls=[];let resolveFetch,saved=0;
+ const state={source:'mastercaller_test',automatic_setup:true,url:'https://mastercaller.com/tournaments/european-championship/2026/results',darts:true,last_attempt:'2026-10-22T20:43:00Z',report:{received:6,applied:1,unchanged:5,checked_at:'2026-10-22T20:43:00Z'}};
+ const client={rpc:async(name,args)=>{calls.push([name,args]);return {data:state};},functions:{invoke:async(name,args)=>{calls.push([name,args]);return new Promise(r=>resolveFetch=r);}}};
+ await w.loadScoreSource(host,{supabase:client,isCurrent:()=>true},'t',()=>saved++);
+ const button=host.querySelector('[data-fetch-scores]'),message=host.querySelector('[data-source-message]');assert.equal(button.textContent,'Nu scores ophalen');
+ const click=()=>button.onclick();
+ let pending=click();assert.equal(message.textContent,'Scores ophalen…');assert(button.disabled);assert(!message.textContent.includes('afgerond'));await click();assert.equal(calls.filter(c=>c[0]==='sync-mastercaller').length,1);
+ resolveFetch({data:{status:'completed',applied:1,received:7,unchanged:6,issues:[]}});await pending;assert.match(message.textContent,/7 uitslagen opgehaald, 1 verwerkt, 6 al aanwezig/);assert(!button.disabled);assert.equal(saved,1);
+ pending=click();resolveFetch({error:{message:'Request failed',context:{json:async()=>({error:'Mastercaller niet bereikbaar (HTTP 418).'})}}});await pending;assert.match(message.textContent,/HTTP 418/);assert(!message.textContent.includes('afgerond'));assert.equal(saved,1);assert(!button.disabled);
+ pending=click();resolveFetch({data:{processed:0,message:'Ophalen staat in de GitHub-wachtrij.'}});await pending;assert.match(message.textContent,/wachtrij/);assert(!message.textContent.includes('afgerond'));assert.equal(saved,1);
+ pending=click();state.report={applied:0,received:7,issues:[{match:'A – B',reason:'Handmatige uitslag behouden'}]};resolveFetch({data:{status:'completed',...state.report}});await pending;assert.match(message.textContent,/1 meldingen controleren/);assert.match(host.querySelector('[data-source-report]').textContent,/Handmatige uitslag behouden/);assert.equal(saved,2);
+ pending=click();resolveFetch({error:{message:'Request failed',context:{json:async()=>({error:'Er loopt al een ophaalactie. Probeer het over één minuut opnieuw.'})}}});await pending;assert.match(message.textContent,/één minuut/);assert(!button.disabled);
+ state.stopped=true;await w.loadScoreSource(host,{supabase:client,isCurrent:()=>true},'t');assert(host.querySelector('[data-fetch-scores]').disabled);
+ assert.equal(calls.some(c=>c[0]==='set_tournament_score_source'),false);dom.window.close();
+ console.log('PASS: real pending state, no duplicate click, processed counts, HTTP 418 and cooldown reasons, legacy queued response cannot appear completed, partial warnings and stopped final.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

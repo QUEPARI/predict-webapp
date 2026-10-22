@@ -1,6 +1,6 @@
 import {renderArchivedTournament} from './tournament-archive.js?v=archive-20261022';
 import {loadSourceResults} from './source-results.js?v=archive-20261022';
-import {loadScoreSource} from './score-source.js?v=header-admin-20261022';
+import {loadScoreSource} from './score-source.js?v=direct-fetch-20261022';
 import {showTournamentImage,createSquareCrop} from './tournament-images.js?v=crop-20261017';
 import {dutchInput,dutchToUTC,dutchTime} from './knockout.js?v=manual-results-20261022';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
