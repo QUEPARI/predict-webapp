@@ -111,12 +111,14 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
     const ended=Date.parse(t.ends_at)<=Date.now()||t.status==='completed'||allMatches.length>0&&allMatches.every(m=>m.status==='finished'&&m.home_score!=null&&m.away_score!=null);
     if(ended&&view.tab==='predictions')view.tab='results';
     const selected=allMatches.filter(m=>!view.round||m.round_id===view.round);
-    const resultMatches=selected.filter(m=>m.home_score!=null);
-    const visiblePredictions=()=>selected.filter(m=>localDay(m.scheduled_start)===localDay(new Date())||open(m,t));
+    const resultMatches=selected.filter(m=>m.home_score!=null).sort((a,b)=>(Date.parse(b.actual_start||b.scheduled_start)||-Infinity)-(Date.parse(a.actual_start||a.scheduled_start)||-Infinity));
+    const notStarted=m=>m.status==='scheduled'&&m.actual_start==null&&m.home_score==null&&m.away_score==null&&(m.scheduled_start==null||Date.parse(m.scheduled_start)>Date.now());
+    const predictionOrder=()=>[...selected].sort((a,b)=>Number(notStarted(b))-Number(notStarted(a)));
+    const visiblePredictions=()=>predictionOrder().filter(m=>localDay(m.scheduled_start)===localDay(new Date())||open(m,t));
     let activeMatches=view.tab==='results'?resultMatches:visiblePredictions();
     page=Math.max(0,Math.min(page,Math.ceil(activeMatches.length/size)-1));
     const list=selected;
-    const predictionMatches=selected;
+    const predictionMatches=predictionOrder();
     const shownResults=resultMatches;
     const predictions=joined && list.length ? await ctx.supabase.from('match_predictions')
       .select('match_id,home_score,away_score').eq('user_id',ctx.userId).in('match_id',list.map(m=>m.id)) : {data:[]};
@@ -159,6 +161,8 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
     const pager=target.querySelector('#online-next').closest('.row');pager.dataset.pagination='';target.append(pager);
     function updatePage(tab=view.tab){
       activeMatches=tab==='results'?resultMatches:visiblePredictions();
+      const grid=target.querySelector('.online-matches'),cards=new Map([...grid.children].map(card=>[card.dataset.onlineMatch,card]));
+      predictionOrder().forEach((m,i)=>{const card=cards.get(m.id);if(card&&grid.children[i]!==card)grid.insertBefore(card,grid.children[i]||null);});
       page=Math.max(0,Math.min(page,Math.ceil(activeMatches.length/size)-1));
       const visibleIds=new Set(activeMatches.slice(page*size,(page+1)*size).map(m=>m.id));
       target.querySelectorAll('[data-online-match]').forEach(card=>card.hidden=!visibleIds.has(card.dataset.onlineMatch));

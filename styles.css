@@ -253,3 +253,20 @@
 .centered-header .header-disc svg{display:block;width:22px;height:22px;flex:none}
 
 [data-source-inline] .notice{overflow-wrap:anywhere;min-width:0}.admin-fold>summary{list-style:none}.admin-fold>summary::-webkit-details-marker{display:none}
+
+/* Shared fold treatment for the player archive and settings. */
+[data-player-archive]>summary{display:flex;align-items:center;gap:10px;padding:14px;border-radius:9px;background:var(--soft);color:var(--txt);box-shadow:inset 3px 0 var(--accent);cursor:pointer;list-style:none}
+[data-player-archive][open]>summary{border-radius:9px 9px 0 0;margin-bottom:14px}
+.settings-fold>.panel{border:0;border-radius:0;box-shadow:none;margin:0;padding:0;background:transparent}
+.settings-fold>.panel>h2:first-child{display:none}
+.compact-match .match-heading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center;color:var(--muted)}
+.compact-match .match-heading>small,.compact-match .match-meta small{color:inherit;font-size:11px;text-align:center;white-space:normal}
+.compact-match .match-heading .match-meta{display:flex;justify-content:center;align-items:center;max-width:100%}
+@media(hover:hover){
+ .centered-header .header-icon:not(.score-alert):hover .header-disc,.centered-header .account-avatar:hover .header-disc{background:var(--soft)}
+ .detail-tabs button:not([aria-pressed=true]):hover,.admin-subnav button:not([aria-pressed=true]):hover,.nav button:not([aria-pressed=true]):hover{background:var(--soft)}
+ .header-icon.score-alert:hover .header-disc{background:#ffdfb0}.dark .header-icon.score-alert:hover .header-disc{background:#563717}
+}
+.centered-header .header-icon:focus-visible .header-disc,.centered-header .account-avatar:focus-visible .header-disc{outline:2px solid currentColor;outline-offset:3px}
+
+[data-player-archive]{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:0 14px;min-width:0}[data-player-archive]>summary{margin-left:-14px;margin-right:-14px}
