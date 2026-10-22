@@ -7,7 +7,7 @@ export function sourceUrl(value) {
   if(!/^\/tournaments\/[a-z0-9-]+\/20\d{2}\/results\/?$/.test(path))throw Error('Gebruik de uitslagenpagina van één toernooi en jaargang.');
   return 'https://mastercaller.com'+path.replace(/\/$/,'');
 }
-export function parseResults(html,url) {
+export function parseResults(html,url,referenceTime=new Date()) {
   const canonical=sourceUrl(url),year=canonical.split('/')[5];
   const {document}=parseHTML(html);
   const title=document.querySelector('h1')?.textContent.trim();
@@ -25,7 +25,7 @@ export function parseResults(html,url) {
       const winners=card.querySelectorAll('div.bg-green-500'),losers=card.querySelectorAll('div.bg-red-500');
       const dateText=card.parentElement.querySelector('.relative')?.textContent.replace(/\s+/g,' ').trim()||'';
       const date=dateText.match(/\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/);
-      const day=date?isoDay(year,date[2],date[1]):null;
+      const day=date?isoDay(year,date[2],date[1]):relativeDay(dateText,referenceTime);
       const names=players.map(p=>p.textContent.trim().replace(/\s+/g,' '));
       if(players.length===2&&day){
         const time=dateText.match(/-\s*(\d{1,2}):(\d{2})\b/);
@@ -41,7 +41,7 @@ export function parseResults(html,url) {
       const [home_score,away_score]=scores.map(Number);
       const winnerScore=Number(winners[0].textContent.trim());
       if(home_score===away_score||winnerScore!==Math.max(home_score,away_score))throw Error('Afwijkende uitslag; handmatige controle vereist.');
-      if(!date)throw Error('Wedstrijddatum ontbreekt in de bron.');
+      if(!day)throw Error('Wedstrijddatum ontbreekt in de bron.');
       const row={depth,round:label,home_name:names[0],away_name:names[1],home_score,away_score,date:day};
       const key=depth+'|'+names.map(n=>n.toLowerCase()).sort().join('|');
       if(seen.has(key))throw Error('Dubbele wedstrijd in de bron; controleer het toernooi.');
@@ -55,6 +55,18 @@ export function parseResults(html,url) {
   return {title,rounds,fixtures,records:records.sort((a,b)=>b.depth-a.depth),url:canonical,start_date:startDate?isoDay(startDate[3],startDate[2],startDate[1]):null,end_date:endDate?isoDay(endDate[3],endDate[2],endDate[1]):null};
 }
 
+// Resolve relative source labels once per fetched page, in the source timezone.
+export function relativeDay(text,referenceTime){
+ const label=text.match(/^(Today|Tomorrow|Yesterday|Vandaag|Morgen|Gisteren)\b/i)?.[1]?.toLowerCase();
+ if(!label)return null;
+ const instant=new Date(referenceTime);
+ if(!Number.isFinite(instant.getTime()))throw Error('Ongeldig ophaaltijdstip.');
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Amsterdam',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(instant);
+ const part=type=>parts.find(p=>p.type===type).value;
+ const day=new Date(Date.UTC(Number(part('year')),Number(part('month'))-1,Number(part('day'))));
+ day.setUTCDate(day.getUTCDate()+({today:0,vandaag:0,tomorrow:1,morgen:1,yesterday:-1,gisteren:-1}[label]));
+ return day.toISOString().slice(0,10);
+}
 function isoDay(year,month,day){
  const m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(month)+1;
  if(!m||Number(day)<1||Number(day)>31)throw Error('Onleesbare datum.');
@@ -107,7 +119,7 @@ async function fetchHtml(canonical,fetcher){
   return new TextDecoder().decode(bytes);
 }
 export async function fetchResults(url,fetcher=fetch){
- const canonical=sourceUrl(url);return parseResults(await fetchHtml(canonical,fetcher),canonical);
+ const canonical=sourceUrl(url),referenceTime=new Date();return parseResults(await fetchHtml(canonical,fetcher),canonical,referenceTime);
 }
 export async function fetchTournament(url,fetcher=fetch){
  const canonical=sourceUrl(url),results=await fetchResults(canonical,fetcher);

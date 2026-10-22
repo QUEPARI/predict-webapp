@@ -5,6 +5,8 @@ on:
     paths:
       - .github/workflows/mastercaller-sync.yml
       - scripts/mastercaller/**
+      - supabase/functions/sync-mastercaller/parser.js
+      - tests/mastercaller-parser.cjs
       - supabase/functions/mastercaller-github/**
   schedule:
     - cron: '3-59/5 * * * *'
@@ -25,4 +27,5 @@ jobs:
           persist-credentials: false
       - run: npm ci --prefix scripts/mastercaller --ignore-scripts --no-audit --no-fund
       - run: ln -s "$PWD/scripts/mastercaller/node_modules" node_modules
+      - run: node tests/mastercaller-parser.cjs
       - run: node scripts/mastercaller/sync.mjs

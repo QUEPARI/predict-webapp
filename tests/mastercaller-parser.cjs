@@ -27,5 +27,14 @@ const assert=require('node:assert/strict');
  const pending=parseResults(resultPage.replaceAll('bg-green-500','bg-gray').replaceAll('bg-red-500','bg-gray').replace('22:15','TBA'),url);assert.equal(pending.fixtures[0].start,null);assert.equal(pending.records.length,0);
  await assert.rejects(()=>fetchResults(url,async()=>new Response('Forbidden',{status:403})),/HTTP 403/);
  await assert.rejects(()=>fetchResults(url,async()=>new Response('oops',{headers:{'content-type':'application/json'}})),/geen HTML/);
- console.log('PASS: Mastercaller parsing, round depth/date, final markers, duplicates, pending scores, URL allowlist, 403 and invalid content.');
+ const reference=new Date('2026-10-21T22:30:00Z'); // Already 22 October in Amsterdam.
+ for(const [label,day] of [['Today','2026-10-22'],['Tomorrow','2026-10-23'],['Yesterday','2026-10-21'],['Vandaag','2026-10-22'],['Morgen','2026-10-23'],['Gisteren','2026-10-21']]){
+  const relative=parseResults(page(card().replace('Sun 11 Oct',label)),url,reference);
+  assert.equal(relative.records[0].date,day);
+  assert.equal(relative.fixtures[0].date,day);
+ }
+ assert.equal(parseResults(page(card().replace('Sun 11 Oct','Tomorrow')),url,new Date('2026-12-31T12:00Z')).records[0].date,'2027-01-01');
+ assert.equal(parseResults(page(card().replace('Sun 11 Oct','Yesterday')),url,new Date('2026-01-01T12:00Z')).records[0].date,'2025-12-31');
+ assert.throws(()=>parseResults(page(card().replace('Sun 11 Oct','Unknown')),url,reference),/datum ontbreekt/);
+ console.log('PASS: relative labels, Amsterdam midnight, year boundaries; Mastercaller parsing, round depth/date, final markers, duplicates, pending scores, URL allowlist, 403 and invalid content.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
