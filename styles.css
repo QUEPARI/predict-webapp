@@ -270,3 +270,13 @@
 .centered-header .header-icon:focus-visible .header-disc,.centered-header .account-avatar:focus-visible .header-disc{outline:2px solid currentColor;outline-offset:3px}
 
 [data-player-archive]{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:0 14px;min-width:0}[data-player-archive]>summary{margin-left:-14px;margin-right:-14px}
+
+/* Tablet tournament cards follow the available screen orientation. */
+@media (min-width:741px) and (max-width:1100px) and (orientation:portrait){
+ [data-my-tournaments],[data-open-tournaments],[data-archive-list],[data-admin-games]{grid-template-columns:minmax(0,1fr)}
+}
+@media (min-width:741px) and (max-width:1440px) and (orientation:landscape){
+ [data-my-tournaments],[data-open-tournaments],[data-archive-list],[data-admin-games]{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+/* Keep the score pair centered and put its autosave feedback to the right. */
+.compact-match .prediction-autosave [data-prediction-message]:not(:empty){grid-column:3;grid-row:1;justify-self:start;align-self:center;text-align:left;min-width:0;overflow-wrap:anywhere;order:initial}
