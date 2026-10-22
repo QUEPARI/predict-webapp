@@ -1,4 +1,4 @@
-import {scoreSourceFields,bindScoreSource,invokeMastercaller,awaitMastercallerCreation} from './score-source.js?v=manual-results-20261022';
+import {scoreSourceFields,bindScoreSource,invokeMastercaller,awaitMastercallerCreation} from './score-source.js?v=direct-fetch-20261022';
 import {roundTable,readRoundTable,unitSelect,roundNames} from './round-settings.js?v=refinements-20261017';
 import {layoutBracket} from './bracket.js?v=hub-20261017';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

@@ -1,4 +1,5 @@
 import {createClient} from '@supabase/supabase-js';
+import {fetchResults,fetchTournament} from './parser.js';
 
 const headers={'Access-Control-Allow-Origin':'https://quepari.github.io','Access-Control-Allow-Headers':'authorization,apikey,content-type,x-client-info','Access-Control-Allow-Methods':'POST,OPTIONS','Cache-Control':'no-store'};
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers});
@@ -31,8 +32,29 @@ export async function handle(req:Request){
    if(result.error)return reply({error:result.error.message},400);return reply(result.data);
   }
   if(!/^[a-f0-9-]{36}$/i.test(input.tournament_id||''))return reply({error:'Kies een toernooi'},400);
-  const result=await userDb.rpc('request_mastercaller_refresh',{p_id:input.tournament_id});
-  if(result.error)return reply({error:result.error.message},400);return reply(result.data);
+  // A manual click performs the fetch now; it must not report a queued job as completed.
+  // The same claim/lease as the scheduled worker prevents duplicate source requests.
+  const claimed=await db.rpc('claim_mastercaller_jobs',{p_tournament:input.tournament_id,p_actor:actor});
+  if(claimed.error)return reply({error:claimed.error.message},400);
+  const job=claimed.data?.[0];
+  if(!job){
+   const state=await userDb.rpc('get_tournament_score_source',{p_tournament:input.tournament_id});
+   if(state.error)return reply({error:state.error.message},400);
+   return reply({error:state.data?.stopped?'De finale is afgerond; ophalen is gestopt.':state.data?.source!=='mastercaller_test'?'Dit toernooi heeft geen Mastercaller-bron.':'Er loopt al een ophaalactie of er is minder dan één minuut geleden opgehaald. Probeer het over één minuut opnieuw.'},409);
+  }
+  let snapshot=null,records=[],sourceError=null;
+  try{
+   const data=await(job.automatic_setup?fetchTournament(job.url):fetchResults(job.url));
+   records=data.records;snapshot=job.automatic_setup?data:null;
+  }catch(e){
+   sourceError=e instanceof Error?e.message:'Mastercaller ophalen mislukt.';
+   if(e instanceof Error&&['TimeoutError','AbortError'].includes(e.name))sourceError='Mastercaller reageert niet binnen 15 seconden. Er zijn geen nieuwe gegevens verwerkt.';
+   else if(e instanceof TypeError)sourceError='Verbinding met Mastercaller mislukt. Er zijn geen nieuwe gegevens verwerkt.';
+  }
+  const finished=await db.rpc('finish_mastercaller_job',{p_tournament:job.tournament_id,p_lease:job.lease,p_records:records,p_error:sourceError,p_snapshot:snapshot});
+  if(finished.error)return reply({error:'Verwerken van de brongegevens mislukt: '+finished.error.message},500);
+  if(sourceError||finished.data?.error)return reply({error:sourceError||finished.data.error},502);
+  return reply({status:'completed',...finished.data});
  }catch(e){return reply({error:e instanceof Error?e.message:'Ophalen mislukt'},400);}
 }
 // Own authentication: validated admin JWT or a Vault-backed worker secret above.
