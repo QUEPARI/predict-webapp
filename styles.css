@@ -248,3 +248,8 @@
 
 /* Action warning remains orange in both account themes. */
 .header-icon.score-alert .header-disc{background:#fff0dc;border-color:#ea7900;color:#a84b00;position:relative}.dark .header-icon.score-alert .header-disc{background:#3b260d;border-color:#ffad42;color:#ffb34e}.score-alert strong{font-size:22px;line-height:1}.score-alert small{position:absolute;right:-5px;top:-5px;min-width:17px;border-radius:99px;background:#c65300;color:#fff;font-size:10px;font-weight:800;padding:1px 3px}.header-actions:has(.score-alert:not([hidden])){gap:2px}@media(max-width:420px){.centered-header:has(.score-alert:not([hidden])) .brand{font-size:21px}.centered-header:has(.score-alert:not([hidden])) .tag{font-size:8px}.centered-header:has(.score-alert:not([hidden])) .header-icon,.centered-header:has(.score-alert:not([hidden])) .account-avatar{width:38px;min-width:38px}}
+
+/* SVG Repo header icons, CC0. */
+.centered-header .header-disc svg{display:block;width:22px;height:22px;flex:none}
+
+[data-source-inline] .notice{overflow-wrap:anywhere;min-width:0}.admin-fold>summary{list-style:none}.admin-fold>summary::-webkit-details-marker{display:none}

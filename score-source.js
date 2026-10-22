@@ -29,6 +29,7 @@ export async function loadScoreSource(host,ctx,tournament,onSaved){
  try{
   let data=await rpc('get_tournament_score_source',{p_tournament:tournament});if(!alive())return;
   host.innerHTML=`<details class="admin-fold"><summary>Uitslagenbron</summary><form class="stack">${scoreSourceFields()}<button class="btn">Uitslagenbron opslaan</button><p role="status" data-source-message></p></form><div data-source-report></div><button type="button" class="ghost" data-fetch-scores>Nu scores ophalen (test)</button></details>`;
+  if(host.hasAttribute('data-source-inline')){const fold=host.querySelector('details.admin-fold');fold.querySelector('summary').remove();fold.replaceWith(...fold.childNodes);}
   const form=host.querySelector('form'),message=host.querySelector('[data-source-message]'),button=host.querySelector('[data-fetch-scores]');
   form.elements.scoreSource.value=data.source;form.elements.mastercallerUrl.value=data.url||'';
   const baseUpdate=bindScoreSource(form,()=>data.darts);let busy=false;
