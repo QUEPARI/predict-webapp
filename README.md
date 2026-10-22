@@ -4,7 +4,7 @@
 
 ## Handmatige bronuitslagen en accountbeheer — 22 oktober 2026
 - Mastercaller-uitslagen kunnen handmatig worden ingevoerd en aangepast via Algemeen of Wedstrijden. De scorevelden gebruiken dezelfde numerieke toetsenbordinstelling als voorspellingen. Schema, deelnemers en planning blijven automatisch beheerd.
-- Uitslagen verwerken punten en doorplaatsing. Een handmatige uitslag blijft behouden bij een afwijkende bronuitslag, met een blijvende melding. Een identieke latere bronuitslag bevestigt de invoer. Het veranderen van de winnaar blijft geblokkeerd als de vervolgwedstrijd voorspellingen heeft of gestart is.
+- Uitslagen verwerken punten en doorplaatsing. Een handmatige uitslag blijft behouden bij een afwijkende bronuitslag, met een blijvende melding, ook wanneer de bron door een andere winnaar een afwijkend vervolgschema toont. Een identieke latere bronuitslag bevestigt de invoer. Het veranderen van de winnaar blijft geblokkeerd als de vervolgwedstrijd voorspellingen heeft of gestart is.
 - Accounts toont alle geregistreerde gebruikers, inclusief rol, accountstatus en zoekfunctie. Alleen hoofdbeheerders kunnen gebruikers beheerder maken of beheerrechten intrekken. Hoofdbeheeraccounts zijn beschermd; rolwijzigingen worden gelogd.
 - Het oude QA-formulier en de tab Testomgeving zijn verwijderd. De toernooitab heet Spelregels.
 - Migratie: `20261022072156_manual_mastercaller_results_and_account_roles.sql`. Databasetests gebruiken rollback; mobiele browsertests gebruiken een mockbackend. Alle 76 bestaande voorspellingen bleven ongewijzigd bij publicatie.

@@ -69,6 +69,13 @@ begin
  result:=public.finish_mastercaller_job(tid,(job->>'lease')::uuid,jsonb_set(records,'{0,away_score}','4'),null,source);
  if jsonb_array_length(result->'issues')<>1 or not exists(select 1 from predict_private.mastercaller_manual_results where match_id=mid and conflict and source_away_score=4) then raise exception 'FAIL source conflict not recorded';end if;
  if not exists(select 1 from public.matches where id=mid and home_score=6 and away_score=3) then raise exception 'FAIL manual overwritten';end if;
+ -- A different source winner changes the downstream source bracket too.
+ update predict_private.mastercaller_sources set last_attempt=now()-interval '5 hours' where tournament_id=tid;
+ job:=public.claim_mastercaller_jobs(tid,admin_id)->0;
+ result:=public.finish_mastercaller_job(tid,(job->>'lease')::uuid,jsonb_set(jsonb_set(records,'{0,home_score}','3'),'{0,away_score}','6'),null,
+  jsonb_set(jsonb_set(source,'{bracket,2,home_name}','"QA B"'),'{bracket,2,away_name}','"QA C"'));
+ if not exists(select 1 from predict_private.mastercaller_manual_results where match_id=mid and conflict and source_home_score=3 and source_away_score=6) then raise exception 'FAIL downstream schema hid manual conflict';end if;
+ if not exists(select 1 from public.matches where id=mid and home_score=6 and away_score=3) then raise exception 'FAIL conflicting winner replaced manual result';end if;
  perform set_config('role','authenticated',true);
  if not (public.get_tournament_score_source(tid)->'manual_results' @> jsonb_build_array(jsonb_build_object('match_id',mid,'conflict',true))) then raise exception 'FAIL conflict hidden';end if;
  perform set_config('request.jwt.claim.sub',player_id::text,true);perform public.submit_match_prediction(final_id,6,3);
