@@ -1,3 +1,15 @@
+export function predictionValidationMessage(match,homeValue,awayValue){
+ const values=[homeValue,awayValue];
+ if(values.some(v=>String(v).trim()===''))return 'Vul beide scores in.';
+ const [home,away]=values.map(Number);
+ if(![home,away].every(n=>Number.isInteger(n)&&n>=0&&n<=99))return 'Gebruik hele getallen van 0 t/m 99.';
+ if(match.score_unit==='goals')return '';
+ const ft=Number(match.first_to);
+ if(!Number.isInteger(ft)||ft<1)return 'Het wedstrijdformaat is nog niet bekend.';
+ if((home===ft&&away<ft)||(away===ft&&home<ft))return '';
+ if(home===away)return 'Gelijkspel is niet mogelijk. Eén speler moet precies '+ft+' halen.';
+ return 'De winnaar moet precies '+ft+' halen; de andere score moet lager zijn.';
+}
 import {renderArchivedTournament} from './tournament-archive.js?v=archive-20261022';
 import {showTournamentImage} from './tournament-images.js?v=header-20261017';
 // Public user screens. Supabase remains authoritative for access, scores and deadlines.
@@ -154,11 +166,11 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
       <div class="row"><button class="btn secondary" id="online-previous" ${page===0?'disabled':''}>Vorige</button>
         <span>Pagina ${page+1}</span><button class="btn secondary" id="online-next" ${(page+1)*size >= activeMatches.length?'disabled':''}>Volgende</button></div></section><section data-detail-panel="results"><div class="results-wrap"><table class="results-table"><thead><tr><th>Ronde / wedstrijd</th><th><span class="results-full-label">Jouw voorspelling</span><span class="results-short-label">Jij</span></th><th class="result-column">Uitslag</th><th><abbr title="Punten">Pt</abbr></th></tr></thead><tbody>${shownResults.map(m=>{const p=myPredictions.get(m.id);return `<tr><td>${esc(roundNames.get(m.round_id)||'—')}${m.scheduled_start?' · '+esc(resultDate(m.scheduled_start)):''}<br>${esc(m.home_name)} – ${esc(m.away_name)}</td><td>${p?`<span class="score-tone score-tone-${predictionOutcome(m,p).state}">${p.home_score} - ${p.away_score}</span>`:'—'}</td><td class="result-column">${m.home_score} - ${m.away_score}</td><td>${myPoints.get(m.id)?.earned_points??'—'}</td></tr>`;}).join('')||'<tr><td colspan="4">Nog geen uitslagen in deze ronde.</td></tr>'}</tbody></table></div></section><section data-detail-panel="pools"><h2>Mijn poules</h2><div id="private-pools" class="stack" role="region" aria-label="Privépoules"></div></section><section data-detail-panel="schema"></section><section data-detail-panel="champion"></section><section data-detail-panel="ranking"><h2>Klassement</h2><div data-ranking></div></section>`;
     const champion=target.querySelector('[data-detail-panel="champion"]');champion.className='panel stack';
-    import('./tournament-management.js?v=mobile-archive-20261019').then(({loadChampionPrediction})=>{if(current(target,ctx))loadChampionPrediction(champion,ctx,t.id,joined).then(data=>{if(!current(target,ctx)||!data)return;const button=target.querySelector('[data-detail-tab=champion]');button.hidden=!data.enabled;if(!data.enabled&&view.tab==='champion')showTab('predictions');});}).catch(()=>{if(current(target,ctx))champion.textContent='Winnaarsvraag laden mislukt.';});
+    import('./tournament-management.js?v=polish-20261023').then(({loadChampionPrediction})=>{if(current(target,ctx))loadChampionPrediction(champion,ctx,t.id,joined).then(data=>{if(!current(target,ctx)||!data)return;const button=target.querySelector('[data-detail-tab=champion]');button.hidden=!data.enabled;if(!data.enabled&&view.tab==='champion')showTab('predictions');});}).catch(()=>{if(current(target,ctx))champion.textContent='Winnaarsvraag laden mislukt.';});
     const rulesPanel=document.createElement('section');rulesPanel.dataset.detailPanel='rules';rulesPanel.className='panel stack';target.append(rulesPanel);
     const renderRules=(bracket)=>{const rds=rounds.data||[];rulesPanel.innerHTML='<h2>Spelregels</h2><p>Voorspel vóór de individuele begintijd. Bij Mastercaller-wedstrijden met tijd NNB kun je alvast voorspellen tot de toernooistart; zodra de tijd bekend is geldt de wedstrijdtijd. Eén voorspelling telt voor het toernooi en alle bijbehorende poules. Vrijstellingen leveren geen punten op. Voetbal: eindstand vóór strafschoppen; gelijkspel toegestaan.</p><p>'+esc(scoringMode==='additive'?'Exacte score telt bovenop de punten voor de juiste winnaar.':'Exacte score vervangt de punten voor de juiste winnaar.')+'</p><div class="table-wrap"><table><thead><tr><th>Ronde</th><th>Spelvorm</th><th>Juiste winnaar</th><th>Exacte score</th></tr></thead><tbody>'+rds.map(r=>{const rule=roundRules.get(r.id),games=bracket?.matches?.filter(m=>m.round===r.round_order)||list.filter(m=>m.round_id===r.id),formats=[...new Set(games.map(m=>{const unit=m.unit||m.score_unit;return unit==='goals'?'Doelpunten':(unit==='sets'?'Sets':'Legs')+' · first-to '+(m.first_to??'—');}))];return `<tr><td>${esc(r.name)}</td><td>${esc(formats.join(' / ')||'Nog niet vastgelegd')}</td><td>${rule?.winner_points??'—'}</td><td>${rule?.exact_score_points??'—'}</td></tr>`;}).join('')+'</tbody></table></div><p class="hint">De eventuele winnaarbonus en sluiting staan bij Toernooiwinnaar. Een gesloten wedstrijd wordt niet opnieuw geopend door alleen een tijd te wijzigen.</p>';};renderRules(bracket);
     const schema=target.querySelector('[data-detail-panel="schema"]');schema.className='panel stack';
-    import('./knockout.js?v=github-mastercaller-20261019').then(({loadKnockoutSchema})=>{if(current(target,ctx))loadKnockoutSchema(schema,ctx,t.id,bracket).then(data=>{if(current(target,ctx)&&data)renderRules(data);});});
+    import('./knockout.js?v=polish-20261023').then(({loadKnockoutSchema})=>{if(current(target,ctx))loadKnockoutSchema(schema,ctx,t.id,bracket).then(data=>{if(current(target,ctx)&&data)renderRules(data);});});
     const pager=target.querySelector('#online-next').closest('.row');pager.dataset.pagination='';target.append(pager);
     function updatePage(tab=view.tab){
       activeMatches=tab==='results'?resultMatches:visiblePredictions();
@@ -213,9 +225,10 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
       const button=form.querySelector('button');
       let debounce,deadlineTimer,inFlight=null,revision=0,stopped=false;
       const values=()=>[form.elements.home.value,form.elements.away.value];
-      const valid=()=>{const [h,a]=values();if(h.trim()===''||a.trim()==='')return false;const home=Number(h),away=Number(a);return [home,away].every(n=>Number.isInteger(n)&&n>=0&&n<=99)&&(m.score_unit==='goals'||home===m.first_to&&away<m.first_to||away===m.first_to&&home<m.first_to);};
+      const validation=()=>predictionValidationMessage(m,...values());
+      const valid=()=>!validation();
       const saved=()=>!inFlight&&myPredictions.has(m.id)&&['home','away'].every(name=>form.elements[name].value===form.elements[name].defaultValue);
-      const say=(text,error=false)=>{message.textContent=text;message.className=error?'error':'mini muted';};
+      const say=(text,error=false)=>{message.textContent=text;message.className=error?'prediction-validation error score-tone score-tone-wrong':'mini muted';message.setAttribute('aria-live',error?'assertive':'polite');form.querySelectorAll('input').forEach(input=>input.setAttribute('aria-invalid',String(error))); };
       const disable=()=>{
         stopped=true;clearTimeout(debounce);clearTimeout(deadlineTimer);
         form.querySelectorAll('input,button').forEach(e=>e.disabled=true);
@@ -226,7 +239,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
         if(inFlight){const succeeded=await inFlight;if(succeeded&&current(target,ctx)&&valid()&&!saved())return save();return;}
         if(!current(target,ctx)||stopped)return;
         if(!open(m,t)){disable();return;}
-        if(!valid()||saved())return;
+        if(!valid()){say(validation(),true);return;}if(saved())return;
         const [home,away]=values().map(Number),requestRevision=revision;
         button.hidden=true;form.dataset.koDirty='true';say('Opslaan…');
         inFlight=(async()=>{
@@ -249,7 +262,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
       pendingSaves.push(save);
       form.addEventListener('input',()=>{revision++;clearTimeout(debounce);button.hidden=true;form.dataset.koDirty=String(!saved());
         if(saved()){say('Opgeslagen ✓');return;}
-        if(!valid()){say(values().some(v=>v==='')?'Vul beide scores in':m.score_unit==='goals'?'Vul een geldige eindstand in':'Eén speler moet '+m.first_to+' halen');return;}
+        if(!valid()){say(validation(),true);return;}
         say('Nog niet opgeslagen');debounce=setTimeout(save,650);
       });
       form.addEventListener('focusout',()=>{if(valid()&&!saved())save();});

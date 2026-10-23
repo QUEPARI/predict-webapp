@@ -28,9 +28,11 @@ export async function loadSourceResults(host,ctx,id,onSaved){
  const alive=()=>host.isConnected&&ctx.isCurrent()&&!ctx.signal?.aborted;let round='',status='pending',revision=0;
  host.oninput=e=>e.stopPropagation();
  async function read(){
+  const expanded=host.querySelector('details.admin-fold')?.open??false;
   const version=++revision,r=await ctx.supabase.rpc('admin_match_overview',{p_tournament:id,p_pending:true});if(!alive()||version!==revision)return;if(r.error)throw r.error;
   const rows=r.data||[],data={status:rows[0]?.tournament_status||'published',start:rows[0]?.source_start,rounds:[...new Map(rows.map(m=>[m.round_order,{order:m.round_order,name:m.round_name}])).values()],matches:rows.map(m=>({...m,id:m.match_id,home:m.home_name,away:m.away_name,start:m.scheduled_start,status:m.match_status,unit:m.score_unit,round:m.round_order}))};
-  host.innerHTML='<details class="admin-fold" open><summary>Handmatige uitslagen</summary><p class="hint">Bij een bronstoring kun je hier de eindstand invoeren. Correcties die de winnaar veranderen kunnen worden geblokkeerd als de vervolgwedstrijd al voorspellingen heeft of gestart is.</p><div class="toolbar"><label>Ronde<select data-result-round><option value="">Alle rondes</option>'+data.rounds.map(r=>`<option value="${r.order}">${esc(r.name)}</option>`).join('')+'</select></label></div><p role="status" data-result-feedback></p><div data-source-result-list class="stack"></div></details>';
+  host.innerHTML='<details class="admin-fold"><summary>Handmatige uitslagen</summary><p class="hint">Bij een bronstoring kun je hier de eindstand invoeren. Correcties die de winnaar veranderen kunnen worden geblokkeerd als de vervolgwedstrijd al voorspellingen heeft of gestart is.</p><div class="toolbar"><label>Ronde<select data-result-round><option value="">Alle rondes</option>'+data.rounds.map(r=>`<option value="${r.order}">${esc(r.name)}</option>`).join('')+'</select></label></div><p role="status" data-result-feedback></p><div data-source-result-list class="stack"></div></details>';
+  host.querySelector('details.admin-fold').open=expanded;
   const roundSelect=host.querySelector('[data-result-round]');roundSelect.value=round;
   function draw(){
    const matches=data.matches.filter(m=>!m.bye&&(!round||m.round===Number(round))&&m.home_score==null&&m.away_score==null&&['scheduled','live'].includes(m.status)&&Date.parse(m.actual_start||m.start)<=Date.now());
