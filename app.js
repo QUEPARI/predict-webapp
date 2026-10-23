@@ -1,12 +1,12 @@
 import {installPullRefresh} from './pull-refresh.js?v=pull-20261022';
 import {bindPoolInvite} from './pool-invitations.js?v=pools-20261022';
 import {bindAdminScoreAlert} from './admin-score-alert.js?v=archive-20261022';
-import {showSourceResultDialog} from './source-results.js?v=archive-20261022';
+import {showSourceResultDialog} from './source-results.js?v=polish-20261023';
 import {loadAdminAccounts} from './admin-accounts.js?v=accounts-20261022';
 import {validAccent,accentPalette,applyAccent} from './branding.js?v=header-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=pools-20261022';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=polish-20261023';
 import {loadOnlineProfile} from './online-profile.js?v=archive-20261022';
 
 // Centrally configured branding; no user data is stored in the public response.
@@ -544,7 +544,7 @@ async function editAdminMatch(matchId) {
   const options = ['<option value="">Onbekend</option>', ...(rounds ?? []).map(r =>
     `<option value="${esc(r.round_id)}" ${r.round_id === match.round_id ? 'selected' : ''}>${esc(r.round_name)}</option>`
   )].join('');
-  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=direct-fetch-20261022');
+  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=polish-20261023');
   editor.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;gap:12px">
       <h2 id="admin-edit-title" style="margin:0">Wedstrijd bewerken</h2>
       <button type="button" class="ghost" id="admin-edit-close" aria-label="Sluiten">✕</button>
@@ -931,7 +931,7 @@ async function recordAdminMatchStart(matchId) {
     const enteredTime = dialog.querySelector('#start-actual-time').value;
     let verifiedStart = null;
     if (enteredTime) {
-      const {dutchToUTC}=await import('./knockout.js?v=direct-fetch-20261022');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
+      const {dutchToUTC}=await import('./knockout.js?v=polish-20261023');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
       if (!Number.isFinite(parsed.getTime()) || parsed.getTime() > Date.now()) {
         message.textContent = 'Vul een geldige werkelijke starttijd in die niet in de toekomst ligt.';
         return;
@@ -974,7 +974,7 @@ async function loadAdminTournamentPublications(force=false) {
   if(!force&&target.querySelector('[data-ko-dirty="true"]'))return;
   tournamentManagementController?.abort();tournamentManagementController=new AbortController();const managementSignal=tournamentManagementController.signal;
   const userId=currentUser.id;
-  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=direct-fetch-20261022');
+  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=polish-20261023');
     if(!target.isConnected||managementSignal.aborted)return;
     await loadTournamentManagement(target,{supabase,signal:managementSignal,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole),
       onCreate:()=>{const general=document.getElementById('admin-tournament-publications');if(general?.querySelector('[data-ko-dirty="true"]')&&!confirm('Niet-opgeslagen toernooiwijzigingen laten vervallen?'))return;if(general)general.querySelectorAll('[data-ko-dirty]').forEach(el=>el.dataset.koDirty='false');adminGameId='';adminGameName='Nieuw toernooi';const ko=document.querySelector('#admin-knockout');if(ko)ko.dataset.tournament='';const create=document.querySelector('#ko-create');if(create)create.hidden=false;const open=()=>{if(managementSignal.aborted||currentUser?.id!==userId)return;const details=document.querySelector('#ko-create details');if(!details)return;document.removeEventListener('predict-knockout-ready',open);details.open=true;details.scrollIntoView({block:'start'});details.querySelector('input[name=name]')?.focus({preventScroll:true});};document.addEventListener('predict-knockout-ready',open,{signal:managementSignal});showAdminSection('schema');open();},
@@ -1242,17 +1242,17 @@ async function loadPrivatePools(host,tournamentId) {
   const tournamentsById = new Map((tournamentsResponse.data || []).map(t => [t.id, t]));
   const openTours = (tournamentsResponse.data || []).filter(t => ['published','active'].includes(t.status)&&(!scope||t.id===scope));
   target.innerHTML = `<p id="pool-message" role="status"></p>
-    <section class="stack" aria-label="Poule-uitnodigingen"><h2>Uitnodigingen</h2>${invitations.length?invitations.map(i=>`<article class="panel stack"><h3>${esc(i.pool_name)}</h3><p>${esc(i.tournament_name)}</p><div class="actions"><button class="btn" data-accept-invitation="${esc(i.id)}">Accepteren</button><button class="btn secondary" data-decline-invitation="${esc(i.id)}">Weigeren</button></div></article>`).join(''):'<p>Geen openstaande uitnodigingen.</p>'}</section>
-    <div class="grid">${mine.length ? mine.map(p => `<article class="panel stack">
+    ${invitations.length?`<section class="stack pool-invitations" aria-label="Poule-uitnodigingen"><h2>Uitnodigingen</h2>${invitations.map(i=>`<article class="panel stack pool-card"><h3>${esc(i.pool_name)}</h3><p>${esc(i.tournament_name)}</p><div class="pool-actions"><button class="btn" data-accept-invitation="${esc(i.id)}">Accepteren</button><button class="btn secondary" data-decline-invitation="${esc(i.id)}">Weigeren</button></div></article>`).join('')}</section>`:''}
+    <div class="grid pool-grid">${mine.length ? mine.map(p => `<article class="panel stack pool-card">
       <h2>${esc(p.name)}</h2><div class="muted">${esc(tournamentsById.get(p.tournament_id)?.name || 'Toernooi')}</div>
       <div>${p.owner_id === userId ? 'Jij beheert deze poule' : ids.has(p.id)?'Pouledeelnemer':'Beheerder'}</div>
-      <button class="btn secondary" data-pool-detail="${esc(p.id)}">Leden en klassement</button>
-      ${p.owner_id===userId||admin?`<button class="btn secondary" data-delete-pool="${esc(p.id)}">Poule verwijderen</button>`:''}
-    </article>`).join('') : '<p>Je bent nog geen lid van een privépoule.</p>'}</div>
+      <div class="pool-actions"><button class="btn secondary" data-pool-detail="${esc(p.id)}">Leden en klassement</button>
+      ${p.owner_id===userId||admin?`<button class="ghost subtle-danger" data-delete-pool="${esc(p.id)}">Poule verwijderen</button>`:''}
+    </div></article>`).join('') : '<p>Je bent nog geen lid van een privépoule.</p>'}</div>
     <form id="private-create-form" class="panel stack"><h2>Poule aanmaken</h2>
-      <label for="private-pool-name">Poulenaam</label><input id="private-pool-name" required minlength="2" maxlength="80">
-      <label for="private-pool-tournament" ${scope?'hidden':''}>Toernooi</label><select id="private-pool-tournament" required ${scope?'hidden':''}>
-      ${openTours.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select>
+      <div class="field"><label for="private-pool-name">Poulenaam</label><input id="private-pool-name" required minlength="2" maxlength="80"></div>
+      <div class="field" ${scope?'hidden':''}><label for="private-pool-tournament">Toernooi</label><select id="private-pool-tournament" required>
+      ${openTours.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select></div>
       <p class="hint">Je wordt automatisch deelnemer van het toernooi en beheerder van de poule.</p>
       <button class="btn" ${openTours.length ? '' : 'disabled'}>Poule aanmaken</button>
     </form>
@@ -1306,7 +1306,7 @@ async function loadPrivatePoolDetail(pool) {
   const host = document.getElementById('private-pool-detail');
   if (!pool || !host || !currentUser) return;
   // A new element invalidates outstanding requests from a previously selected pool.
-  const target = document.createElement('div'); target.className = 'panel stack';
+  const target = document.createElement('div'); target.className = 'panel stack pool-detail';
   const overview=host.parentElement;[...overview.children].forEach(x=>{if(x!==host){x.dataset.poolOverviewHidden='true';x.hidden=true;}});host.replaceChildren(target);host.scrollIntoView({block:'start'}); target.textContent = 'Leden en klassement laden...';
   try{
   const userId = currentUser.id;
@@ -1322,10 +1322,7 @@ async function loadPrivatePoolDetail(pool) {
   }
   const names = new Map((rows.data || []).map(r => [r.user_id,r.display_name]));
   target.innerHTML = `<button class="ghost" id="private-detail-back">← Mijn poules</button><h2>${esc(pool.name)}</h2><p id="private-detail-message" role="status"></p>
-    <h3>Leden (${members.data.length})</h3><ul>${members.data.map(m => `<li>
-      <button class="name-link" data-compare-member="${esc(m.user_id)}">${esc(names.get(m.user_id) || 'Gebruiker')}</button>${m.user_id === pool.owner_id ? ' (beheerder)' : ''}
-      ${owner && m.user_id !== userId ? `<button class="ghost" data-remove-member="${esc(m.user_id)}">Verwijderen</button>
-        <button class="ghost" data-transfer-member="${esc(m.user_id)}">Beheer overdragen</button>` : ''}</li>`).join('')}</ul>
+    <section class="stack pool-members"><h3>Leden (${members.data.length})</h3><div class="table-wrap"><table class="pool-members-table"><thead><tr><th scope="col">Speler</th><th scope="col">Rol</th>${owner?'<th scope="col" class="member-actions-heading">Acties</th>':''}</tr></thead><tbody>${members.data.map(m=>`<tr><td><button class="name-link" data-compare-member="${esc(m.user_id)}">${esc(names.get(m.user_id)||'Gebruiker')}</button></td><td><span class="member-role">${m.user_id===pool.owner_id?'Beheerder':'Lid'}</span></td>${owner?`<td>${m.user_id!==userId?`<div class="member-actions"><button type="button" class="ghost subtle-danger" data-remove-member="${esc(m.user_id)}" aria-label="Verwijder ${esc(names.get(m.user_id)||'dit lid')} uit de poule">Verwijderen</button><button type="button" class="ghost" data-transfer-member="${esc(m.user_id)}" aria-label="Draag beheer over aan ${esc(names.get(m.user_id)||'dit lid')}">Beheer overdragen</button></div>`:'<span class="hint">Jouw account</span>'}</td>`:''}</tr>`).join('')}</tbody></table></div></section>
     <label for="private-pool-round">Klassement per ronde</label><select id="private-pool-round"><option value="">Alle rondes</option>
       ${rounds.data.map(r => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('')}</select>
     <div id="private-pool-ranking" class="table-wrap" role="status"></div>
@@ -1486,7 +1483,7 @@ render=function(){
 
 function loadAdminKnockout(){const target=document.getElementById('admin-knockout');if(!target||target.dataset.loaded)return;target.dataset.loaded='true';
   knockoutScreenController=new AbortController();const signal=knockoutScreenController.signal,userId=currentUser.id;
-  import('./knockout.js?v=direct-fetch-20261022').then(({loadKnockoutAdmin})=>{
+  import('./knockout.js?v=polish-20261023').then(({loadKnockoutAdmin})=>{
     if(!signal.aborted&&target.isConnected)loadKnockoutAdmin(target,{supabase,signal,isCurrent:()=>currentUser?.id===userId,onSaved:()=>{loadAdminMatches();loadAdminTournamentPublications();}});
   }).catch(()=>{if(!signal.aborted&&target.isConnected)target.textContent='Knock-outbeheer laden mislukt. Open Beheer opnieuw.';});
 }
