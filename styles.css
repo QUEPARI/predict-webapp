@@ -222,7 +222,7 @@
 .results-wrap{min-width:0;max-width:100%}
 .results-table{table-layout:fixed;min-width:0;width:100%}
 .results-table th,.results-table td{overflow-wrap:anywhere;padding:10px 5px}
-.results-table th:first-child{width:49%}.results-table th:nth-child(2){width:20%}.results-table th:nth-child(3){width:21%}.results-table th:nth-child(4){width:10%}
+.results-table th:first-child{width:49%}.results-table th:nth-child(2){width:20%}.results-table th:nth-child(3){width:17%}.results-table th:nth-child(4){width:14%}
 .results-table td:not(:first-child){white-space:nowrap;overflow-wrap:normal;font-variant-numeric:tabular-nums}
 .results-short-label{display:none}.results-table abbr{text-decoration:none}
 [data-comparison]{max-height:65vh;max-height:65svh;overflow:auto;position:relative;isolation:isolate}
@@ -342,3 +342,29 @@ button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var
 #private-pool-ranking .name-link{white-space:normal;text-align:left;overflow-wrap:anywhere;max-width:100%}
 @media(max-width:480px){#private-pool-ranking th{font-size:10px}#private-pool-ranking td{font-size:12px}}
 [data-source-inline]>button.btn{justify-self:start;max-width:100%}.toolbar:empty{display:none}
+
+/* Pool navigation and compact account screens. */
+.pool-detail-nav,.pool-card-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+.pool-card-heading h2{flex:1;min-width:0}.pool-owner-badge{flex:none;white-space:nowrap;font-size:11px;font-weight:650;padding:3px 7px;border-radius:7px;background:var(--soft);color:var(--accent)}
+.pool-detail-nav>[data-pool-manage]{margin-left:auto}.pool-detail-nav>button{flex:none}
+.pool-detail .pool-members-table th,.pool-detail #private-pool-ranking th{font-size:12px}
+.pool-detail .pool-members-table td,.pool-detail #private-pool-ranking td{font-size:13px}
+.pool-detail .member-role{font:inherit}
+.pool-user-picker{position:relative;min-width:0}.pool-user-picker input[aria-expanded=true]{border-radius:9px 9px 0 0}
+.user-suggestions{position:absolute;z-index:8;top:100%;left:0;right:0;display:grid;gap:0;padding:4px 0;background:var(--panel);border:1px solid var(--border);border-top:0;border-radius:0 0 9px 9px;box-shadow:0 8px 16px #0002;overflow:hidden}
+.user-suggestions [role=option]{display:flex;align-items:center;gap:9px;width:100%;min-height:40px;padding:9px 12px;border:0;border-radius:0;text-align:left;font-size:13px;line-height:1.4;background:transparent;color:var(--txt);overflow-wrap:anywhere}
+.user-suggestions [role=option]::before{content:'↳';color:var(--muted);flex:none}
+.user-suggestions [role=option]:hover,.user-suggestions [aria-selected=true]{background:var(--soft);color:var(--accent)}
+.results-table th:nth-child(2),.results-table td:nth-child(2),.results-table th:nth-child(3),.results-table td:nth-child(3),.comparison-table th:nth-child(2),.comparison-table td:nth-child(2),.comparison-table th.result-column,.comparison-table td.result-column{text-align:center}
+.tournament-detail [data-detail-panel=rules]>p{font-size:13px;line-height:1.55}
+.account-settings{max-width:620px;width:100%;gap:10px}.account-settings>.panel,.account-session{padding:12px;gap:8px}
+.account-settings .field{gap:4px}.account-settings input,.account-settings select{padding:8px 10px}
+.account-settings [data-push-settings]>p{font-size:12px;line-height:1.45;margin:0}
+.account-settings [data-push-settings] h2,.account-session h2{font-size:16px;margin:0}
+.account-settings [data-push-settings] .row{flex-wrap:wrap;gap:6px;justify-content:flex-start}
+.account-session{max-width:620px;margin-top:10px}
+@media(max-width:480px){.pool-detail .pool-members-table th,.pool-detail #private-pool-ranking th{font-size:11px}.pool-detail .pool-members-table td,.pool-detail #private-pool-ranking td{font-size:12px}}
+
+.account-settings #account-profile-message{font-size:12px;line-height:1.4}
+
+.comparison-table th.result-column{width:12%}.comparison-table th:nth-child(5),.comparison-table th:nth-child(6){width:14%}

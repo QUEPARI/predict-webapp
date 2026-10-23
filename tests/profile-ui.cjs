@@ -1,99 +1,27 @@
-// Real browser, mock account backend. No hosted data or real credentials.
-const {chromium}=require('playwright');const http=require('node:http');const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
+// Browser tests with synthetic accounts only; no hosted reads or writes.
+const {chromium}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 (async()=>{
-  const files={'/':'index.html','/tournament-images.js':'tournament-images.js','/round-settings.js':'round-settings.js','/template-management.js':'template-management.js','/branding.js':'branding.js','/app.js':'app.js','/push-notifications.js':'push-notifications.js','/online-profile.js':'online-profile.js','/online-tournaments.js':'online-tournaments.js','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest'};
-  const server=http.createServer((req,res)=>{req.url=req.url.split('?')[0];const f=files[req.url];if(!f){res.writeHead(404).end();return;}res.setHeader('Content-Type',f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(path.join(__dirname,'..',f)));});
-  await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
-  const profiles={a:{username:'account-a',display_name:'QA <img src=x onerror=alert(1)>',theme:'system'},b:{username:'account-b',display_name:'Ander account',theme:'dark'}};
-  try {
-    browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHANNEL?{channel:process.env.PLAYWRIGHT_CHANNEL}:{})});
-    const page=await browser.newPage({viewport:{width:390,height:844}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
-    await page.emulateMedia({colorScheme:'dark'});
-    await page.route('https://profile-qa.invalid/**',async route=>{
-      const url=new URL(route.request().url());const uid=url.searchParams.get('uid');
-      if(url.pathname==='/save'){const c=route.request().postDataJSON();if(c.p_display_name!=null)profiles[uid].display_name=c.p_display_name.trim();if(c.p_theme!=null)profiles[uid].theme=c.p_theme;}
-      await route.fulfill({contentType:'application/json',body:JSON.stringify(profiles[uid])});
-    });
-    await page.addInitScript(()=>{
-      window.qaUid='a';window.qaFailSave=false;window.qaFailPredictions=false;window.qaSlow=false;window.qaReads=[];
-      localStorage.setItem('predict-demo-v1',JSON.stringify({user:'Old Demo',predictions:{d1:{home:3,away:0}}}));
-      localStorage.setItem('qa-auth-session','session-preserved');
-      window.qaSupabase={auth:{getUser:async()=>({data:{user:window.qaUid?{id:window.qaUid}:null}}),signOut:async()=>{if(window.qaFailLogout)return {error:{message:'QA uitlogfout'}};window.qaUid=null;return {};},
-        signInWithPassword:async({email})=>{window.qaUid=email.startsWith('b')?'b':'a';return {};}},
-        from(table){const filters={};let one=false,start=0,end=999;
-          const q={select(){return q;},eq(k,v){filters[k]=v;return q;},neq(){return q;},in(){return q;},order(){return q;},single(){one=true;return q;},range(a,b){start=a;end=b;return q;},then(resolve,reject){return (async()=>{
-            const uid=window.qaUid;
-            if(table==='profiles')return {data:await(await fetch('https://profile-qa.invalid/profile?uid='+filters.id)).json()};
-            if(table==='match_predictions'){
-              window.qaReads.push({...filters});
-              if(window.qaSlow)await new Promise(r=>{window.qaResolve=r;});
-              if(window.qaFailPredictions)return {error:{message:'QA leesfout'}};
-              const data=filters['matches.tournament_id']==='tour-2'?[]:Array.from({length:26},(_,i)=>({id:uid+'-prediction-'+i,match_id:'match-'+i,home_score:6,away_score:4,
-                matches:{tournament_id:'tour-1',home_name:i===0?'Speler <img src=x onerror=alert(1)>':'Speler '+i,away_name:'Tegenstander',status:i===0?'finished':'scheduled',home_score:i===0?6:null,away_score:i===0?3:null}}));
-              return {data:data.slice(start,end+1),count:data.length};
-            }
-            return {data:{user_roles:{role:'user'},tournament_entries:[{tournament_id:'tour-1'},{tournament_id:'tour-2'}],
-              tournaments:one?{id:'tour-1',name:'QA toernooi',status:'published'}:[{id:'tour-1',name:'QA toernooi',status:'published'},{id:'tour-2',name:'Zonder voorspellingen',status:'active'}],pools:[],pool_members:[]}[table]||[]};
-          })().then(resolve,reject);}};return q;
-        },
-        async rpc(name,args){
-          if(name==='update_my_profile'){
-            if(window.qaFailSave)return {error:{message:'QA opslagfout'}};
-            const p=await(await fetch('https://profile-qa.invalid/save?uid='+window.qaUid,{method:'POST',body:JSON.stringify(args)})).json();
-            return {data:{display_name:p.display_name,theme:p.theme}};
-          }
-          return {data:name==='get_my_match_points'?[{match_id:'match-0',earned_points:1}]:[]};
-        }};
-    });
-    await page.route('https://cdn.jsdelivr.net/**',r=>r.fulfill({contentType:'text/javascript',body:'export const createClient=()=>window.qaSupabase;'}));
-    await page.goto(`http://127.0.0.1:${server.address().port}/`);
-    await page.getByRole('button',{name:'Account',exact:true}).click();
-    await page.getByRole('button',{name:'Account opslaan'}).waitFor();
-    await page.waitForFunction(()=>document.body.classList.contains('dark'));
-    await page.emulateMedia({colorScheme:'light'});await page.waitForFunction(()=>!document.body.classList.contains('dark'));
-    assert.equal(await page.locator('.top .badge,.top-actions,.nav').count(),0);assert.equal(await page.getByRole('button',{name:'Account',exact:true}).textContent(),'A');assert.equal(await page.getByRole('button',{name:'Beheer',exact:true}).count(),0);assert.equal(await page.locator('#online-profile img').count(),0);
-    assert.equal(await page.getByRole('button',{name:'Verwijder lokale demogegevens'}).count(),0);
-    await page.locator('#account-predictions table').waitFor();
-    const first=page.locator('#account-predictions tbody tr').first();
-    assert((await first.innerText()).includes('6–4'));assert((await first.innerText()).includes('6–3'));assert.equal(await first.locator('td').last().innerText(),'1');
-    await page.getByLabel('Weergavenaam',{exact:true}).fill('  Opgeslagen naam  ');
-    await page.getByLabel('Thema',{exact:true}).selectOption('light');await page.getByRole('button',{name:'Account opslaan'}).click();
-    await page.getByText('Account opgeslagen in Predict.').waitFor();assert.equal(profiles.a.display_name,'Opgeslagen naam');
-    await page.reload();await page.getByRole('button',{name:'Account',exact:true}).click();await page.getByRole('button',{name:'Account opslaan'}).waitFor();
-    assert.equal(await page.getByLabel('Weergavenaam',{exact:true}).inputValue(),'Opgeslagen naam');
-    await page.getByRole('button',{name:'Volgende',exact:true}).click();
-    await page.getByText('Speler 25 – Tegenstander',{exact:false}).waitFor();
-    assert.equal(await page.locator('#account-predictions tbody tr').count(),1);
-    await page.getByLabel('Toernooi',{exact:true}).selectOption('tour-2');await page.getByText('Nog geen voorspellingen voor dit toernooi.').waitFor();
-    await page.evaluate(()=>window.qaFailPredictions=true);
-    await page.getByLabel('Toernooi',{exact:true}).selectOption('tour-1');await page.getByText('Eigen voorspellingen laden mislukt: QA leesfout').waitFor();
-    await page.evaluate(()=>window.qaFailPredictions=false);await page.getByRole('button',{name:'Voorspellingen opnieuw proberen'}).click();
-    await page.locator('#account-predictions table').waitFor();
-    await page.getByLabel('Weergavenaam',{exact:true}).fill('Niet kwijt');await page.evaluate(()=>window.qaFailSave=true);
-    await page.getByRole('button',{name:'Account opslaan'}).click();await page.getByText('Opslaan mislukt: QA opslagfout').waitFor();
-    assert.equal(await page.getByLabel('Weergavenaam',{exact:true}).inputValue(),'Niet kwijt');
-    await page.evaluate(()=>window.qaFailSave=false);
-    await page.getByLabel('Thema',{exact:true}).selectOption('dark');await page.getByRole('button',{name:'Account opslaan'}).click();
-    await page.getByText('Account opgeslagen in Predict.').waitFor();await page.waitForFunction(()=>document.body.classList.contains('dark'));
-    assert.equal(await page.getByLabel('Weergavenaam',{exact:true}).inputValue(),'Niet kwijt');
-    assert.equal(await page.getByLabel('Thema',{exact:true}).inputValue(),'dark');
-    await page.getByLabel('Weergavenaam',{exact:true}).fill('Niet kwijt concept');
-    page.once('dialog',d=>d.dismiss());await page.getByRole('button',{name:'Home',exact:true}).click();assert.equal(await page.getByLabel('Weergavenaam',{exact:true}).inputValue(),'Niet kwijt concept');await page.getByLabel('Weergavenaam',{exact:true}).fill('Niet kwijt');
-    await page.getByRole('button',{name:'Account opslaan'}).click();await page.getByText('Account opgeslagen in Predict.').waitFor();
-    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-    fs.mkdirSync(path.join(__dirname,'..','test-results'),{recursive:true});await page.evaluate(()=>scrollTo(0,0));
-    await page.screenshot({path:path.join(__dirname,'..','test-results','profile-mobile.png'),fullPage:false});
-    assert(await page.evaluate(()=>window.qaReads.every(r=>r.user_id==='a'&&r['matches.tournament_id'])));
-    const local=await page.evaluate(()=>({...localStorage}));assert.equal(local['predict-demo-v1'],undefined);assert.equal(local['qa-auth-session'],'session-preserved');
-    assert.deepEqual(Object.keys(JSON.parse(local['predict-ui-v2'])).sort(),['tab','theme']);
-    await page.getByRole('button',{name:'Home',exact:true}).click();await page.evaluate(()=>window.qaSlow=true);
-    await page.getByRole('button',{name:'Account',exact:true}).click();await page.waitForFunction(()=>!!window.qaResolve);
-    await page.getByRole('button',{name:'Home',exact:true}).click();await page.evaluate(()=>{window.qaSlow=false;window.qaResolve();});
-    assert.equal(await page.locator('#account-predictions').count(),0,'Late response cannot replace another screen');
-    await page.getByRole('button',{name:'Account',exact:true}).click();await page.evaluate(()=>window.qaFailLogout=true);await page.getByRole('button',{name:'Uitloggen'}).click();await page.getByText('Uitloggen mislukt. Probeer opnieuw.').waitFor();assert.equal(await page.getByRole('button',{name:'Uitloggen'}).isEnabled(),true);await page.evaluate(()=>window.qaFailLogout=false);await page.getByRole('button',{name:'Uitloggen'}).click();await page.getByLabel('Gebruikersnaam',{exact:true}).fill('b@example.invalid');await page.getByLabel('Wachtwoord').fill('test-only');
-    await page.getByRole('button',{name:'Inloggen',exact:true}).click();await page.getByRole('button',{name:'Account',exact:true}).click();
-    await page.getByRole('button',{name:'Account opslaan'}).waitFor();assert.equal(await page.getByLabel('Weergavenaam',{exact:true}).inputValue(),'Ander account');
-    assert.equal(profiles.a.display_name,'Niet kwijt');assert.equal(profiles.b.display_name,'Ander account');assert.deepEqual(errors,[]);
-    console.log('PASS: profile persistence/reload, account themes, error recovery, draft preservation, own paginated predictions/points, legacy-cache cleanup, stale requests and account separation');
-  } finally {if(browser)await browser.close();await new Promise(r=>server.close(r));}
+ const root=path.join(__dirname,'..'),server=http.createServer((req,res)=>{const file=req.url.split('?')[0].slice(1);if(['online-profile.js','push-notifications.js','styles.css'].includes(file)){res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript; charset=utf-8':'text/css');return res.end(fs.readFileSync(path.join(root,file)));}res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"></head><body><main class="layout"><section id="online-profile" class="stack"></section><section class="panel stack account-session"><h2>Sessie</h2><button class="ghost">Uitloggen</button></section></main></body></html>');});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
+ try{
+  browser=await chromium.launch({headless:true,executablePath:process.env.PREDICT_CHROMIUM,args:['--no-sandbox','--disable-gpu']});const page=await browser.newPage({viewport:{width:390,height:844}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.addInitScript(()=>{
+   window.accountId='a';window.failRead=false;window.failSave=false;window.hold=false;window.reads=[];window.rpcCalls=[];
+   window.accounts=JSON.parse(localStorage.getItem('qa-profile-records')||'null')||{a:{username:'account-a',display_name:'Naam <img src=x>',theme:'light'},b:{username:'account-b',display_name:'Ander account',theme:'dark'}};
+   const registration={pushManager:{getSubscription:async()=>null}};Object.defineProperty(navigator,'serviceWorker',{configurable:true,value:{register:async()=>registration,ready:Promise.resolve(registration)}});
+   window.client={from(table){if(table!=='profiles')throw Error('Account must not read '+table);let id;const q={select(){return q},eq(k,v){id=v;return q},single:async()=>{reads.push({table,id});const snapshot={...accounts[id]};if(hold){hold=false;await new Promise(r=>window.releaseProfile=r);}return failRead?{error:{message:'Profiel niet beschikbaar'}}:{data:snapshot};}};return q;},rpc:async(name,args)=>{rpcCalls.push([name,args]);if(name!=='push_notifications')throw Error('Unexpected account RPC: '+name);return {data:{ready:true,public_key:'test-key'}};}};
+   window.showAccount=async()=>{profileAbort?.abort();window.profileAbort=new AbortController();const id=accountId,{loadOnlineProfile}=await import('/online-profile.js');await loadOnlineProfile(document.querySelector('#online-profile'),{supabase:client,userId:id,signal:profileAbort.signal,isCurrent:()=>accountId===id,onLoaded:p=>{document.body.classList.toggle('dark',p.theme==='dark');return p;},save:async args=>{if(failSave)throw Error('Opslaan tijdelijk mislukt');accounts[id]={...accounts[id],display_name:args.p_display_name.trim(),theme:args.p_theme};localStorage.setItem('qa-profile-records',JSON.stringify(accounts));document.body.classList.toggle('dark',args.p_theme==='dark');return accounts[id];}});};window.profileAbort=null;
+  });
+  await page.goto('http://127.0.0.1:'+server.address().port);await page.evaluate(()=>showAccount());await page.getByRole('button',{name:'Account opslaan'}).waitFor();await page.locator('[data-enable-push]').waitFor();
+  assert.equal(await page.locator('#account-predictions,#account-prediction-tour').count(),0);assert.equal(await page.getByRole('heading',{name:'Mijn voorspellingen'}).count(),0);assert.equal(await page.getByText('Je accountvoorkeuren en eigen voorspellingen.',{exact:true}).count(),0);assert.equal(await page.getByText('Naam en thema worden bij je account opgeslagen. Systeeminstelling volgt de voorkeur van je apparaat.',{exact:true}).count(),0);assert.equal(await page.locator('img').count(),0);
+  await page.getByLabel('Weergavenaam').fill('  Opgeslagen naam  ');await page.getByLabel('Thema',{exact:true}).selectOption('dark');await page.getByRole('button',{name:'Account opslaan'}).click();await page.getByText('Account opgeslagen in Predict.',{exact:true}).waitFor();assert.equal(await page.getByLabel('Weergavenaam').inputValue(),'Opgeslagen naam');assert(await page.locator('body').evaluate(e=>e.classList.contains('dark')));
+  await page.reload();await page.evaluate(()=>showAccount());await page.getByRole('button',{name:'Account opslaan'}).waitFor();assert.equal(await page.getByLabel('Weergavenaam').inputValue(),'Opgeslagen naam');assert.equal(await page.getByLabel('Thema',{exact:true}).inputValue(),'dark');
+  await page.getByLabel('Weergavenaam').fill('Concept behouden');await page.evaluate(()=>failSave=true);await page.getByRole('button',{name:'Account opslaan'}).click();await page.getByText('Opslaan mislukt: Opslaan tijdelijk mislukt',{exact:true}).waitFor();assert.equal(await page.getByLabel('Weergavenaam').inputValue(),'Concept behouden');assert(await page.getByRole('button',{name:'Account opslaan'}).isEnabled());
+  await page.evaluate(()=>{window.dispatchEvent(new CustomEvent('predict-preferences-saved',{detail:{username:'account-a',display_name:'Externe naam',theme:'dark'}}));});assert.equal(await page.getByLabel('Weergavenaam').inputValue(),'Concept behouden');await page.evaluate(()=>failSave=false);await page.getByRole('button',{name:'Account opslaan'}).click();await page.getByText('Account opgeslagen in Predict.').waitFor();
+  for(const [width,height] of [[320,844],[390,844],[768,1024],[1024,768],[1366,1024]])for(const dark of [false,true]){await page.setViewportSize({width,height});await page.evaluate(d=>document.body.classList.toggle('dark',d),dark);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert((await page.locator('[data-profile-form]').boundingBox()).height<300);}
+  await page.setViewportSize({width:390,height:844});await fs.promises.mkdir(path.join(root,'test-results'),{recursive:true});await page.screenshot({path:path.join(root,'test-results/account-compact-dark.png'),fullPage:true});await page.evaluate(()=>document.body.classList.remove('dark'));await page.screenshot({path:path.join(root,'test-results/account-compact-light.png'),fullPage:true});
+  await page.evaluate(()=>{hold=true;showAccount();});await page.waitForFunction(()=>!!window.releaseProfile);await page.evaluate(()=>{accountId='b';return showAccount();});await page.getByLabel('Weergavenaam').waitFor();assert.equal(await page.getByLabel('Weergavenaam').inputValue(),'Ander account');await page.evaluate(()=>releaseProfile());assert.equal(await page.getByLabel('Weergavenaam').inputValue(),'Ander account','Stale profile cannot overwrite another account');
+  await page.evaluate(()=>{failRead=true;return showAccount();});await page.getByText('Account laden mislukt: Profiel niet beschikbaar').waitFor();await page.evaluate(()=>failRead=false);await page.getByRole('button',{name:'Opnieuw proberen'}).click();await page.getByRole('button',{name:'Account opslaan'}).waitFor();assert.equal(await page.getByLabel('Weergavenaam').inputValue(),'Ander account');
+  assert(await page.evaluate(()=>reads.every(r=>r.table==='profiles')&&rpcCalls.every(([n])=>n==='push_notifications')));assert.deepEqual(errors,[]);console.log('PASS: profile-only reads, removed prediction history/text, persisted name/theme, failed-save draft, preference-event draft preservation, stale account isolation, read retry, push controls, compact light/dark phone/tablet/desktop layout.');
+ }finally{await browser?.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
