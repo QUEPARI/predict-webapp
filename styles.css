@@ -368,3 +368,29 @@ button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var
 .account-settings #account-profile-message{font-size:12px;line-height:1.4}
 
 .comparison-table th.result-column{width:12%}.comparison-table th:nth-child(5),.comparison-table th:nth-child(6){width:14%}
+
+/* Consistent secondary information and table alignment. */
+.hint,.info-text,.notice,.admin-fold>p,[data-champion]>p,[data-source-report], [data-source-message],.tournament-detail [data-detail-panel=champion]>p,.ranking-pagination{font-size:12px;line-height:1.5}
+.info-text{color:var(--muted);margin:0}
+.tournament-detail [data-detail-panel=rules]>p{font-size:12px;line-height:1.5}
+.notice{overflow-wrap:anywhere}
+.admin-save-section{padding:10px;gap:7px}
+.admin-save-section label{font-size:13px}
+.admin-save-section input,.admin-save-section select{padding:7px 9px}
+.admin-save-section .notice{padding:8px 10px}
+.admin-save-section .hint{margin:0}
+.admin-save-section>button{justify-self:start}
+.admin-save-section [data-source-inline]{gap:7px}
+[data-general-settings]{gap:7px}
+[data-general-settings]>.admin-save-section{margin-bottom:8px}
+.pool-card-link{cursor:pointer;transition:border-color .15s,background .15s}
+.pool-card-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media(hover:hover){.pool-card-link:hover{border-color:var(--accent);background:var(--soft)}}
+.pool-detail [data-delete-pool]{justify-self:start;margin-top:8px}
+.results-table th:nth-child(n+2),.results-table td:nth-child(n+2),
+.comparison-table th:nth-child(n+2),.comparison-table td:nth-child(n+2),
+.ranking-table th:nth-child(n+3),.ranking-table td:nth-child(n+3),
+#private-pool-ranking th:nth-child(n+3),#private-pool-ranking td:nth-child(n+3),
+.rules-table th:nth-child(n+3),.rules-table td:nth-child(n+3){text-align:center}
+/* Balance the result divider so it does not shift the apparent centre. */
+.results-table .result-column,.comparison-table .result-column{border-left:0;box-shadow:inset 1px 0 var(--border),inset -1px 0 var(--border)}

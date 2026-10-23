@@ -6,7 +6,7 @@ import {loadAdminAccounts} from './admin-accounts.js?v=pools-account-20261023';
 import {validAccent,accentPalette,applyAccent} from './branding.js?v=header-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=polish-20261023';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=layout-findings-20261023';
 import {loadOnlineProfile} from './online-profile.js?v=pools-account-20261023';
 
 // Centrally configured branding; no user data is stored in the public response.
@@ -974,7 +974,7 @@ async function loadAdminTournamentPublications(force=false) {
   if(!force&&target.querySelector('[data-ko-dirty="true"]'))return;
   tournamentManagementController?.abort();tournamentManagementController=new AbortController();const managementSignal=tournamentManagementController.signal;
   const userId=currentUser.id;
-  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=polish-20261023');
+  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=layout-findings-20261023');
     if(!target.isConnected||managementSignal.aborted)return;
     await loadTournamentManagement(target,{supabase,signal:managementSignal,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole),
       onCreate:()=>{const general=document.getElementById('admin-tournament-publications');if(general?.querySelector('[data-ko-dirty="true"]')&&!confirm('Niet-opgeslagen toernooiwijzigingen laten vervallen?'))return;if(general)general.querySelectorAll('[data-ko-dirty]').forEach(el=>el.dataset.koDirty='false');adminGameId='';adminGameName='Nieuw toernooi';const ko=document.querySelector('#admin-knockout');if(ko)ko.dataset.tournament='';const create=document.querySelector('#ko-create');if(create)create.hidden=false;const open=()=>{if(managementSignal.aborted||currentUser?.id!==userId)return;const details=document.querySelector('#ko-create details');if(!details)return;document.removeEventListener('predict-knockout-ready',open);details.open=true;details.scrollIntoView({block:'start'});details.querySelector('input[name=name]')?.focus({preventScroll:true});};document.addEventListener('predict-knockout-ready',open,{signal:managementSignal});showAdminSection('schema');open();},
@@ -1136,7 +1136,7 @@ async function loadAdminLeaderboards() {
       return;
     }
     const rows = data || [];
-    const {renderLeaderboard,loadTournamentComparison,loadPoolComparison}=await import('./pool-comparison.js?v=mobile-archive-20261019');
+    const {renderLeaderboard,loadTournamentComparison,loadPoolComparison}=await import('./pool-comparison.js?v=layout-findings-20261023');
     if(!panel.isConnected||request!==version)return;
     renderLeaderboard(results,rows,(host,member,name)=>pool.value?loadPoolComparison(host,{supabase,isCurrent:()=>panel.isConnected},{id:pool.value},member,name):loadTournamentComparison(host,{supabase,isCurrent:()=>panel.isConnected},tour.value,member,name),{detailed:true,userId:currentUser.id});
   }
@@ -1188,7 +1188,7 @@ async function loadPublicLeaderboard() {
     const {data,error}=await supabase.rpc('get_tournament_leaderboard',{p_tournament_id:tour.value,p_pool_id:pool.value||null,p_round_id:round.value||null});
     if (!target.isConnected||g!==generation)return;
     if (error) {results.textContent='Klassement ophalen mislukt: '+error.message;return;}
-    results.innerHTML=(data||[]).length?'<table><thead><tr><th>#</th><th>Gebruiker</th><th>Punten</th><th>Winnaars</th></tr></thead><tbody>'+(data||[]).map(r=>'<tr><td>'+r.rank_position+'</td><td>'+esc(r.display_name)+(r.user_id===currentUser.id?' (jij)':'')+'</td><td>'+r.earned_points+'</td><td>'+r.correct_winners+'</td></tr>').join('')+'</tbody></table>':'Nog geen deelnemers.';
+    results.innerHTML=(data||[]).length?'<table class="ranking-table"><thead><tr><th>#</th><th>Gebruiker</th><th>Punten</th><th>Winnaars</th></tr></thead><tbody>'+(data||[]).map(r=>'<tr><td>'+r.rank_position+'</td><td>'+esc(r.display_name)+(r.user_id===currentUser.id?' (jij)':'')+'</td><td>'+r.earned_points+'</td><td>'+r.correct_winners+'</td></tr>').join('')+'</tbody></table>':'Nog geen deelnemers.';
   }
   tour.onchange=loadRounds;
   round.onchange=loadRows;
@@ -1242,12 +1242,10 @@ async function loadPrivatePools(host,tournamentId) {
   const openTours = (tournamentsResponse.data || []).filter(t => ['published','active'].includes(t.status)&&(!scope||t.id===scope));
   target.innerHTML = `<p id="pool-message" role="status"></p>
     ${invitations.length?`<section class="stack pool-invitations" aria-label="Poule-uitnodigingen"><h2>Uitnodigingen</h2>${invitations.map(i=>`<article class="panel stack pool-card"><h3>${esc(i.pool_name)}</h3><p>${esc(i.tournament_name)}</p><div class="pool-actions"><button class="btn" data-accept-invitation="${esc(i.id)}">Accepteren</button><button class="btn secondary" data-decline-invitation="${esc(i.id)}">Weigeren</button></div></article>`).join('')}</section>`:''}
-    <div class="grid pool-grid">${mine.length ? mine.map(p => `<article class="panel stack pool-card">
+    <div class="grid pool-grid">${mine.length ? mine.map(p => `<article class="panel stack pool-card pool-card-link" data-pool-detail="${esc(p.id)}" role="button" tabindex="0" aria-label="Open poule ${esc(p.name)}">
       <div class="pool-card-heading"><h2>${esc(p.name)}</h2>${p.owner_id===userId?'<span class="pool-owner-badge">Beheerder</span>':''}</div>
       ${p.owner_id===userId?'':`<div>${ids.has(p.id)?'Pouledeelnemer':'Beheerder'}</div>`}
-      <div class="pool-actions"><button class="btn secondary" data-pool-detail="${esc(p.id)}">Klassement</button>
-      ${p.owner_id===userId||admin?`<button class="ghost subtle-danger" data-delete-pool="${esc(p.id)}">Poule verwijderen</button>`:''}
-    </div></article>`).join('') : '<p>Je bent nog geen lid van een privépoule.</p>'}</div>
+    </article>`).join('') : '<p>Je bent nog geen lid van een privépoule.</p>'}</div>
     <form id="private-create-form" class="panel stack"><h2>Poule aanmaken</h2>
       <div class="field"><label for="private-pool-name">Poulenaam</label><input id="private-pool-name" required minlength="2" maxlength="80"></div>
       <div class="field" ${scope?'hidden':''}><label for="private-pool-tournament">Toernooi</label><select id="private-pool-tournament" required>
@@ -1287,17 +1285,9 @@ async function loadPrivatePools(host,tournamentId) {
       p_invitation_id:button.dataset.acceptInvitation||button.dataset.declineInvitation,p_accept:!!button.dataset.acceptInvitation
     });
   });
-  target.querySelectorAll('[data-delete-pool]').forEach(button=>button.onclick=async()=>{
-    const pool=mine.find(p=>p.id===button.dataset.deletePool);
-    if(!confirm(`Poule “${pool.name}” definitief verwijderen? Alle pouleleden en uitnodigingen worden verwijderd. Je toernooivoorspellingen blijven bewaard.`))return;
-    button.disabled=true;
-    try{const r=await supabase.rpc('delete_pool',{p_pool_id:pool.id});if(!target.isConnected||currentUser?.id!==userId)return;if(r.error)throw r.error;
-      await loadPrivatePools(target);if(target.isConnected)target.querySelector('#pool-message').textContent='Poule verwijderd.';
-    }catch(error){if(target.isConnected)message.textContent=error.message||'Verwijderen mislukt. Probeer opnieuw.';}
-    finally{if(button.isConnected)button.disabled=false;}
-  });
   target.querySelectorAll('[data-pool-detail]').forEach(button => {
     button.onclick = () => loadPrivatePoolDetail(mine.find(p => p.id === button.dataset.poolDetail));
+    button.onkeydown = event => {if(event.key==='Enter'||event.key===' '){event.preventDefault();button.click();}};
   });
 }
 
@@ -1309,9 +1299,9 @@ async function loadPrivatePoolDetail(pool,view='ranking') {
   const overview=host.parentElement;[...overview.children].forEach(x=>{if(x!==host){x.dataset.poolOverviewHidden='true';x.hidden=true;}});host.replaceChildren(target);host.scrollIntoView({block:'start'}); target.textContent = 'Leden en klassement laden...';
   try{
   const userId = currentUser.id;
-  const owner = pool.owner_id === userId,managing=owner&&view==='manage';
+  const owner = pool.owner_id === userId,canManage=owner||['admin','super_admin'].includes(currentRole),managing=canManage&&view==='manage';
   const [members, rows, rounds] = await Promise.all([
-    managing?supabase.from('pool_members').select('user_id').eq('pool_id',pool.id):Promise.resolve({data:[]}),
+    managing&&owner?supabase.from('pool_members').select('user_id').eq('pool_id',pool.id):Promise.resolve({data:[]}),
     supabase.rpc('get_tournament_leaderboard',{p_tournament_id:pool.tournament_id,p_pool_id:pool.id,p_round_id:null}),
     managing?Promise.resolve({data:[]}):supabase.from('tournament_rounds').select('id,name').eq('tournament_id',pool.tournament_id).order('round_order')
   ]);
@@ -1321,18 +1311,18 @@ async function loadPrivatePoolDetail(pool,view='ranking') {
   }
   const names = new Map((rows.data || []).map(r => [r.user_id,r.display_name]));
 
-  target.innerHTML = `<div class="pool-detail-nav"><button class="ghost" id="private-detail-back">${managing?'← Poule':'← Mijn poules'}</button>${owner&&!managing?'<button type="button" class="btn secondary" data-pool-manage>Beheer</button>':''}</div><h2>${esc(pool.name)}</h2>${managing?'<h3>Beheer</h3>':''}<p id="private-detail-message" role="status"></p>
-    ${managing?`<section class="stack pool-members"><h3>Leden (${members.data.length})</h3><div class="table-wrap"><table class="pool-members-table"><thead><tr><th scope="col">Speler</th><th scope="col">Rol</th><th scope="col" class="member-actions-heading">Acties</th></tr></thead><tbody>${members.data.map(m=>`<tr><td><button class="name-link" data-compare-member="${esc(m.user_id)}">${esc(names.get(m.user_id)||'Gebruiker')}</button></td><td><span class="member-role">${m.user_id===pool.owner_id?'Beheerder':'Lid'}</span></td><td>${m.user_id!==userId?`<div class="member-actions"><button type="button" class="ghost subtle-danger" data-remove-member="${esc(m.user_id)}" aria-label="Verwijder ${esc(names.get(m.user_id)||'dit lid')} uit de poule">Verwijderen</button><button type="button" class="ghost" data-transfer-member="${esc(m.user_id)}" aria-label="Draag beheer over aan ${esc(names.get(m.user_id)||'dit lid')}">Beheer overdragen</button></div>`:'<span class="hint">Jouw account</span>'}</td></tr>`).join('')}</tbody></table></div></section>
-    <form id="private-invite-form" class="stack"><h3>Lid uitnodigen</h3><div class="field"><label for="private-invite-user">Gebruikersnaam van het lid</label><div class="pool-user-picker"><input id="private-invite-user" required maxlength="254" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="private-invite-result"><div data-user-suggestions class="user-suggestions" hidden></div></div></div><button class="btn" type="submit" disabled>Gebruiker uitnodigen</button><p id="private-invite-result" role="status">Typ minimaal 3 letters en selecteer een gebruiker.</p></form><button class="btn secondary" id="private-revoke">Alle openstaande uitnodigingen intrekken</button>`:
+  target.innerHTML = `<div class="pool-detail-nav"><button class="ghost" id="private-detail-back">${managing?'← Poule':'← Mijn poules'}</button>${canManage&&!managing?'<button type="button" class="btn secondary" data-pool-manage>Beheer</button>':''}</div><h2>${esc(pool.name)}</h2>${managing?'<h3>Beheer</h3>':''}<p id="private-detail-message" role="status"></p>
+    ${managing?(owner?`<section class="stack pool-members"><h3>Leden (${members.data.length})</h3><div class="table-wrap"><table class="pool-members-table"><thead><tr><th scope="col">Speler</th><th scope="col">Rol</th><th scope="col" class="member-actions-heading">Acties</th></tr></thead><tbody>${members.data.map(m=>`<tr><td><button class="name-link" data-compare-member="${esc(m.user_id)}">${esc(names.get(m.user_id)||'Gebruiker')}</button></td><td><span class="member-role">${m.user_id===pool.owner_id?'Beheerder':'Lid'}</span></td><td>${m.user_id!==userId?`<div class="member-actions"><button type="button" class="ghost subtle-danger" data-remove-member="${esc(m.user_id)}" aria-label="Verwijder ${esc(names.get(m.user_id)||'dit lid')} uit de poule">Verwijderen</button><button type="button" class="ghost" data-transfer-member="${esc(m.user_id)}" aria-label="Draag beheer over aan ${esc(names.get(m.user_id)||'dit lid')}">Beheer overdragen</button></div>`:'<span class="hint">Jouw account</span>'}</td></tr>`).join('')}</tbody></table></div></section>
+    <form id="private-invite-form" class="stack"><h3>Lid uitnodigen</h3><div class="field"><label for="private-invite-user">Gebruikersnaam van het lid</label><div class="pool-user-picker"><input id="private-invite-user" required maxlength="254" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="private-invite-result"><div data-user-suggestions class="user-suggestions" hidden></div></div></div><button class="btn" type="submit" disabled>Gebruiker uitnodigen</button><p id="private-invite-result" role="status">Typ minimaal 3 letters en selecteer een gebruiker.</p></form><button class="btn secondary" id="private-revoke">Alle openstaande uitnodigingen intrekken</button>`:'')+`<button type="button" class="ghost subtle-danger" data-delete-pool="${esc(pool.id)}">Poule verwijderen</button>`:
     `<section class="stack" data-pool-ranking-view><label for="private-pool-round">Klassement per ronde</label><select id="private-pool-round"><option value="">Alle rondes</option>${rounds.data.map(r=>`<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('')}</select><div id="private-pool-ranking" class="table-wrap" role="status"></div></section>${!owner?'<button class="btn secondary" id="private-leave">Poule verlaten</button>':''}`}`;
   target.querySelector('#private-detail-back').onclick=()=>managing?loadPrivatePoolDetail(pool):loadPrivatePools(overview);
   target.querySelector('[data-pool-manage]')?.addEventListener('click',()=>loadPrivatePoolDetail(pool,'manage'));
   const comparison=document.createElement('section');comparison.className='stack';target.append(comparison);
-  const compare=member=>{import('./pool-comparison.js?v=mobile-archive-20261019').then(({loadPoolComparison})=>{if(target.isConnected)loadPoolComparison(comparison,{supabase,isCurrent:()=>currentUser?.id===userId},pool,member,names.get(member)||'Poulegenoot');}).catch(()=>comparison.textContent='Vergelijken laden mislukt. Probeer opnieuw.');};
+  const compare=member=>{import('./pool-comparison.js?v=layout-findings-20261023').then(({loadPoolComparison})=>{if(target.isConnected)loadPoolComparison(comparison,{supabase,isCurrent:()=>currentUser?.id===userId},pool,member,names.get(member)||'Poulegenoot');}).catch(()=>comparison.textContent='Vergelijken laden mislukt. Probeer opnieuw.');};
   const message = target.querySelector('#private-detail-message');
   const ranking = target.querySelector('#private-pool-ranking');
   function showRanking(data) {
-    ranking.innerHTML = data.length ? `<table><thead><tr><th>#</th><th>Gebruiker</th><th>Punten</th><th>Winnaars</th></tr></thead>
+    ranking.innerHTML = data.length ? `<table class="ranking-table"><thead><tr><th>#</th><th>Gebruiker</th><th>Punten</th><th>Winnaars</th></tr></thead>
       <tbody>${data.map(r => `<tr><td>${esc(r.rank_position)}</td><td><button class="name-link" data-compare-member="${esc(r.user_id)}">${esc(r.display_name)}${r.user_id === userId ? ' (jij)' : ''}</button></td>
         <td>${esc(r.earned_points)}</td><td>${esc(r.correct_winners)}</td></tr>`).join('')}</tbody></table>` : 'Nog geen deelnemers.';
   }
@@ -1365,6 +1355,15 @@ async function loadPrivatePoolDetail(pool,view='ranking') {
   target.querySelectorAll('[data-transfer-member]').forEach(b => b.onclick = () => manage('transfer',b.dataset.transferMember,b));
   const leave = target.querySelector('#private-leave'); if (leave) leave.onclick = () => manage('leave',null,leave);
   const revoke = target.querySelector('#private-revoke'); if (revoke) revoke.onclick = () => manage('revoke',null,revoke);
+  const removePool=target.querySelector('[data-delete-pool]');
+  if(removePool)removePool.onclick=async()=>{
+    if(!confirm(`Poule "${pool.name}" definitief verwijderen? Alle pouleleden en uitnodigingen worden verwijderd. Je toernooivoorspellingen blijven bewaard.`))return;
+    removePool.disabled=true;
+    try{const r=await supabase.rpc('delete_pool',{p_pool_id:pool.id});if(!target.isConnected||currentUser?.id!==userId)return;if(r.error)throw r.error;
+      await loadPrivatePools(overview);if(overview.isConnected)overview.querySelector('#pool-message').textContent='Poule verwijderd.';
+    }catch(error){if(target.isConnected)message.textContent=error.message||'Verwijderen mislukt. Probeer opnieuw.';}
+    finally{if(removePool.isConnected)removePool.disabled=false;}
+  };
   const invite = target.querySelector('#private-invite-form');
   if(invite)bindPoolInvite(invite,{supabase,poolId:pool.id,isCurrent:()=>currentUser?.id===userId});
   }catch(error){if(target.isConnected){target.innerHTML='<button class="ghost">← Mijn poules</button><p role="alert"></p>';target.querySelector('p').textContent='Poule laden mislukt: '+error.message;target.querySelector('button').onclick=()=>loadPrivatePools(overview);}}
