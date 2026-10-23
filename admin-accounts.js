@@ -2,7 +2,7 @@ const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const roleLabel={user:'Gebruiker',admin:'Beheerder',super_admin:'Hoofdbeheerder'};
 export async function loadAdminAccounts(host,ctx){
  const alive=()=>host.isConnected&&ctx.isCurrent();let users=[],page=0,busy=false;
- host.innerHTML='<h2>Gebruikers</h2><div class="toolbar"><label>Gebruiker zoeken<input type="search" data-account-search placeholder="Naam of gebruikersnaam"></label><button type="button" class="ghost" data-account-refresh>Vernieuwen</button></div><p role="status" data-account-message></p><div data-account-list></div>';
+ host.innerHTML='<h2>Gebruikers</h2><div class="toolbar"><label>Gebruiker zoeken<input type="search" data-account-search placeholder="Naam of gebruikersnaam"></label></div><p role="status" data-account-message></p><div data-account-list></div>';
  const message=host.querySelector('[data-account-message]'),list=host.querySelector('[data-account-list]'),search=host.querySelector('input');
  function draw(){
   const query=search.value.trim().toLocaleLowerCase('nl-NL'),filtered=users.filter(u=>(u.username+' '+(u.display_name||'')).toLocaleLowerCase('nl-NL').includes(query));
@@ -15,10 +15,10 @@ export async function loadAdminAccounts(host,ctx){
    busy=true;host.querySelectorAll('button').forEach(b=>b.disabled=true);message.textContent='Rechten opslaan…';
    try{const r=await ctx.supabase.rpc('admin_set_account_role',{p_user:user.id,p_role:role});if(r.error)throw r.error;if(!alive())return;await read();if(alive())message.textContent='Rechten opgeslagen.';}
    catch(error){if(alive())message.textContent='Niet opgeslagen: '+error.message;}
-   finally{busy=false;if(alive()){host.querySelector('[data-account-refresh]').disabled=false;draw();}}
+   finally{busy=false;if(alive())draw();}
   });
  }
  async function read(){const r=await ctx.supabase.rpc('admin_list_accounts');if(r.error)throw r.error;if(!alive())return;users=Array.isArray(r.data)?r.data:[];draw();}
- search.oninput=()=>{page=0;draw();};host.querySelector('[data-account-refresh]').onclick=()=>{if(!busy)read().then(()=>message.textContent='').catch(e=>message.textContent='Laden mislukt: '+e.message);};
+ search.oninput=()=>{page=0;draw();};
  try{await read();}catch(error){if(alive())message.textContent='Gebruikers laden mislukt: '+error.message;}
 }
