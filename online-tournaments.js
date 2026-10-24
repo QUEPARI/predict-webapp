@@ -1,3 +1,4 @@
+import {loadingScreen} from './loading-screen.js?v=loading-ui-20261024';
 export function predictionValidationMessage(match,homeValue,awayValue){
  const values=[homeValue,awayValue];
  if(values.some(v=>String(v).trim()===''))return 'Vul beide scores in.';
@@ -36,6 +37,7 @@ export function predictionOutcome(m,p){
 }
 
 export async function loadTournamentCatalog(target,ctx) {
+  target.innerHTML=loadingScreen();
  try{
   const response=await ctx.supabase.rpc('get_active_tournament_catalog');if(!current(target,ctx))return;if(response.error)throw response.error;
   const all=response.data?.tournaments||[],joined=new Set(all.filter(t=>t.joined).map(t=>t.id));
@@ -83,7 +85,7 @@ function showError(target,ctx,error,retry) {
 }
 
 export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'predictions',round:''}) {
-  const target=document.createElement('section');target.className='stack tournament-detail';target.textContent='Toernooi laden...';host.replaceChildren(target);
+  const target=document.createElement('section');target.className='stack tournament-detail';target.innerHTML=loadingScreen();host.replaceChildren(target);
   try {
     const archive=await ctx.supabase.rpc('get_tournament_archive',{p_id:ctx.tournamentId});
     if(!current(target,ctx))return;if(archive.error)throw archive.error;if(archive.data?.archived){renderArchivedTournament(target,ctx,archive.data);return;}
@@ -166,7 +168,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
       <div class="row"><button class="btn secondary" id="online-previous" ${page===0?'disabled':''}>Vorige</button>
         <span>Pagina ${page+1}</span><button class="btn secondary" id="online-next" ${(page+1)*size >= activeMatches.length?'disabled':''}>Volgende</button></div></section><section data-detail-panel="results"><div class="results-wrap"><table class="results-table"><thead><tr><th>Ronde / wedstrijd</th><th><span class="results-full-label">Jouw voorspelling</span><span class="results-short-label">Jij</span></th><th class="result-column">Uitslag</th><th><abbr title="Punten">Pt</abbr></th></tr></thead><tbody>${shownResults.map(m=>{const p=myPredictions.get(m.id);return `<tr><td>${esc(roundNames.get(m.round_id)||'—')}${m.scheduled_start?' · '+esc(resultDate(m.scheduled_start)):''}<br>${esc(m.home_name)} – ${esc(m.away_name)}</td><td>${p?`<span class="score-tone score-tone-${predictionOutcome(m,p).state}">${p.home_score} - ${p.away_score}</span>`:'—'}</td><td class="result-column">${m.home_score} - ${m.away_score}</td><td>${myPoints.get(m.id)?.earned_points??'—'}</td></tr>`;}).join('')||'<tr><td colspan="4">Nog geen uitslagen in deze ronde.</td></tr>'}</tbody></table></div></section><section data-detail-panel="pools"><h2>Mijn poules</h2><div id="private-pools" class="stack" role="region" aria-label="Privépoules"></div></section><section data-detail-panel="schema"></section><section data-detail-panel="champion"></section><section data-detail-panel="ranking"><h2>Klassement</h2><div data-ranking></div></section>`;
     const champion=target.querySelector('[data-detail-panel="champion"]');champion.className='panel stack';
-    import('./tournament-management.js?v=round-points-20261024').then(({loadChampionPrediction})=>{if(current(target,ctx))loadChampionPrediction(champion,ctx,t.id,joined).then(data=>{if(!current(target,ctx)||!data)return;const button=target.querySelector('[data-detail-tab=champion]');button.hidden=!data.enabled;if(!data.enabled&&view.tab==='champion')showTab('predictions');});}).catch(()=>{if(current(target,ctx))champion.textContent='Winnaarsvraag laden mislukt.';});
+    import('./tournament-management.js?v=loading-ui-20261024').then(({loadChampionPrediction})=>{if(current(target,ctx))loadChampionPrediction(champion,ctx,t.id,joined).then(data=>{if(!current(target,ctx)||!data)return;const button=target.querySelector('[data-detail-tab=champion]');button.hidden=!data.enabled;if(!data.enabled&&view.tab==='champion')showTab('predictions');});}).catch(()=>{if(current(target,ctx))champion.textContent='Winnaarsvraag laden mislukt.';});
     const rulesPanel=document.createElement('section');rulesPanel.dataset.detailPanel='rules';rulesPanel.className='panel stack';target.append(rulesPanel);
     const renderRules=(bracket)=>{const rds=rounds.data||[];rulesPanel.innerHTML='<h2>Spelregels</h2><p>Voorspel vóór de individuele begintijd. Bij Mastercaller-wedstrijden met tijd NNB kun je alvast voorspellen tot de toernooistart; zodra de tijd bekend is geldt de wedstrijdtijd. Eén voorspelling telt voor het toernooi en alle bijbehorende poules. Vrijstellingen leveren geen punten op. Voetbal: eindstand vóór strafschoppen; gelijkspel toegestaan.</p><p>'+esc(scoringMode==='additive'?'Exacte score telt bovenop de punten voor de juiste winnaar.':'Exacte score vervangt de punten voor de juiste winnaar.')+'</p><div class="table-wrap"><table class="rules-table"><thead><tr><th>Ronde</th><th>Spelvorm</th><th>Juiste winnaar</th><th>Exacte score</th></tr></thead><tbody>'+rds.map(r=>{const rule=roundRules.get(r.id),games=bracket?.matches?.filter(m=>m.round===r.round_order)||list.filter(m=>m.round_id===r.id),formats=[...new Set(games.map(m=>{const unit=m.unit||m.score_unit;return unit==='goals'?'Doelpunten':(unit==='sets'?'Sets':'Legs')+' · first-to '+(m.first_to??'—');}))];return `<tr><td>${esc(r.name)}</td><td>${esc(formats.join(' / ')||'Nog niet vastgelegd')}</td><td>${rule?.winner_points??'—'}</td><td>${rule?.exact_score_points??'—'}</td></tr>`;}).join('')+'</tbody></table></div><p class="hint">De eventuele winnaarbonus en sluiting staan bij Toernooiwinnaar. Een gesloten wedstrijd wordt niet opnieuw geopend door alleen een tijd te wijzigen.</p>';};renderRules(bracket);
     const schema=target.querySelector('[data-detail-panel="schema"]');schema.className='panel stack';
