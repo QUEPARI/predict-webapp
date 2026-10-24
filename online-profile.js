@@ -1,9 +1,10 @@
+import {loadingScreen} from './loading-screen.js?v=loading-ui-20261024';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const active=(target,ctx)=>target.isConnected&&!ctx.signal.aborted&&ctx.isCurrent();
 
 
 export async function loadOnlineProfile(target,ctx){
-  target.textContent='Account laden...';
+  target.innerHTML=loadingScreen();
   try {
     target.classList.add('account-settings');
     const profile=await ctx.supabase.from('profiles').select('username,display_name,theme').eq('id',ctx.userId).single();
