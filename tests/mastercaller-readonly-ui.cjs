@@ -1,6 +1,6 @@
 const {chromium}=require('playwright'),http=require('http'),fs=require('fs'),path=require('path'),assert=require('assert/strict');
 (async()=>{
- const allowed=['tournament-archive.js','source-results.js','tournament-management.js','tournament-images.js','knockout.js','score-source.js','round-settings.js','bracket.js','styles.css'];
+ const allowed=['round-points.js','tournament-archive.js','source-results.js','tournament-management.js','tournament-images.js','knockout.js','score-source.js','round-settings.js','bracket.js','styles.css'];
  const server=http.createServer((req,res)=>{const name=req.url.split('?')[0].slice(1);if(allowed.includes(name)){res.setHeader('Content-Type',name.endsWith('.js')?'text/javascript':'text/css');res.end(fs.readFileSync(path.join(__dirname,'..',name)));return;}
  const schema=name==='schema';res.end(`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"></head><body><main class="layout"><section class="panel stack" id="target" ${schema?'data-tournament="t"':'data-selected-tournament="t"'}></section></main><script type="module">import {${schema?'loadKnockoutAdmin':'loadTournamentManagement'}} from "/${schema?'knockout':'tournament-management'}.js";const ab=new AbortController();${schema?'loadKnockoutAdmin':'loadTournamentManagement'}(document.querySelector('#target'),{supabase:window.mock,signal:ab.signal,isCurrent:()=>true,needsResult:()=>true});</script></body></html>`);});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
