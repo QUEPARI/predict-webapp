@@ -5,8 +5,8 @@ self.addEventListener('push',event=>{
  let data={};try{data=event.data?.json()||{};}catch{}
  event.waitUntil(self.registration.showNotification(typeof data.title==='string'?data.title:'Predict',{
   body:typeof data.body==='string'?data.body:'Er staat een nieuw bericht voor je klaar.',
-  icon:new URL('./icons/predict-192.png',self.registration.scope).href,
-  badge:new URL('./icons/predict-192.png',self.registration.scope).href,
+  icon:new URL('./icons/predict-v2-192.png',self.registration.scope).href,
+  badge:new URL('./icons/predict-v2-badge-96.png',self.registration.scope).href,
   tag:typeof data.tag==='string'?data.tag:'predict',
   data:{url:self.registration.scope},
  }));
