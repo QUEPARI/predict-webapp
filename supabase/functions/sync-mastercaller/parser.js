@@ -4,11 +4,11 @@ export function sourceUrl(value) {
   const u=new URL(value);
   if(u.protocol!=='https:'||u.port||u.username||u.password||u.search||u.hash||!['mastercaller.com','www.mastercaller.com','mastercaller.nl','www.mastercaller.nl'].includes(u.hostname))throw Error('Gebruik een Mastercaller-uitslagenlink.');
   const path=u.pathname.replace(/^\/toernooien\//,'/tournaments/').replace(/\/uitslagen\/?$/,'/results');
-  if(!/^\/tournaments\/[a-z0-9-]+\/20\d{2}\/results\/?$/.test(path))throw Error('Gebruik de uitslagenpagina van één toernooi en jaargang.');
+  if(!/^\/tournaments\/(?:[a-z0-9-]+\/20\d{2}|players-championships\/20\d{2}-pc-[1-9]\d?-[a-z0-9]+(?:-[a-z0-9]+)*)\/results\/?$/.test(path))throw Error('Gebruik de uitslagenpagina van één toernooi en jaargang.');
   return 'https://mastercaller.com'+path.replace(/\/$/,'');
 }
 export function parseResults(html,url,referenceTime=new Date()) {
-  const canonical=sourceUrl(url),year=canonical.split('/')[5];
+  const canonical=sourceUrl(url),year=canonical.split('/')[5].slice(0,4);
   const {document}=parseHTML(html);
   const title=document.querySelector('h1')?.textContent.trim();
   if(!title||!document.body.textContent.includes('Professional Darts Corporation'))throw Error('Geen herkenbare PDC-uitslagenpagina ontvangen.');
@@ -98,6 +98,7 @@ export function parseBracket(html,results){
   return {order,position,depth,home_name:names[0],away_name:names[1],home_id:sides[0]?.dataset.playerid||null,away_id:sides[1]?.dataset.playerid||null,start:matching[0]?.start||null,date:matching[0]?.date||null};
  }).sort((a,b)=>a.order-b.order||a.position-b.position);
  const first=fixtures.filter(f=>f.order===1),roster=first.flatMap(f=>[f.home_name,f.away_name]);
+ if(roster.length&&roster.every(n=>!n))throw Error('De loting van dit toernooi is nog niet ingevuld op Mastercaller. Probeer opnieuw zodra de deelnemers in het bracket staan.');
  // Initial fully automatic setup supports complete, power-of-two knockouts.
  // Byes/seeded entry require an explicit source graph; never guess their slots.
  if(roster.length!==2**rounds.length||roster.some(n=>!n)||new Set(roster.map(clean)).size!==roster.length)throw Error('Dit bracket kan nog niet volledig automatisch worden ingericht.');
