@@ -6,6 +6,8 @@ on:
       - .github/workflows/mastercaller-sync.yml
       - scripts/mastercaller/**
       - supabase/functions/sync-mastercaller/parser.js
+      - supabase/functions/sync-mastercaller/draft-parser.js
+      - tests/mastercaller-drafts-parser.cjs
       - tests/mastercaller-parser.cjs
       - supabase/functions/mastercaller-github/**
   schedule:
@@ -29,4 +31,5 @@ jobs:
       - run: ln -s "$PWD/scripts/mastercaller/node_modules" node_modules
       - run: node tests/mastercaller-parser.cjs
       - run: node tests/mastercaller-pc-parser.cjs
+      - run: node tests/mastercaller-drafts-parser.cjs
       - run: node scripts/mastercaller/sync.mjs
