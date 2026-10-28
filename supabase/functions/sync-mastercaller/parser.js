@@ -110,7 +110,7 @@ export function parseBracket(html,results){
  return {...results,rounds,roster,bracket:fixtures};
 }
 
-async function fetchHtml(canonical,fetcher){
+export async function fetchHtml(canonical,fetcher){
   const r=await fetcher(canonical,{redirect:'error',signal:AbortSignal.timeout(15000),headers:{Accept:'text/html','User-Agent':'Predict-Mastercaller-Test/1.0'}});
   if(!r.ok)throw Error(`Mastercaller niet bereikbaar (HTTP ${r.status}). Automatische verwerking wacht op de bron.`);
   if(!r.headers.get('content-type')?.includes('text/html'))throw Error('Mastercaller gaf geen HTML-uitslagenpagina terug.');

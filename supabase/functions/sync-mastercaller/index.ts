@@ -1,6 +1,7 @@
 import {createClient} from '@supabase/supabase-js';
 import {fetchResults,fetchTournament} from './parser.js';
 
+import {fetchSourceDraft} from './draft-parser.js';
 const headers={'Access-Control-Allow-Origin':'https://quepari.github.io','Access-Control-Allow-Headers':'authorization,apikey,content-type,x-client-info','Access-Control-Allow-Methods':'POST,OPTIONS','Cache-Control':'no-store'};
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers});
 export async function handle(req:Request){
@@ -32,6 +33,9 @@ export async function handle(req:Request){
    if(result.error)return reply({error:result.error.message},400);return reply(result.data);
   }
   if(!/^[a-f0-9-]{36}$/i.test(input.tournament_id||''))return reply({error:'Kies een toernooi'},400);
+  const source=await userDb.rpc('get_tournament_score_source',{p_tournament:input.tournament_id});
+  if(source.error)return reply({error:source.error.message},400);
+  if(source.data?.setup_pending){const queued=await userDb.rpc('admin_request_mastercaller_setup_check',{p_id:input.tournament_id});return queued.error?reply({error:queued.error.message},400):reply(queued.data);}
   // A manual click performs the fetch now; it must not report a queued job as completed.
   // The same claim/lease as the scheduled worker prevents duplicate source requests.
   const claimed=await db.rpc('claim_mastercaller_jobs',{p_tournament:input.tournament_id,p_actor:actor});
@@ -44,8 +48,8 @@ export async function handle(req:Request){
   }
   let snapshot=null,records=[],sourceError=null;
   try{
-   const data=await(job.automatic_setup?fetchTournament(job.url):fetchResults(job.url));
-   records=data.records;snapshot=job.automatic_setup?data:null;
+   const generic=job.source_layout==='generic',data=await(generic?fetchSourceDraft(job.url):job.automatic_setup?fetchTournament(job.url):fetchResults(job.url));
+   records=data.records||[];snapshot=generic||job.automatic_setup?data:null;
   }catch(e){
    sourceError=e instanceof Error?e.message:'Mastercaller ophalen mislukt.';
    if(e instanceof Error&&['TimeoutError','AbortError'].includes(e.name))sourceError='Mastercaller reageert niet binnen 15 seconden. Er zijn geen nieuwe gegevens verwerkt.';

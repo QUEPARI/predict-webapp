@@ -9,14 +9,17 @@ export async function handle(req:Request){
  try{
   const body=await req.text();if(body.length>1500000)return reply({error:'Verzoek te groot'},413);const input=JSON.parse(body);
   if(input.action==='claim'){
-   const creations=await rpc('claim_mastercaller_creations');const scores=await rpc('claim_mastercaller_jobs',{p_tournament:null,p_actor:null});
-   return reply({jobs:[...creations,...scores.map((j:any)=>({...j,kind:'scores'}))]});
+   const scores=await rpc('claim_mastercaller_jobs',{p_tournament:null,p_actor:null});
+   if(scores.length)return reply({jobs:scores.map((j:any)=>({...j,kind:'scores'}))});
+   const creations=await rpc('claim_mastercaller_creations');if(creations.length)return reply({jobs:creations});
+   return reply({jobs:await rpc('claim_mastercaller_setups')});
   }
   if(input.action==='finish'){
+   if(input.kind==='setup')return reply(await rpc('finish_mastercaller_setup',{p_tournament:input.tournament_id,p_lease:input.lease,p_snapshot:input.snapshot||null,p_error:input.error||null}));
    if(input.kind==='create')return reply(await rpc('finish_mastercaller_creation',{p_job:input.job_id,p_lease:input.lease,p_snapshot:input.snapshot||null,p_error:input.error||null}));
    if(input.kind==='scores'){
     const result=await rpc('finish_mastercaller_job',{p_tournament:input.tournament_id,p_lease:input.lease,p_records:input.records||[],p_error:input.error||null,p_snapshot:input.snapshot||null});
-    if(input.snapshot&&!input.error)await rpc('cache_mastercaller_snapshot',{p_snapshot:input.snapshot});return reply(result);
+    if(input.snapshot&&!input.error&&input.source_layout!=='generic')await rpc('cache_mastercaller_snapshot',{p_snapshot:input.snapshot});return reply(result);
    }
   }
   if(input.action==='cache'&&input.snapshot)return reply({cached:await rpc('cache_mastercaller_snapshot',{p_snapshot:input.snapshot})});

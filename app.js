@@ -545,7 +545,7 @@ async function editAdminMatch(matchId) {
   const options = ['<option value="">Onbekend</option>', ...(rounds ?? []).map(r =>
     `<option value="${esc(r.round_id)}" ${r.round_id === match.round_id ? 'selected' : ''}>${esc(r.round_name)}</option>`
   )].join('');
-  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=polish-20261023');
+  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=source-drafts-20261028');
   editor.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;gap:12px">
       <h2 id="admin-edit-title" style="margin:0">Wedstrijd bewerken</h2>
       <button type="button" class="ghost" id="admin-edit-close" aria-label="Sluiten">✕</button>
@@ -932,7 +932,7 @@ async function recordAdminMatchStart(matchId) {
     const enteredTime = dialog.querySelector('#start-actual-time').value;
     let verifiedStart = null;
     if (enteredTime) {
-      const {dutchToUTC}=await import('./knockout.js?v=polish-20261023');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
+      const {dutchToUTC}=await import('./knockout.js?v=source-drafts-20261028');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
       if (!Number.isFinite(parsed.getTime()) || parsed.getTime() > Date.now()) {
         message.textContent = 'Vul een geldige werkelijke starttijd in die niet in de toekomst ligt.';
         return;
@@ -975,7 +975,7 @@ async function loadAdminTournamentPublications(force=false) {
   if(!force&&target.querySelector('[data-ko-dirty="true"]'))return;
   tournamentManagementController?.abort();tournamentManagementController=new AbortController();const managementSignal=tournamentManagementController.signal;
   const userId=currentUser.id;
-  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=loading-ui-20261024');
+  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=source-drafts-20261028');
     if(!target.isConnected||managementSignal.aborted)return;
     await loadTournamentManagement(target,{supabase,signal:managementSignal,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole),
       onCreate:()=>{const general=document.getElementById('admin-tournament-publications');if(general?.querySelector('[data-ko-dirty="true"]')&&!confirm('Niet-opgeslagen toernooiwijzigingen laten vervallen?'))return;if(general)general.querySelectorAll('[data-ko-dirty]').forEach(el=>el.dataset.koDirty='false');adminGameId='';adminGameName='Nieuw toernooi';const ko=document.querySelector('#admin-knockout');if(ko)ko.dataset.tournament='';const create=document.querySelector('#ko-create');if(create)create.hidden=false;const open=()=>{if(managementSignal.aborted||currentUser?.id!==userId)return;const details=document.querySelector('#ko-create details');if(!details)return;document.removeEventListener('predict-knockout-ready',open);details.open=true;details.scrollIntoView({block:'start'});details.querySelector('input[name=name]')?.focus({preventScroll:true});};document.addEventListener('predict-knockout-ready',open,{signal:managementSignal});showAdminSection('schema');open();},
@@ -1478,7 +1478,7 @@ render=function(){
 
 function loadAdminKnockout(){const target=document.getElementById('admin-knockout');if(!target||target.dataset.loaded)return;target.dataset.loaded='true';
   knockoutScreenController=new AbortController();const signal=knockoutScreenController.signal,userId=currentUser.id;
-  import('./knockout.js?v=polish-20261023').then(({loadKnockoutAdmin})=>{
+  import('./knockout.js?v=source-drafts-20261028').then(({loadKnockoutAdmin})=>{
     if(!signal.aborted&&target.isConnected)loadKnockoutAdmin(target,{supabase,signal,isCurrent:()=>currentUser?.id===userId,onSaved:()=>{loadAdminMatches();loadAdminTournamentPublications();}});
   }).catch(()=>{if(!signal.aborted&&target.isConnected)target.textContent='Knock-outbeheer laden mislukt. Open Beheer opnieuw.';});
 }
@@ -1515,7 +1515,7 @@ function showAdminSection(id){
  if(id==='settings'){const h=document.getElementById('app-appearance');if(h&&!h.children.length)loadAppearanceSettings(h);}
  if(id==='settings'){const host=document.getElementById('admin-push');if(host&&!host.children.length)import('./push-notifications.js?v=push-times-20261017').then(({loadPushAdmin})=>{if(host.isConnected)loadPushAdmin(host,supabase);}).catch(()=>host.textContent='Meldingen laden mislukt.');}
 }
-document.addEventListener('predict-admin-schema-created',e=>{if(!e.detail?.id)return;adminGameId=e.detail.id;adminGameName=e.detail.name;adminGameKnockout=true;const ko=document.getElementById('admin-knockout');if(ko)ko.dataset.tournament=adminGameId;const host=document.getElementById('admin-tournament-publications');if(host)host.dataset.selectedTournament=adminGameId;refreshAdminGameContext();});
+document.addEventListener('predict-admin-schema-created',e=>{if(!e.detail?.id)return;adminGameId=e.detail.id;adminGameName=e.detail.name;adminGameKnockout=!e.detail.sourceDraft;const ko=document.getElementById('admin-knockout');if(ko)ko.dataset.tournament=adminGameId;const host=document.getElementById('admin-tournament-publications');if(host)host.dataset.selectedTournament=adminGameId;refreshAdminGameContext();if(e.detail.sourceDraft){showAdminSection('tournaments');loadAdminTournamentPublications(true);}});
 
 const renderBeforeAdminNavigation=render;
 render=function(){

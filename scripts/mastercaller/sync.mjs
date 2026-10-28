@@ -1,4 +1,5 @@
 import {fetchTournament,fetchResults} from '../../supabase/functions/sync-mastercaller/parser.js';
+import {fetchSourceDraft} from '../../supabase/functions/sync-mastercaller/draft-parser.js';
 const endpoint='https://sfcozzjcuppfypetbbzn.supabase.co/functions/v1/mastercaller-github';
 const oidcURL=new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);oidcURL.searchParams.set('audience',endpoint);
 const identity=await fetch(oidcURL,{headers:{Authorization:'Bearer '+process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}});
@@ -11,6 +12,6 @@ if(process.env.GITHUB_EVENT_NAME==='push'){
 }
 const {jobs}=await call({action:'claim'});console.log(JSON.stringify({claimed:jobs.length}));
 for(const job of jobs){let snapshot=null,records=[],error=null;
- try{const data=await(job.kind==='create'||job.automatic_setup?fetchTournament(job.url):fetchResults(job.url));records=data.records;snapshot=job.kind==='create'||job.automatic_setup?data:null;}catch(e){error=e.message;}
+ try{const draft=job.kind==='setup'||job.source_layout==='generic',data=await(draft?fetchSourceDraft(job.url):job.kind==='create'||job.automatic_setup?fetchTournament(job.url):fetchResults(job.url));records=data.records||[];snapshot=draft||job.kind==='create'||job.automatic_setup?data:null;}catch(e){error=e.message;}
  const result=await call({...job,action:'finish',snapshot,records,error});console.log(JSON.stringify({kind:job.kind,status:result.status||'processed',received:records.length,source_error:error}));
 }
