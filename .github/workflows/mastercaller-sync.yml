@@ -28,4 +28,5 @@ jobs:
       - run: npm ci --prefix scripts/mastercaller --ignore-scripts --no-audit --no-fund
       - run: ln -s "$PWD/scripts/mastercaller/node_modules" node_modules
       - run: node tests/mastercaller-parser.cjs
+      - run: node tests/mastercaller-pc-parser.cjs
       - run: node scripts/mastercaller/sync.mjs
