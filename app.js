@@ -84,7 +84,11 @@ let state=read();const save=()=>{try{localStorage.setItem(STORE,JSON.stringify({
 const themeMedia=window.matchMedia('(prefers-color-scheme: dark)');
 function isDarkTheme(){return state.theme==='dark'||(state.theme==='system'&&themeMedia.matches);}
 function applyTheme(){
-  document.body.classList.toggle('dark',isDarkTheme());applyBrandAccent();
+  const dark=isDarkTheme();
+  document.documentElement.classList.toggle('dark',dark);
+  document.documentElement.style.colorScheme=dark?'dark':'light';
+  const themeColor=document.querySelector('meta[name="theme-color"]');if(themeColor)themeColor.content=dark?'#101010':'#f3f5f9';
+  document.body.classList.toggle('dark',dark);applyBrandAccent();
   const button=document.querySelector('[data-action="theme"]');
   if(button)button.textContent=isDarkTheme()?'☀ Licht':'◐ Donker';
 }
