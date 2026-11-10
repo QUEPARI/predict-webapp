@@ -32,9 +32,10 @@ export function parseSourceDraft(resultsHtml,bracketHtml,url,groupsHtml=null,ref
  if(!groupsHtml)return base;
  const {document:g}=parseHTML(groupsHtml),headings=[...g.querySelectorAll('h3')].filter(h=>/^Group\s+[A-Z]+$/i.test(name(h)));
  if(!headings.length)return base;
- const roster=[],fixtures=[],records=[],groupNames=new Set();let complete=true;
+ const roster=[],fixtures=[],records=[],groupNames=new Set();let complete=true,groupSize=null;
  for(const h of headings){const label=name(h);if(groupNames.has(label))throw Error('Dubbele groep in de bron.');groupNames.add(label);const box=h.parentElement.parentElement;
-  const players=[...box.querySelectorAll('table tbody a[href*="/players/"]')].map(name);if(players.length!==4||players.some(x=>!x)||new Set(players.map(clean)).size!==4){complete=false;continue;}roster.push(...players);
+  const players=[...box.querySelectorAll('table tbody a[href*="/players/"]')].map(name);if(![3,4].includes(players.length)||players.some(x=>!x)||new Set(players.map(clean)).size!==players.length){complete=false;continue;}
+  groupSize??=players.length;if(players.length!==groupSize){complete=false;continue;}roster.push(...players);
   const pairs=new Set();
   for(const card of box.querySelectorAll('div.grid.grid-cols-1')){
    const sides=[...card.querySelectorAll('a[href*="/players/"]')].map(name);if(sides.length!==2||sides.some(n=>!players.some(p=>clean(p)===clean(n)))){complete=false;continue;}
@@ -45,9 +46,9 @@ export function parseSourceDraft(resultsHtml,bracketHtml,url,groupsHtml=null,ref
    const scores=[...card.children].map(x=>x.querySelector('div.bg-green-500,div.bg-red-500')?.textContent.trim());if(win.length!==1||lose.length!==1||scores.length!==2||!scores.every(x=>/^\d{1,2}$/.test(x||''))||!day||scores[0]===scores[1]||+win[0].textContent.trim()!==Math.max(...scores.map(Number)))throw Error('Onleesbare groepsuitslag.');
    records.push({depth:ko.rounds.length,round:label,home_name:sides[0],away_name:sides[1],home_score:+scores[0],away_score:+scores[1],date:day});
   }
-  if(pairs.size!==6)complete=false;
+  if(pairs.size!==groupSize*(groupSize-1)/2)complete=false;
  }
- if(!complete||!ko.rounds.length||headings.length*2!==2**ko.rounds.length||new Set(roster.map(clean)).size!==roster.length)return base;
+ if(!complete||!ko.rounds.length||headings.length*(groupSize===3?1:2)!==2**ko.rounds.length||new Set(roster.map(clean)).size!==roster.length)return base;
  return {...base,ready:true,reason:null,roster,matches:[...fixtures,...base.matches],records:[...records,...base.records]};
 }
 export async function fetchSourceDraft(url,fetcher=fetch){
