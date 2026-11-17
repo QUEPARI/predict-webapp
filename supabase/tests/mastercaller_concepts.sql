@@ -61,5 +61,20 @@ begin
  perform set_config('role','authenticated',true);perform public.admin_source_lifecycle(gid,'publish',5);perform set_config('role','none',true);
  if (select count(*) from public.matches where tournament_id=gid)<>7 or (select count(*) from public.matches where tournament_id=gid and predictions_enabled)<>6 then raise exception 'FAIL group/KO separation';end if;
  answer:=public.get_knockout_schema(gid);if answer->>'format'<>'groups' or jsonb_array_length(answer->'matches')<>7 then raise exception 'FAIL group schema';end if;
+ -- Explicitly excluded groups are not recreated or processed by future polls.
+ perform predict_private.mc_enter(gid);
+ insert into predict_private.tournament_mutation_permits(tournament_id,transaction_id,actor) values(gid,txid_current(),a);
+ update predict_private.mastercaller_sources set setup_snapshot=jsonb_set(setup_snapshot,'{excluded_rounds}','[1]') where tournament_id=gid;
+ delete from public.matches where tournament_id=gid and round_id in(select id from public.tournament_rounds where tournament_id=gid and round_order=1);
+ delete from public.round_scoring where tournament_id=gid and round_id in(select id from public.tournament_rounds where tournament_id=gid and round_order=1);
+ delete from public.tournament_rounds where tournament_id=gid and round_order=1;
+ delete from predict_private.tournament_mutation_permits where tournament_id=gid and transaction_id=txid_current();
+ perform predict_private.mc_exit(gid);
+ perform predict_private.sync_mastercaller_schema(gid,snap);
+ update predict_private.mastercaller_sources set lease=gen_random_uuid(),last_attempt=clock_timestamp() where tournament_id=gid returning lease into mid;
+ answer:=public.finish_mastercaller_job(gid,mid,'[{"depth":1,"round":"A","home_name":"A","away_name":"B","home_score":5,"away_score":0}]',null,snap);
+ if answer ? 'error' or (answer->>'received')::int<>0 then raise exception 'FAIL excluded group result %',answer;end if;
+ if (select count(*) from public.matches where tournament_id=gid)<>1 then raise exception 'FAIL group fixtures recreated';end if;
+ if exists(select 1 from predict_private.mastercaller_write_permits where tournament_id=gid) or exists(select 1 from predict_private.tournament_mutation_permits where tournament_id=gid) then raise exception 'FAIL leaked group correction permissions';end if;
 end $$;
 rollback;
