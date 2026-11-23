@@ -7,7 +7,7 @@ import {loadAdminAccounts} from './admin-accounts.js?v=pools-account-20261023';
 import {validAccent,accentPalette,applyAccent} from './branding.js?v=header-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=loading-ui-20261024';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=pool-colors-20261123';
 import {loadOnlineProfile} from './online-profile.js?v=loading-ui-20261024';
 
 // Centrally configured branding; no user data is stored in the public response.
@@ -1141,7 +1141,7 @@ async function loadAdminLeaderboards() {
       return;
     }
     const rows = data || [];
-    const {renderLeaderboard,loadTournamentComparison,loadPoolComparison}=await import('./pool-comparison.js?v=layout-findings-20261023');
+    const {renderLeaderboard,loadTournamentComparison,loadPoolComparison}=await import('./pool-comparison.js?v=pool-colors-20261123');
     if(!panel.isConnected||request!==version)return;
     renderLeaderboard(results,rows,(host,member,name)=>pool.value?loadPoolComparison(host,{supabase,isCurrent:()=>panel.isConnected},{id:pool.value},member,name):loadTournamentComparison(host,{supabase,isCurrent:()=>panel.isConnected},tour.value,member,name),{detailed:true,userId:currentUser.id});
   }
@@ -1323,7 +1323,7 @@ async function loadPrivatePoolDetail(pool,view='ranking') {
   target.querySelector('#private-detail-back').onclick=()=>managing?loadPrivatePoolDetail(pool):loadPrivatePools(overview);
   target.querySelector('[data-pool-manage]')?.addEventListener('click',()=>loadPrivatePoolDetail(pool,'manage'));
   const comparison=document.createElement('section');comparison.className='stack';target.append(comparison);
-  const compare=member=>{import('./pool-comparison.js?v=layout-findings-20261023').then(({loadPoolComparison})=>{if(target.isConnected)loadPoolComparison(comparison,{supabase,isCurrent:()=>currentUser?.id===userId},pool,member,names.get(member)||'Poulegenoot');}).catch(()=>comparison.textContent='Vergelijken laden mislukt. Probeer opnieuw.');};
+  const compare=member=>{import('./pool-comparison.js?v=pool-colors-20261123').then(({loadPoolComparison})=>{if(target.isConnected)loadPoolComparison(comparison,{supabase,isCurrent:()=>currentUser?.id===userId},pool,member,names.get(member)||'Poulegenoot');}).catch(()=>comparison.textContent='Vergelijken laden mislukt. Probeer opnieuw.');};
   const message = target.querySelector('#private-detail-message');
   const ranking = target.querySelector('#private-pool-ranking');
   function showRanking(data) {
