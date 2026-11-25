@@ -35,7 +35,20 @@ export async function handle(req:Request){
   if(!/^[a-f0-9-]{36}$/i.test(input.tournament_id||''))return reply({error:'Kies een toernooi'},400);
   const source=await userDb.rpc('get_tournament_score_source',{p_tournament:input.tournament_id});
   if(source.error)return reply({error:source.error.message},400);
-  if(source.data?.setup_pending){const queued=await userDb.rpc('admin_request_mastercaller_setup_check',{p_id:input.tournament_id});return queued.error?reply({error:queued.error.message},400):reply(queued.data);}
+  if(source.data?.setup_pending){
+   const claim=await db.rpc('claim_mastercaller_setup_now',{p_id:input.tournament_id});
+   if(claim.error)return reply({error:claim.error.message},500);
+   const job=claim.data;
+   if(!job)return reply({error:'Er loopt al een lotingcontrole, de laatste poging was minder dan één minuut geleden of het toernooi is inmiddels gepubliceerd.'},409);
+   let snapshot=null,problem=null;
+   try{snapshot=await fetchSourceDraft(job.url);}catch(e){problem=e instanceof Error?e.message:'Mastercaller ophalen mislukt.';}
+   const done=await db.rpc('finish_mastercaller_setup',{p_tournament:job.tournament_id,p_lease:job.lease,p_snapshot:snapshot,p_error:problem});
+   if(done.error)return reply({error:'Loting verwerken mislukt: '+done.error.message},500);
+   if(problem||done.data?.status==='error')return reply({error:problem||done.data.error},502);
+   if(done.data?.status==='ready')return reply({status:'ready',message:'Loting opgehaald. Je kunt de loting en spelvorm nu controleren.'});
+   if(done.data?.status==='waiting')return reply({status:'waiting',message:snapshot?.reason||'De loting is nog niet volledig bekend bij Mastercaller.'});
+   return reply({error:'De lotingcontrole is niet afgerond.'},500);
+  }
   // A manual click performs the fetch now; it must not report a queued job as completed.
   // The same claim/lease as the scheduled worker prevents duplicate source requests.
   const claimed=await db.rpc('claim_mastercaller_jobs',{p_tournament:input.tournament_id,p_actor:actor});

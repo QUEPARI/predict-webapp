@@ -1,7 +1,7 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),{stripTypeScriptTypes}=require('node:module');
 (async()=>{
- let handler,fetches=0,writes=0,verified=false,role='admin',claims=[],sourceError=null,finishError=null,finishReport={applied:1,received:2,unchanged:1,issues:[]},sourceState={source:'mastercaller_test'},calls=[];
- const db={auth:{getUser:async token=>token==='valid'?{data:{user:{id:'admin-id'}}}:{error:{message:'invalid'}}},from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:{role}})})})}),rpc:async(name,args)=>{calls.push([name,args]);if(name==='admin_request_mastercaller_setup_check')return {data:{status:'queued',message:'Lotingcontrole ingepland'}};if(name==='request_mastercaller_game')return {data:{id:'created-id'}};if(name==='verify_mastercaller_worker')return {data:verified};if(name==='claim_mastercaller_jobs')return {data:claims};if(name==='get_tournament_score_source')return {data:sourceState};if(name==='finish_mastercaller_job'){writes++;return finishError?{error:{message:finishError}}:{data:args.p_error?{error:args.p_error}:finishReport};}throw Error('Unexpected RPC: '+name);}};
+ let setupJob=null,setupStatus="ready",handler,fetches=0,writes=0,verified=false,role='admin',claims=[],sourceError=null,finishError=null,finishReport={applied:1,received:2,unchanged:1,issues:[]},sourceState={source:'mastercaller_test'},calls=[];
+ const db={auth:{getUser:async token=>token==='valid'?{data:{user:{id:'admin-id'}}}:{error:{message:'invalid'}}},from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:{role}})})})}),rpc:async(name,args)=>{calls.push([name,args]);if(name==='claim_mastercaller_setup_now')return {data:setupJob};if(name==='finish_mastercaller_setup')return {data:{status:args.p_error?'error':setupStatus}};if(name==='request_mastercaller_game')return {data:{id:'created-id'}};if(name==='verify_mastercaller_worker')return {data:verified};if(name==='claim_mastercaller_jobs')return {data:claims};if(name==='get_tournament_score_source')return {data:sourceState};if(name==='finish_mastercaller_job'){writes++;return finishError?{error:{message:finishError}}:{data:args.p_error?{error:args.p_error}:finishReport};}throw Error('Unexpected RPC: '+name);}};
  const src=fs.readFileSync(require('path').join(__dirname,'../supabase/functions/sync-mastercaller/index.ts'),'utf8').replace(/^import .*;\n/gm,'').replace('export async function handle','async function handle');
  const read=async()=>{fetches++;if(sourceError)throw sourceError;return {records:[{home_score:6,away_score:4}],title:'EC',rounds:[],roster:[],bracket:[]};};
  vm.runInNewContext(stripTypeScriptTypes(src),{createClient:()=>db,fetchResults:read,fetchTournament:read,fetchSourceDraft:read,Deno:{env:{get:()=>''},serve:f=>handler=f},Response,Request,JSON,URL,Error,TypeError});
@@ -25,7 +25,13 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),{stripTy
  finishError='Database unavailable';r=await request(body);assert.equal(r.status,500);assert.match((await r.json()).error,/Verwerken.*Database/);
  finishError=null;finishReport={applied:0,received:1,issues:[{reason:'Handmatige uitslag behouden'}]};claims=[{...job,automatic_setup:false}];r=await request(body);assert.equal(r.status,200);assert.equal((await r.json()).issues.length,1);assert.equal(calls.filter(c=>c[0]==='finish_mastercaller_job').at(-1)[1].p_snapshot,null);
  assert.equal(calls.some(c=>c[0]==='request_mastercaller_refresh'),false,'Manual fetch never queues a request');
- sourceState={source:'mastercaller_test',setup_pending:true};const before=fetches;r=await request(body);assert.equal((await r.json()).status,'queued');assert.equal(fetches,before,'Pending concepts queue metadata checks without claiming scores');
+ sourceState={source:'mastercaller_test',setup_pending:true};const before=fetches;
+ assert.equal((await request(body)).status,409);assert.equal(fetches,before);
+ setupJob=job;r=await request(body);assert.equal((await r.json()).status,'ready');assert.equal(fetches,before+1);
+ assert.equal(calls.find(c=>c[0]==='claim_mastercaller_setup_now')[1].p_id,body.tournament_id);
+ assert.equal(calls.find(c=>c[0]==='finish_mastercaller_setup')[1].p_lease,job.lease);
+ setupStatus='waiting';assert.equal((await (await request(body)).json()).status,'waiting');
+ sourceError=Error('HTTP 418');r=await request(body);assert.equal(r.status,502);assert.match((await r.json()).error,/418/);sourceError=null;
  sourceState={source:'mastercaller_test'};claims=[{...job,source_layout:'generic'}];r=await request(body);assert.equal(r.status,200);assert(calls.filter(c=>c[0]==='finish_mastercaller_job').at(-1)[1].p_snapshot);
  console.log('PASS: authorization, direct fetch and processing, shared claim/cooldown, HTTP 418, timeout, network, schema and DB errors, partial-result warnings, legacy worker and create unchanged.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
