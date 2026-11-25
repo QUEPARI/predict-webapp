@@ -151,7 +151,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
       ${joined ? `<div class="participation-line">Punten uit afgeronde wedstrijden: ${esc(total)}.</div>` :
       `<div class="panel stack"><p>Neem deel om je voorspellingen centraal op te slaan.</p>
         ${['published','active'].includes(t.status) ? '<button class="btn" id="online-join">Deelnemen aan dit toernooi</button>' : '<p>Dit toernooi staat niet meer open voor nieuwe deelnemers.</p>'}</div>`}
-      <nav class="detail-tabs" aria-label="Toernooionderdelen">${[['predictions','Voorspellingen'],['results','Uitslagen'],['schema','Schema'],['champion','Toernooiwinnaar'],['ranking','Klassement'],['pools','Poules'],['rules','Spelregels']].filter(([id])=>!ended||id!=='predictions').map(([id,label])=>`<button type="button" data-detail-tab="${id}">${label}</button>`).join('')}</nav><div data-round-controls class="match-controls"><h2 data-list-title>Wedstrijden</h2><select id="online-round" aria-label="Ronde"><option value="">Alle rondes</option>${(rounds.data||[]).map(r=>`<option value="${esc(r.id)}" ${view.round===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select></div><section data-detail-panel="predictions">
+      <nav class="detail-tabs" aria-label="Toernooionderdelen">${[['predictions','Voorspellingen'],['results','Uitslagen'],['schema','Schema'],['champion','Toernooiwinnaar'],['ranking','Klassement'],['pools','Poules'],['rules','Spelregels']].filter(([id])=>!ended||id!=='predictions').map(([id,label])=>`<button type="button" data-detail-tab="${id}">${label}</button>`).join('')}</nav><div data-inline-champion hidden></div><div data-round-controls class="match-controls"><h2 data-list-title>Wedstrijden</h2><select id="online-round" aria-label="Ronde"><option value="">Alle rondes</option>${(rounds.data||[]).map(r=>`<option value="${esc(r.id)}" ${view.round===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select></div><section data-detail-panel="predictions">
       <div class="grid online-matches">${predictionMatches.map(m=>{
         const p=myPredictions.get(m.id),earned=myPoints.get(m.id);
         const allowed=joined && open(m,t),closed=!open(m,t),outcome=predictionOutcome(m,p);
@@ -167,8 +167,24 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
       }).join('') || ''}</div><p data-empty-predictions>Geen wedstrijden vandaag of open om te voorspellen in deze ronde.</p>
       <div class="row"><button class="btn secondary" id="online-previous" ${page===0?'disabled':''}>Vorige</button>
         <span>Pagina ${page+1}</span><button class="btn secondary" id="online-next" ${(page+1)*size >= activeMatches.length?'disabled':''}>Volgende</button></div></section><section data-detail-panel="results"><div class="results-wrap"><table class="results-table"><thead><tr><th>Ronde / wedstrijd</th><th><span class="results-full-label">Jouw voorspelling</span><span class="results-short-label">Jij</span></th><th class="result-column">Uitslag</th><th><abbr title="Punten">Pt</abbr></th></tr></thead><tbody>${shownResults.map(m=>{const p=myPredictions.get(m.id);return `<tr><td>${esc(roundNames.get(m.round_id)||'—')}${m.scheduled_start?' · '+esc(resultDate(m.scheduled_start)):''}<br>${esc(m.home_name)} – ${esc(m.away_name)}</td><td>${p?`<span class="score-tone score-tone-${predictionOutcome(m,p).state}">${p.home_score} - ${p.away_score}</span>`:'—'}</td><td class="result-column">${m.home_score} - ${m.away_score}</td><td>${myPoints.get(m.id)?.earned_points??'—'}</td></tr>`;}).join('')||'<tr><td colspan="4">Nog geen uitslagen in deze ronde.</td></tr>'}</tbody></table></div></section><section data-detail-panel="pools"><h2>Mijn poules</h2><div id="private-pools" class="stack" role="region" aria-label="Privépoules"></div></section><section data-detail-panel="schema"></section><section data-detail-panel="champion"></section><section data-detail-panel="ranking"><h2>Klassement</h2><div data-ranking></div></section>`;
-    const champion=target.querySelector('[data-detail-panel="champion"]');champion.className='panel stack';
-    import('./tournament-management.js?v=loading-ui-20261024').then(({loadChampionPrediction})=>{if(current(target,ctx))loadChampionPrediction(champion,ctx,t.id,joined).then(data=>{if(!current(target,ctx)||!data)return;const button=target.querySelector('[data-detail-tab=champion]');button.hidden=!data.enabled;if(!data.enabled&&view.tab==='champion')showTab('predictions');});}).catch(()=>{if(current(target,ctx))champion.textContent='Winnaarsvraag laden mislukt.';});
+    const championTab=target.querySelector('[data-detail-panel="champion"]');
+    const inlineChampion=target.querySelector('[data-inline-champion]');
+    const champion=document.createElement('div');champion.className='panel stack';championTab.append(champion);
+    inlineChampion.style.marginBottom='12px';
+    let championOpen=false;
+    function placeChampion(){
+      const inline=view.tab==='predictions'&&championOpen&&!ended;
+      const parent=inline?inlineChampion:championTab;
+      if(champion.parentElement!==parent)parent.append(champion);
+      inlineChampion.hidden=!inline;
+    }
+    import('./tournament-management.js?v=winner-top-20261125').then(async ({loadChampionPrediction})=>{
+      if(!current(target,ctx)||!champion.isConnected)return;
+      const data=await loadChampionPrediction(champion,ctx,t.id,joined,open=>{championOpen=open;placeChampion();});
+      if(!current(target,ctx)||!champion.isConnected||!data)return;
+      target.querySelector('[data-detail-tab=champion]').hidden=!data.enabled;
+      if(!data.enabled&&view.tab==='champion')showTab('predictions');
+    }).catch(()=>{if(champion.isConnected)champion.textContent='Winnaarsvraag laden mislukt.';});
     const rulesPanel=document.createElement('section');rulesPanel.dataset.detailPanel='rules';rulesPanel.className='panel stack';target.append(rulesPanel);
     const renderRules=(bracket)=>{const rds=rounds.data||[];rulesPanel.innerHTML='<h2>Spelregels</h2><p>Voorspel vóór de individuele begintijd. Bij Mastercaller-wedstrijden met tijd NNB kun je alvast voorspellen tot de toernooistart; zodra de tijd bekend is geldt de wedstrijdtijd. Eén voorspelling telt voor het toernooi en alle bijbehorende poules. Vrijstellingen leveren geen punten op. Voetbal: eindstand vóór strafschoppen; gelijkspel toegestaan.</p><p>'+esc(scoringMode==='additive'?'Exacte score telt bovenop de punten voor de juiste winnaar.':'Exacte score vervangt de punten voor de juiste winnaar.')+'</p><div class="table-wrap"><table class="rules-table"><thead><tr><th>Ronde</th><th>Spelvorm</th><th>Juiste winnaar</th><th>Exacte score</th></tr></thead><tbody>'+rds.map(r=>{const rule=roundRules.get(r.id),games=bracket?.matches?.filter(m=>m.round===r.round_order)||list.filter(m=>m.round_id===r.id),formats=[...new Set(games.map(m=>{const unit=m.unit||m.score_unit;return unit==='goals'?'Doelpunten':(unit==='sets'?'Sets':'Legs')+' · first-to '+(m.first_to??'—');}))];return `<tr><td>${esc(r.name)}</td><td>${esc(formats.join(' / ')||'Nog niet vastgelegd')}</td><td>${rule?.winner_points??'—'}</td><td>${rule?.exact_score_points??'—'}</td></tr>`;}).join('')+'</tbody></table></div><p class="hint">De eventuele winnaarbonus en sluiting staan bij Toernooiwinnaar. Een gesloten wedstrijd wordt niet opnieuw geopend door alleen een tijd te wijzigen.</p>';};renderRules(bracket);
     const schema=target.querySelector('[data-detail-panel="schema"]');schema.className='panel stack';
@@ -192,6 +208,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
       if(ended&&tab==='predictions')tab='results';
       if(view.tab!==tab&&['predictions','results'].includes(tab))page=0;updatePage(tab);
       view.tab=tab;target.querySelectorAll('[data-detail-panel]').forEach(p=>p.hidden=p.dataset.detailPanel!==tab);target.querySelectorAll('[data-detail-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.detailTab===tab)));target.querySelector('[data-round-controls]').hidden=!['predictions','results'].includes(tab);target.querySelector('[data-list-title]').textContent=tab==='results'?'Uitslagen':'Wedstrijden';pager.hidden=!['predictions','results'].includes(tab)||activeMatches.length<=size;
+      placeChampion();
       if(tab==='pools'&&!poolsLoaded){poolsLoaded=true;ctx.onPools?.(target.querySelector('#private-pools'),joined);}
       if(tab==='ranking'&&!rankingLoaded){rankingLoaded=true;loadTournamentRankings(target.querySelector('[data-ranking]'),ctx,t.id);}
     }
