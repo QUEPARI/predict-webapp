@@ -2,7 +2,7 @@ import {sourceDraftPanel,bindSourceDraft} from './source-draft-management.js?v=s
 import {mountRoundPoints} from './round-points.js?v=round-points-20261024';
 import {renderArchivedTournament} from './tournament-archive.js?v=archive-20261022';
 import {loadSourceResults} from './source-results.js?v=polish-20261023';
-import {loadScoreSource} from './score-source.js?v=source-drafts-20261028';
+import {loadScoreSource} from './score-source.js?v=direct-draw-20261125';
 import {showTournamentImage,createSquareCrop} from './tournament-images.js?v=crop-20261017';
 import {dutchInput,dutchToUTC,dutchTime} from './knockout.js?v=source-drafts-20261028';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -40,7 +40,7 @@ export async function loadTournamentManagement(target,ctx){
   // Keep destructive actions last, after every settings and results section.
   detail.append(detail.querySelector('.danger-zone'));
   header=document.createElement('div');header.className='stack game-context';header.dataset.generalContext='';header.append(detail.querySelector('[data-general-title]'),detail.querySelector('nav'));target.before(header);
-  loadScoreSource(detail.querySelector('[data-score-source]'),ctx,t.id,()=>ctx.onSaved?.());
+  loadScoreSource(detail.querySelector('[data-score-source]'),ctx,t.id,async result=>{if(result && selected===t.id && !busy && detail.dataset.koDirty!=='true'){try{await refresh();if(alive() && selected===t.id)message.textContent=result.message;}catch(e){if(alive())message.textContent=result.message+' Beheer vernieuwen mislukt: '+e.message;}}ctx.onSaved?.();});
   const imageForm=detail.querySelector('[data-image]'),imageMessage=detail.querySelector('[data-image-message]');
   const saveButton=detail.querySelector('[data-save-image]');
   function imagePreview(){const host=detail.querySelector('[data-image-preview]');host.className='tournament-art image-preview';showTournamentImage(host,ctx.supabase,t.id,'Huidige toernooiafbeelding');}imagePreview();
