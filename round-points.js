@@ -3,6 +3,33 @@ export function mountRoundPoints(host,ctx,tournament,{getBusy=()=>false,setBusy=
  let expected=structuredClone(tournament.rules||[]),busy=false;
  const alive=()=>host.isConnected&&ctx.isCurrent()&&!ctx.signal?.aborted;
  host.innerHTML=`<summary>Puntenberekening</summary><form class="stack round-points-form" novalidate><p class="hint">Pas de punten per ronde aan. Opslaan herberekent bestaande voorspellingen, het toernooiklassement en alle pouleklassementen.</p>${expected.length?`<div class="table-wrap"><table class="round-points-table"><thead><tr><th scope="col">Ronde</th><th scope="col">Juiste winnaar</th><th scope="col">Exacte score</th></tr></thead><tbody>${expected.map(r=>`<tr data-points-round="${esc(r.id)}"><th scope="row">${esc(r.name)}</th><td><input aria-label="${esc(r.name)}: punten juiste winnaar" data-winner type="number" inputmode="numeric" min="0" max="1000" step="1" required value="${esc(r.winner_points)}"></td><td><input aria-label="${esc(r.name)}: punten exacte score" data-exact type="number" inputmode="numeric" min="0" max="1000" step="1" required value="${esc(r.exact_points)}"></td></tr>`).join('')}</tbody></table></div>`:'<p class="hint">Dit toernooi heeft nog geen rondes.</p>'}<p data-points-message role="status" aria-live="polite"></p><button type="submit" class="btn" ${expected.length?'':'disabled'}>Opslaan + herberekenen</button></form>`;
+ // Fetch all matches once when opened, including finished and future rounds.
+ let formatsRequested=false;
+ async function showFormats(){
+  if(!host.open||!expected.length||formatsRequested||!alive())return;
+  formatsRequested=true;
+  try{
+   const {data,error}=await ctx.supabase.rpc('admin_match_overview',{p_tournament:tournament.id,p_pending:false});
+   if(error)throw error;
+   if(!alive())return;
+   const formats=new Map();
+   for(const m of data||[]){
+    if(m.home_name==='Vrijgesteld'||m.away_name==='Vrijgesteld'||!['legs','sets'].includes(m.score_unit)||!Number.isInteger(m.first_to)||m.first_to<1)continue;
+    if(!formats.has(m.round_id))formats.set(m.round_id,new Set());
+    formats.get(m.round_id).add(m.first_to);
+   }
+   for(const row of host.querySelectorAll('[data-points-round]')){
+    const values=formats.get(row.dataset.pointsRound);
+    if(!values?.size)continue;
+    const label=document.createElement('small');
+    label.style.fontWeight='normal';
+    label.textContent=' · first to '+[...values].sort((a,b)=>a-b).join(' / ');
+    row.querySelector('th').append(label);
+   }
+  }catch{formatsRequested=false;}
+ }
+ host.addEventListener('toggle',showFormats,{signal:ctx.signal});
+ showFormats();
  const form=host.querySelector('form'),message=host.querySelector('[data-points-message]'),detail=host.closest('[data-detail]');
  let otherDirty=detail?.dataset.koDirty==='true';
  detail?.addEventListener('input',e=>{if(alive()&&!host.contains(e.target))otherDirty=true;},{signal:ctx.signal});

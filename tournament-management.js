@@ -1,5 +1,5 @@
 import {sourceDraftPanel,bindSourceDraft} from './source-draft-management.js?v=source-drafts-20261028';
-import {mountRoundPoints} from './round-points.js?v=round-points-20261024';
+import {mountRoundPoints} from './round-points.js?v=first-to-20261127';
 import {renderArchivedTournament} from './tournament-archive.js?v=archive-20261022';
 import {loadSourceResults} from './source-results.js?v=polish-20261023';
 import {loadScoreSource} from './score-source.js?v=direct-draw-20261125';
