@@ -979,7 +979,7 @@ async function loadAdminTournamentPublications(force=false) {
   if(!force&&target.querySelector('[data-ko-dirty="true"]'))return;
   tournamentManagementController?.abort();tournamentManagementController=new AbortController();const managementSignal=tournamentManagementController.signal;
   const userId=currentUser.id;
-  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=winner-top-20261125');
+  try{const {loadTournamentManagement}=await import('./tournament-management.js?v=first-to-20261127');
     if(!target.isConnected||managementSignal.aborted)return;
     await loadTournamentManagement(target,{supabase,signal:managementSignal,isCurrent:()=>currentUser?.id===userId&&['admin','super_admin'].includes(currentRole),
       onCreate:()=>{const general=document.getElementById('admin-tournament-publications');if(general?.querySelector('[data-ko-dirty="true"]')&&!confirm('Niet-opgeslagen toernooiwijzigingen laten vervallen?'))return;if(general)general.querySelectorAll('[data-ko-dirty]').forEach(el=>el.dataset.koDirty='false');adminGameId='';adminGameName='Nieuw toernooi';const ko=document.querySelector('#admin-knockout');if(ko)ko.dataset.tournament='';const create=document.querySelector('#ko-create');if(create)create.hidden=false;const open=()=>{if(managementSignal.aborted||currentUser?.id!==userId)return;const details=document.querySelector('#ko-create details');if(!details)return;document.removeEventListener('predict-knockout-ready',open);details.open=true;details.scrollIntoView({block:'start'});details.querySelector('input[name=name]')?.focus({preventScroll:true});};document.addEventListener('predict-knockout-ready',open,{signal:managementSignal});showAdminSection('schema');open();},
