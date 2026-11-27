@@ -12,21 +12,54 @@ import {loadOnlineProfile} from './online-profile.js?v=loading-ui-20261024';
 
 // Centrally configured branding; no user data is stored in the public response.
 let brandAccent=null,appearanceRevision=0,appearanceController=null;
-function applyBrandAccent(){applyAccent(brandAccent);}
+let publishedTheme='standard',themePreview=null;
+function applyBrandAccent(){
+ if(themePreview && (currentRole!=='super_admin'||currentUser?.id!==themePreview.user))themePreview=null;
+ const christmas=(themePreview?.value??publishedTheme)==='christmas';
+ document.body.dataset.seasonalTheme=christmas?'christmas':'standard';
+ applyAccent(christmas?null:brandAccent);
+ const meta=document.querySelector('meta[name="theme-color"]');
+ if(meta)meta.content=christmas?(document.body.classList.contains('dark')?'#101b16':'#f8f3e8'):(document.body.classList.contains('dark')?'#101010':'#f3f5f9');
+}
+function mountSeasonalTheme(target,userId){
+ if(currentRole!=='super_admin')return;
+ const panel=document.createElement('section');panel.className='stack seasonal-theme-settings';
+ panel.innerHTML='<h3>Thema voor Predict</h3><label>Thema<select><option value="standard">Standaard</option><option value="christmas">Kerstavond</option></select></label><p class="hint" data-theme-state></p><div class="toolbar"><button type="button" class="ghost" data-preview-theme>Voorvertoning voor mij</button><button type="button" class="ghost" data-stop-preview>Voorvertoning stoppen</button><button type="button" class="btn" data-publish-theme>Activeren voor iedereen</button></div><p role="status" data-theme-message></p>';
+ target.querySelector('[data-appearance-form]').before(panel);
+ const select=panel.querySelector('select'),state=panel.querySelector('[data-theme-state]'),msg=panel.querySelector('[data-theme-message]'),stop=panel.querySelector('[data-stop-preview]');
+ const active=()=>panel.isConnected&&currentRole==='super_admin'&&currentUser?.id===userId;
+ const label=t=>t==='christmas'?'Kerstavond':'Standaard';
+ const update=()=>{select.value=themePreview?.value??publishedTheme;stop.hidden=!themePreview;state.textContent='Actief voor iedereen: '+label(publishedTheme)+(themePreview?' · Alleen voor jou: '+label(themePreview.value):'');};
+ panel.querySelector('[data-preview-theme]').onclick=()=>{if(!active())return;themePreview={user:userId,value:select.value};applyBrandAccent();update();msg.textContent='Voorvertoning actief.';};
+ stop.onclick=()=>{if(!active())return;themePreview=null;applyBrandAccent();update();msg.textContent='Voorvertoning gestopt.';};
+ panel.querySelector('[data-publish-theme]').onclick=async()=>{
+  if(!active())return;const value=select.value;if(!confirm(label(value)+' instellen voor alle spelers?'))return;
+  const controls=[...panel.querySelectorAll('button,select')];controls.forEach(x=>x.disabled=true);msg.textContent='Opslaan…';
+  try{const r=await supabase.rpc('set_app_theme',{p_theme:value});if(r.error)throw r.error;if(!['standard','christmas'].includes(r.data))throw Error('Onbekend thema ontvangen.');
+   appearanceRevision++;publishedTheme=r.data;themePreview=null;applyBrandAccent();
+   if(active()){update();msg.textContent=label(value)+' is actief voor iedereen.';}
+  }catch(e){if(active())msg.textContent='Opslaan mislukt: '+e.message;}
+  finally{if(active())controls.forEach(x=>x.disabled=false);}
+ };
+ select.onchange=()=>{if(themePreview&&active()){themePreview={user:userId,value:select.value};applyBrandAccent();update();}};
+ update();
+ return update;
+}
 async function readAppAppearance(){
  const revision=appearanceRevision,r=await supabase.rpc('get_app_appearance');if(r.error)throw Error(r.error.message);
  const color=r.data?.accent??null;if(color!==null&&!validAccent(color))throw Error('Ongeldige kleurinstelling ontvangen.');
- if(revision===appearanceRevision){brandAccent=color;applyBrandAccent();}return revision===appearanceRevision?color:brandAccent;
+ if(revision===appearanceRevision){brandAccent=color;publishedTheme=r.data?.theme==='christmas'?'christmas':'standard';applyBrandAccent();}return revision===appearanceRevision?color:brandAccent;
 }
 function loadAppearanceSettings(target){
  appearanceController?.abort();appearanceController=new AbortController();
  const userId=currentUser.id;
  target.innerHTML='<h2>Uiterlijk van Predict</h2><p>De accentkleur geldt voor alle gebruikers, ook op het inlogscherm. Licht en donker worden automatisch aangepast voor leesbare tekst.</p><form class="stack" data-appearance-form><label for="app-accent">Accentkleur</label><div class="accent-inputs"><input id="app-accent" type="color" value="#126f6b"><input id="app-accent-hex" aria-label="Kleurcode" pattern="#[0-9a-fA-F]{6}" maxlength="7" value="#126f6b" required spellcheck="false"></div><div class="accent-previews" aria-label="Kleurvoorbeeld"></div><p data-appearance-message role="status"></p><div class="toolbar"><button class="btn" type="submit">Kleur opslaan</button><button class="ghost" type="button" data-accent-reset>Standaardkleur herstellen</button><button class="ghost" type="button" data-accent-read>Opnieuw ophalen</button></div></form>';
+ const updateSeasonalTheme=mountSeasonalTheme(target,userId);
  const form=target.querySelector('form'),picker=form.querySelector('#app-accent'),hex=form.querySelector('#app-accent-hex'),message=form.querySelector('[data-appearance-message]');
  const active=()=>target.isConnected&&currentUser?.id===userId&&['admin','super_admin'].includes(currentRole);
  const preview=()=>{if(!validAccent(hex.value))return;target.querySelector('.accent-previews').innerHTML=[false,true].map(dark=>{const p=form.dataset.useDefault==='true'?{accent:dark?'#58c6b0':'#126f6b',text:dark?'#10241e':'#ffffff'}:accentPalette(hex.value,dark);return `<div style="background:${dark?'#1e1e1e':'#ffffff'};color:${dark?'#f0f4f9':'#172335'}"><span>${dark?'Donker':'Licht'}</span><span class="accent-sample" style="background:${p.accent};color:${p.text}">Voorbeeld</span></div>`;}).join('');};
  form.oninput=event=>{form.dataset.useDefault='false';form.dataset.koDirty='true';message.textContent='';if(event.target===picker)hex.value=picker.value;else if(validAccent(hex.value))picker.value=hex.value;preview();};preview();
- const load=async()=>{message.textContent='Kleur laden…';try{const color=await readAppAppearance();if(!active())return;if(form.dataset.koDirty!=='true'){form.dataset.useDefault=String(color===null);picker.value=hex.value=color||'#126f6b';preview();}message.textContent='';}catch(error){if(active()){message.textContent='Ophalen mislukt: '+error.message;message.className='error';}}};
+ const load=async()=>{message.textContent='Kleur laden…';try{const color=await readAppAppearance();if(!active())return;updateSeasonalTheme?.();if(form.dataset.koDirty!=='true'){form.dataset.useDefault=String(color===null);picker.value=hex.value=color||'#126f6b';preview();}message.textContent='';}catch(error){if(active()){message.textContent='Ophalen mislukt: '+error.message;message.className='error';}}};
  const save=async color=>{if(!active())return;if(color!==null&&!validAccent(color)){message.textContent='Vul een geldige kleurcode in, bijvoorbeeld #2459B8.';message.className='error';hex.focus();return;}
    const controls=[...form.querySelectorAll('input,button')];controls.forEach(x=>x.disabled=true);message.className='';message.textContent='Opslaan…';
    try{const r=await supabase.rpc('set_app_appearance',{p_accent:color});if(!active())return;if(r.error)throw Error(r.error.message);const saved=r.data?.accent??null;if(saved!==null&&!validAccent(saved))throw Error('Ongeldige kleurinstelling ontvangen.');appearanceRevision++;brandAccent=saved;applyBrandAccent();picker.value=hex.value=saved||'#126f6b';form.dataset.koDirty='false';form.dataset.useDefault=String(saved===null);preview();message.textContent=saved?'Accentkleur opgeslagen.':'Standaardkleur hersteld.';message.className='success';}
@@ -1416,7 +1449,7 @@ let pushBoundUser=null;
 const renderBeforeOnlineProfile=render;
 render=function(){
   profileScreenController?.abort();renderBeforeOnlineProfile();
-  if(!currentUser){currentProfile=null;pushBoundUser=null;return;}
+  if(!currentUser){currentProfile=null;pushBoundUser=null;applyBrandAccent();return;}
   if(pushBoundUser!==currentUser.id){pushBoundUser=currentUser.id;import('./push-notifications.js?v=push-times-20261017').then(({syncPushDevice})=>syncPushDevice(supabase)).catch(()=>{pushBoundUser=null;});}
   const badge=document.querySelector('.top .badge');if(badge)badge.textContent='ONLINE';
   const footer=document.querySelector('.footer');if(footer)footer.textContent='PREDICT. – Powered by Supabase';
