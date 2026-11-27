@@ -7,7 +7,7 @@ import {loadAdminAccounts} from './admin-accounts.js?v=pools-account-20261023';
 import {validAccent,accentPalette,applyAccent} from './branding.js?v=header-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=winner-top-20261125';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=bracket-20261127';
 import {loadOnlineProfile} from './online-profile.js?v=loading-ui-20261024';
 
 // Centrally configured branding; no user data is stored in the public response.
@@ -582,7 +582,7 @@ async function editAdminMatch(matchId) {
   const options = ['<option value="">Onbekend</option>', ...(rounds ?? []).map(r =>
     `<option value="${esc(r.round_id)}" ${r.round_id === match.round_id ? 'selected' : ''}>${esc(r.round_name)}</option>`
   )].join('');
-  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=source-drafts-20261028');
+  const {dutchInput,dutchToUTC}=await import('./knockout.js?v=bracket-20261127');
   editor.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;gap:12px">
       <h2 id="admin-edit-title" style="margin:0">Wedstrijd bewerken</h2>
       <button type="button" class="ghost" id="admin-edit-close" aria-label="Sluiten">✕</button>
@@ -969,7 +969,7 @@ async function recordAdminMatchStart(matchId) {
     const enteredTime = dialog.querySelector('#start-actual-time').value;
     let verifiedStart = null;
     if (enteredTime) {
-      const {dutchToUTC}=await import('./knockout.js?v=source-drafts-20261028');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
+      const {dutchToUTC}=await import('./knockout.js?v=bracket-20261127');let parsed;try{parsed=new Date(dutchToUTC(enteredTime));}catch(error){message.textContent=error.message;return;}
       if (!Number.isFinite(parsed.getTime()) || parsed.getTime() > Date.now()) {
         message.textContent = 'Vul een geldige werkelijke starttijd in die niet in de toekomst ligt.';
         return;
@@ -1515,7 +1515,7 @@ render=function(){
 
 function loadAdminKnockout(){const target=document.getElementById('admin-knockout');if(!target||target.dataset.loaded)return;target.dataset.loaded='true';
   knockoutScreenController=new AbortController();const signal=knockoutScreenController.signal,userId=currentUser.id;
-  import('./knockout.js?v=source-drafts-20261028').then(({loadKnockoutAdmin})=>{
+  import('./knockout.js?v=bracket-20261127').then(({loadKnockoutAdmin})=>{
     if(!signal.aborted&&target.isConnected)loadKnockoutAdmin(target,{supabase,signal,isCurrent:()=>currentUser?.id===userId,onSaved:()=>{loadAdminMatches();loadAdminTournamentPublications();}});
   }).catch(()=>{if(!signal.aborted&&target.isConnected)target.textContent='Knock-outbeheer laden mislukt. Open Beheer opnieuw.';});
 }
