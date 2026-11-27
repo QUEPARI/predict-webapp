@@ -400,3 +400,23 @@ button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var
 
 .loading-screen{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:var(--bg);color:var(--txt)}.loading-screen .brand{font-size:32px;font-weight:900;letter-spacing:-1px;line-height:1}
 [data-close-match]{color:#b13c40}.dark [data-close-match]{color:#ff959c}
+
+/* Kerstavond overlays the personal light/dark setting. Score badges keep their own palette. */
+body[data-seasonal-theme="christmas"]{
+ --bg:#f8f3e8;--panel:#fffdf6;--txt:#192c24;--muted:#4d6558;--border:#d7cfb9;
+ --accent:#20563e;--accent-contrast:#fff;--soft:#e6ede2;--christmas-gold:#8a641f;
+}
+body.dark[data-seasonal-theme="christmas"]{
+ --bg:#101b16;--panel:#1a2820;--txt:#f6f2e5;--muted:#b9c7bc;--border:#455449;
+ --accent:#a4d5b3;--accent-contrast:#132b1f;--soft:#293d30;--christmas-gold:#e4bb6a;
+}
+body[data-seasonal-theme="christmas"] .centered-brand .brand{
+ background:linear-gradient(90deg,var(--christmas-gold),var(--christmas-gold)) no-repeat center bottom / 62% 1px;
+ padding-bottom:3px;
+}
+body[data-seasonal-theme="christmas"] .centered-brand .brand::after{
+ content:"";display:inline-block;width:.48em;height:.48em;margin-left:.12em;
+ background:var(--christmas-gold);clip-path:polygon(50% 0,62% 37%,100% 50%,62% 63%,50% 100%,38% 63%,0 50%,38% 37%);
+ vertical-align:top;
+}
+.seasonal-theme-settings{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
