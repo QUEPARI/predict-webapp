@@ -43,7 +43,7 @@ export function predictionState(m,t,now=Date.now()){
  return {open:!reason,label:reason?'Voorspellen gesloten — '+reason:'Voorspellen open'};
 }
 const won=(m,side)=>m.status==='finished'&&(m.winner_slot!=null?m.winner_slot===m[side+'_slot']:side==='home'?m.home_score>m.away_score:m.away_score>m.home_score);
-const person=(m,side)=>`<div class="ko-person ${won(m,side)?'ko-winner':''}"><span>${esc(m[side+'_slot']||'—')}.</span><span>${esc(m[side])}${won(m,side)?'<i class="winner-mark" aria-label="Winnaar">✓</i>':''}</span>${m[side+'_score']!=null?`<b>${m[side+'_score']}</b>`:''}</div>`;
+const person=(m,side)=>`<div class="ko-person ${won(m,side)?'ko-winner':''}">${m.sourceParticipant?'<span hidden></span>':`<span>${esc(m[side+'_slot']||'—')}.</span>`}<span>${esc(m[side])}${won(m,side)?'<i class="winner-mark" aria-label="Winnaar">✓</i>':''}</span>${m[side+'_score']!=null?`<b>${m[side+'_score']}</b>`:''}</div>`;
 const alive=(target,ctx)=>target.isConnected&&!ctx.signal.aborted&&ctx.isCurrent();
 export async function loadKnockoutSchema(target,ctx,id,prefetched){
   try{
@@ -53,11 +53,25 @@ export async function loadKnockoutSchema(target,ctx,id,prefetched){
   }catch(e){if(alive(target,ctx))target.textContent='Schema laden mislukt: '+e.message;}
 }
 function drawSchema(target,data,admin=false){
+ const matchTime=(m,fallback)=>m.start?new Intl.DateTimeFormat('nl-NL',{dateStyle:'short',timeStyle:'short',...(admin?{timeZone:'Europe/Amsterdam'}:{})}).format(new Date(m.start)):fallback;
+ let groupOverview='';
  if(data.source_layout==='generic'){
-  target.innerHTML='<h2>Toernooischema</h2><div class="stack">'+data.rounds.map(r=>'<section class="stack"><h3>'+esc(r.name)+'</h3><div class="grid">'+data.matches.filter(m=>m.round===r.order).map(m=>'<article class="panel stack">'+(m.group?'<small>'+esc(m.group)+'</small>':'')+'<strong>'+esc(m.home_name||m.home||'NNB')+' – '+esc(m.away_name||m.away||'NNB')+'</strong><span>'+esc(m.home_score!=null?m.home_score+' – '+m.away_score:'Uitslag NNB')+'</span><small>'+esc(m.start?new Intl.DateTimeFormat('nl-NL',{dateStyle:'short',timeStyle:'short',...(admin?{timeZone:'Europe/Amsterdam'}:{})}).format(new Date(m.start)):'Tijd NNB')+'</small></article>').join('')+'</div></section>').join('')+'</div>';return;
+  const groupMatches=data.matches.filter(m=>m.group);
+  const groupRounds=data.rounds.filter(r=>groupMatches.some(m=>m.round===r.order));
+  const rounds=data.rounds.filter(r=>!groupRounds.includes(r)).sort((a,b)=>a.order-b.order);
+  const matches=data.matches.filter(m=>!m.group).map(m=>({...m,position:m.number-m.round*1000,sourceParticipant:true}));
+  const cards=(rs,ms)=>rs.map(r=>'<section class="stack"><h3>'+esc(r.name)+'</h3><div class="grid">'+ms.filter(m=>m.round===r.order).map(m=>'<article class="panel stack">'+(m.group?'<small>'+esc(m.group)+'</small>':'')+'<strong>'+esc(m.home||'NNB')+' – '+esc(m.away||'NNB')+'</strong><span>'+esc(m.home_score!=null?m.home_score+' – '+m.away_score:'Uitslag NNB')+'</span><small>'+esc(matchTime(m,'Tijd NNB'))+'</small></article>').join('')+'</div></section>').join('');
+  groupOverview=cards(groupRounds,groupMatches);
+  const complete=rounds.length&&rounds.every((r,i)=>{
+   const roundMatches=matches.filter(m=>m.round===r.order);
+   const positions=new Set(roundMatches.map(m=>m.position));
+   return (!i||r.order===rounds[i-1].order+1)&&positions.size===roundMatches.length&&positions.size===2**(rounds.length-i-1)&&[...positions].every(p=>Number.isInteger(p)&&p>=1&&p<=positions.size);
+  });
+  if(!complete){target.innerHTML='<h2>Toernooischema</h2><div class="stack">'+groupOverview+cards(rounds,matches)+'</div>';return;}
+  data={...data,rounds,matches};
  }
 
- target.innerHTML=`<h2>Volledig toernooischema</h2><div class="ko-bracket compact-public">${data.rounds.map(r=>`<section class="stack ko-round"><h3>${esc(r.name)}</h3>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel ko-node" data-node="${esc(m.id)}">${person(m,'home')}${person(m,'away')}<small>${esc(m.start?new Intl.DateTimeFormat('nl-NL',{dateStyle:'short',timeStyle:'short',...(admin?{timeZone:'Europe/Amsterdam'}:{})}).format(new Date(m.start)):'NNB')}</small></article>`).join('')}</section>`).join('')}</div>`;
+ target.innerHTML=`<h2>Volledig toernooischema</h2>${groupOverview?`<div class="stack">${groupOverview}<h3>Knock-outfase</h3></div>`:''}<div class="ko-bracket compact-public">${data.rounds.map(r=>`<section class="stack ko-round"><h3>${esc(r.name)}</h3>${data.matches.filter(m=>m.round===r.order&&!m.bye).map(m=>`<article class="panel ko-node" data-node="${esc(m.id)}">${person(m,'home')}${person(m,'away')}<small>${esc(matchTime(m,'NNB'))}</small></article>`).join('')}</section>`).join('')}</div>`;
  layoutBracket(target.querySelector('.ko-bracket'),data);
 }
 export async function loadKnockoutAdmin(target,ctx){
