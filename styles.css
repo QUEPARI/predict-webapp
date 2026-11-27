@@ -410,13 +410,56 @@ body.dark[data-seasonal-theme="christmas"]{
  --bg:#101b16;--panel:#1a2820;--txt:#f6f2e5;--muted:#b9c7bc;--border:#455449;
  --accent:#a4d5b3;--accent-contrast:#132b1f;--soft:#293d30;--christmas-gold:#e4bb6a;
 }
-body[data-seasonal-theme="christmas"] .centered-brand .brand{
- background:linear-gradient(90deg,var(--christmas-gold),var(--christmas-gold)) no-repeat center bottom / 62% 1px;
- padding-bottom:3px;
+body[data-seasonal-theme="christmas"] .centered-header{
+ position:relative;isolation:isolate;align-items:center;padding:24px 8px 11px;
+ border:1px solid #ac8745;border-radius:16px;overflow:hidden;
+ background:radial-gradient(ellipse at 50% 100%,#285943,#0c291e 75%);
+ box-shadow:0 5px 18px #061b2630,inset 0 -3px #f4f0dc;
 }
-body[data-seasonal-theme="christmas"] .centered-brand .brand::after{
- content:"";display:inline-block;width:.48em;height:.48em;margin-left:.12em;
- background:var(--christmas-gold);clip-path:polygon(50% 0,62% 37%,100% 50%,62% 63%,50% 100%,38% 63%,0 50%,38% 37%);
- vertical-align:top;
+body[data-seasonal-theme="christmas"] .centered-header::before{
+ content:"";position:absolute;inset:0 0 auto;height:23px;pointer-events:none;
+ background:
+ radial-gradient(circle at 8px 9px,#fff8cd 0 2px,#ffd0798c 3px,transparent 9px) 0 0/48px 23px repeat-x,
+ radial-gradient(circle at 8px 15px,#ffc4aa 0 2px,#df5c4580 3px,transparent 9px) 24px 0/48px 23px repeat-x,
+ radial-gradient(ellipse at 50% -4px,transparent 65%,#b8ac77 68% 70%,transparent 73%) 8px 0/48px 11px repeat-x;
+ animation:christmas-lights 4s ease-in-out infinite alternate;
+}
+body[data-seasonal-theme="christmas"] .centered-brand .brand{color:#fff5dc}
+body[data-seasonal-theme="christmas"] .christmas-brand-dot{color:#ffd076}
+body[data-seasonal-theme="christmas"] .centered-header button:focus-visible{outline-color:#ffd076}
+body[data-seasonal-theme="christmas"] .centered-header .header-disc{border-color:#ac8745}
+body[data-seasonal-theme="christmas"] .btn:not(.secondary):not(.danger){
+ background:#9e2537;color:#fff7ed;border-color:#9e2537;
+}
+body[data-seasonal-theme="christmas"] .btn:not(.secondary):not(.danger):enabled:hover{
+ background:#811c2c;border-color:#811c2c;
+}
+body[data-seasonal-theme="christmas"] h1:has(+[data-my-tournaments]){
+ isolation:isolate;overflow:hidden;display:flex;align-items:end;min-height:100px;
+ color:#fff5dc;padding:16px;margin-bottom:10px;border:1px solid #ac8745;border-radius:16px;
+ background:radial-gradient(ellipse at 80% 5%,#38594f,#102e24 68%);
+}
+body[data-seasonal-theme="christmas"] h1:has(+[data-my-tournaments])::before{
+ content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+ background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 350 110'%3E%3Cpath fill='%23091f17' d='M0 110h350V93l-21-18h9l-18-22h8l-19-29-18 29h7l-17 22h8l-23 24-15-16h7l-16-20h6l-17-25-17 25h7l-15 22h7l-17 17-14-10h5l-10-14h4l-13-19-13 19h5l-12 14h6l-14 13-17-8h5L98 78 84 97h5L70 110Z'/%3E%3Cpath fill='%23e1ead2' d='m309 24-12 19 12-5 12 5Zm-78 14-11 16 11-4 11 4Zm-58 21-8 12 8-3 8 3Z'/%3E%3Ccircle cx='271' cy='28' r='12' fill='%23ffdc91'/%3E%3C/svg%3E") right bottom/auto 100% no-repeat;
+}
+body[data-seasonal-theme="christmas"] h1:has(+[data-my-tournaments])::after{
+ content:"";position:absolute;inset:-24px 0 0;z-index:-1;pointer-events:none;
+ background:radial-gradient(circle at 12px 10px,#fff8e4b3 0 1px,transparent 2px) 0 0/58px 24px,
+ radial-gradient(circle at 33px 15px,#fff8e470 0 1px,transparent 2px) 0 0/79px 24px;
+ animation:christmas-snow 7s linear infinite;
+}
+body[data-seasonal-theme="christmas"] .tournament-tile{
+ position:relative;border-color:var(--christmas-gold);
+}
+body[data-seasonal-theme="christmas"] .tournament-tile::after{
+ content:"";position:absolute;top:0;right:0;width:24px;height:24px;
+ pointer-events:none;background:#a42b3d;clip-path:polygon(0 0,100% 0,100% 100%);
+}
+@keyframes christmas-snow{to{transform:translateY(24px)}}
+@keyframes christmas-lights{from{opacity:.7}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){
+ body[data-seasonal-theme="christmas"] .centered-header::before,
+ body[data-seasonal-theme="christmas"] h1:has(+[data-my-tournaments])::after{animation:none}
 }
 .seasonal-theme-settings{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
