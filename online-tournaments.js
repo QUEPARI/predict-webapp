@@ -25,7 +25,7 @@ const current = (target,ctx) => target.isConnected && !ctx.signal.aborted && ctx
 const open = (m,t) => ['published','active'].includes(t.status) && m.predictions_enabled === true &&
   m.needs_review === false && m.round_id != null &&
   m.status === 'scheduled' && m.actual_start == null && m.home_score == null && m.away_score == null &&
-  (m.start_time_confirmed === true && Date.parse(m.scheduled_start) > Date.now() || m.scheduled_start == null && t.source_automatic === true && Date.parse(t.starts_at) > Date.now() && m.participants_known === true) &&
+  (m.start_time_confirmed === true && Date.parse(m.scheduled_start) > Date.now() || m.scheduled_start == null && t.source_automatic === true && (t.source_knockout || Date.parse(t.starts_at) > Date.now()) && m.participants_known === true) &&
   (m.score_unit === 'goals' ? m.first_to == null : ['sets','legs'].includes(m.score_unit) && Number.isInteger(m.first_to) && m.first_to >= 1 && m.first_to <= 99);
 
 export function predictionOutcome(m,p){
@@ -119,6 +119,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
     if (failure) throw new Error(failure.message);
     const bracket=!bracketResponse.error&&Array.isArray(bracketResponse.data?.matches)&&Array.isArray(bracketResponse.data?.rounds)?bracketResponse.data:null;
     t.source_automatic=!!bracket?.score_source?.automatic_setup;
+    t.source_knockout=bracket?.source_layout==='generic'&&bracket?.format==='knockout';
     const known=new Set((bracket?.matches||[]).filter(m=>m.home_slot&&m.away_slot&&!m.bye).map(m=>m.id));
     (matches.data||[]).forEach(m=>m.participants_known=known.has(m.id));
     const byes=new Set((bracket?.matches||[]).filter(m=>m.bye).map(m=>m.id));
@@ -287,7 +288,7 @@ export async function loadTournamentDetail(host,ctx,page=0,notice='',view={tab:'
       form.addEventListener('focusout',()=>{if(valid()&&!saved())save();});
       form.onsubmit=e=>{e.preventDefault();save();};button.onclick=save;
       if(saved())say('Opgeslagen ✓');
-      if(open(m,t)){
+      if(open(m,t)&&(m.scheduled_start||!t.source_knockout)){
         const expire=()=>{if(!current(target,ctx))return;const remaining=Date.parse(m.scheduled_start||t.starts_at)-Date.now();if(remaining<=0)disable();else deadlineTimer=setTimeout(expire,Math.min(remaining,2147483647));};expire();
       }
       ctx.signal.addEventListener('abort',()=>{stopped=true;clearTimeout(debounce);clearTimeout(deadlineTimer);},{once:true});

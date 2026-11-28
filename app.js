@@ -7,7 +7,7 @@ import {loadAdminAccounts} from './admin-accounts.js?v=pools-account-20261023';
 import {validAccent,accentPalette,applyAccent} from './branding.js?v=header-20261017';
 import { createClient } from
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=bracket-20261127';
+import {loadTournamentCatalog,loadTournamentDetail} from './online-tournaments.js?v=advance-20261128';
 import {loadOnlineProfile} from './online-profile.js?v=loading-ui-20261024';
 
 // Centrally configured branding; no user data is stored in the public response.
